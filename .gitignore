@@ -1,0 +1,12 @@
+# Secrets — never commit
+includes/config.local.php
+setup.lock
+
+# Uploaded / cached files
+uploads/*
+!uploads/.htaccess
+!uploads/.gitkeep
+uploads/fb_cache/*
+
+.DS_Store
+Thumbs.db
