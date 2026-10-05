@@ -90,7 +90,7 @@ if (isset($_POST['ajax_action'])) {
             }
             echo json_encode(['success' => true, 'message' => $emailed
                 ? 'Registration rejected. The reason was emailed to the student.'
-                : 'Registration rejected. (No email sent — the student has no email on file or sending failed.)']);
+                : 'Registration rejected. (No email sent — ' . (empty($s['email']) ? 'the student has no email on file.' : 'sending failed: ' . ($GLOBALS['gnc_last_mail_error'] ?? 'unknown error')) . ')']);
         } else {
             echo json_encode(['success' => false, 'message' => 'Student not found or already processed.']);
         }
@@ -343,7 +343,7 @@ function stuUrl($overrides = []) {
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Students — GNC-OSA Admin</title>
-    <link rel="stylesheet" href="../assets/css/style.css?v=25">
+    <link rel="stylesheet" href="../assets/css/style.css?v=27">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 </head>
 <body>

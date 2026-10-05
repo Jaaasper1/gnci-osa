@@ -174,7 +174,7 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register — GNC-OSA Portal</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=25">
+    <link rel="stylesheet" href="assets/css/style.css?v=27">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 </head>
 <body class="auth-split-page">
@@ -356,6 +356,7 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
 (function () {
     var v = document.querySelector('.login-bg-video');
     if (!v) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { v.removeAttribute('autoplay'); v.pause(); return; } // show the poster only
     v.muted = true;
     var p = v.play();
     if (p && p.catch) p.catch(function () {});

@@ -132,7 +132,7 @@ function addStaffNotification($pdo, $staff_id, $message, $link = null) {
     $stmt2->execute([$staff_id]);
     $staff = $stmt2->fetch();
     if ($staff && !empty($staff['email'])) {
-        sendNotificationEmail($staff['email'], $staff['first_name'] . ' ' . $staff['last_name'], $message);
+        sendNotificationEmail($staff['email'], $staff['first_name'] . ' ' . $staff['last_name'], $message, portalUrl('staff-login.php'));
     }
 }
 

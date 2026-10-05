@@ -95,7 +95,7 @@ if ($rangeStart && $rangeEnd && preg_match('/^\d{4}-\d{2}-\d{2}$/', $rangeStart)
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reports — GNC-OSA Portal</title>
-    <link rel="stylesheet" href="../assets/css/style.css?v=25">
+    <link rel="stylesheet" href="../assets/css/style.css?v=27">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
     <style>
         .card{margin-bottom:20px;}

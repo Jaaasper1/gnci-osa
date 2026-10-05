@@ -128,7 +128,7 @@ foreach ($events as $ev) {
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Events — GNC-OSA Admin</title>
-    <link rel="stylesheet" href="../assets/css/style.css?v=25">
+    <link rel="stylesheet" href="../assets/css/style.css?v=27">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 </head>
 <body class="theme-events">
@@ -321,7 +321,7 @@ foreach ($events as $ev) {
                 </div>
 
                 <div class="section-label"><i class="ti ti-calendar-time"></i> Schedule &amp; Location</div>
-                <div style="display:flex;gap:10px;">
+                <div class="ev-row" style="display:flex;gap:10px;">
                     <div class="form-group" style="flex:1;">
                         <label>Start Date *</label>
                         <div class="field-icon-input">
@@ -337,7 +337,7 @@ foreach ($events as $ev) {
                         </div>
                     </div>
                 </div>
-                <div style="display:flex;gap:10px;">
+                <div class="ev-row" style="display:flex;gap:10px;">
                     <div class="form-group" style="flex:1;">
                         <label>Time (optional)</label>
                         <div class="field-icon-input">

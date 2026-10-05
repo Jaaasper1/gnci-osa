@@ -18,7 +18,7 @@ $unclaimedCount = $pdo->query("SELECT COUNT(*) FROM complaints WHERE assigned_to
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OSA Dashboard — GNC-OSA Portal</title>
-    <link rel="stylesheet" href="../assets/css/style.css?v=25">
+    <link rel="stylesheet" href="../assets/css/style.css?v=27">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 </head>
 <body>

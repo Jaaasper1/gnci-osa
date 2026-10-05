@@ -133,10 +133,61 @@ HTML;
 }
 
 /**
+ * Builds a full portal URL for use inside emails.
+ * Set PORTAL_URL in includes/config.local.php (e.g. 'https://osa.yourschool.edu.ph')
+ * when hosting online. If not set, it is auto-detected from the current request
+ * (works on localhost, but links will only open on the same computer).
+ */
+function portalUrl(string $path = ''): string {
+    if (defined('PORTAL_URL') && PORTAL_URL !== '') {
+        $base = rtrim(PORTAL_URL, '/');
+    } else {
+        $scheme  = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host    = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $docRoot = isset($_SERVER['DOCUMENT_ROOT']) ? realpath($_SERVER['DOCUMENT_ROOT']) : false;
+        $root    = realpath(__DIR__ . '/..');
+        $sub     = '';
+        if ($docRoot && $root && strpos($root, $docRoot) === 0) {
+            $sub = str_replace('\\', '/', substr($root, strlen($docRoot)));
+        }
+        $base = $scheme . '://' . $host . rtrim($sub, '/');
+    }
+    return $base . '/' . ltrim($path, '/');
+}
+
+/**
+ * Bulletproof (table-based) email button + plain-link fallback.
+ */
+function emailButtonHtml(string $url, string $label, string $color = '#6B1A2A'): string {
+    $u = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
+    $l = htmlspecialchars($label, ENT_QUOTES, 'UTF-8');
+    return '<table cellpadding="0" cellspacing="0" align="center" style="margin:0 auto 14px;"><tr>'
+        . '<td style="background:' . $color . '; border-radius:8px;">'
+        . '<a href="' . $u . '" style="display:inline-block; padding:12px 28px; color:#ffffff; font-size:14px; font-weight:bold; text-decoration:none; font-family:Arial,sans-serif;">' . $l . '</a>'
+        . '</td></tr></table>'
+        . '<p style="color:#6B7280; font-size:12px; margin:0 0 16px; text-align:center; word-break:break-all;">Or copy this link: '
+        . '<a href="' . $u . '" style="color:#6B1A2A;">' . $u . '</a></p>';
+}
+
+/**
+ * Public URL of the OSA Facebook page (for "contact us" links in emails).
+ * Uses FB_PAGE_URL if set, otherwise builds it from FB_PAGE_ID. Returns '' if neither is set.
+ */
+function osaFacebookUrl(): string {
+    if (defined('FB_PAGE_URL') && FB_PAGE_URL !== '') return FB_PAGE_URL;
+    if (defined('FB_PAGE_ID') && FB_PAGE_ID !== '' && FB_PAGE_ID !== 'PASTE_YOUR_PAGE_ID_HERE') {
+        return 'https://www.facebook.com/' . FB_PAGE_ID;
+    }
+    return '';
+}
+
+/**
  * Sends an "account approved" email to a newly-approved student.
  */
 function sendApprovalEmail(string $toEmail, string $toName): bool {
     $subject = "Your GNC-OSA Portal account has been approved!";
+    $loginUrl = portalUrl('index.php');
+    $loginBtn = emailButtonHtml($loginUrl, 'Log in to the Portal', '#059669');
 
     $html = <<<HTML
 <!DOCTYPE html>
@@ -161,6 +212,7 @@ function sendApprovalEmail(string $toEmail, string $toName): bool {
             <p style="color:#374151; font-size:14px; line-height:1.6; margin:0 0 20px;">
               Good news! Your GNC-OSA Portal account has been <strong>approved</strong> by the OSA Admin. You can now log in anytime using your Student ID — we'll email you a login code each time.
             </p>
+            {$loginBtn}
             <p style="color:#6B7280; font-size:12px; margin:0;">If you weren't expecting this, please contact the OSA office.</p>
           </td>
         </tr>
@@ -177,10 +229,11 @@ HTML;
         $mail->isHTML(true);
         $mail->Subject = $subject;
         $mail->Body    = $html;
-        $mail->AltBody = "Hi {$toName}, your GNC-OSA Portal account has been approved. You can now log in using your Student ID.";
+        $mail->AltBody = "Hi {$toName}, your GNC-OSA Portal account has been approved. You can now log in using your Student ID: {$loginUrl}";
         $mail->send();
         return true;
     } catch (Exception $e) {
+        $GLOBALS['gnc_last_mail_error'] = $e->getMessage();
         error_log("GNC-OSA approval mailer error for {$toEmail}: " . $e->getMessage());
         return false;
     }
@@ -191,6 +244,17 @@ HTML;
  */
 function sendRejectionEmail(string $toEmail, string $toName, string $reason = ''): bool {
     $subject = "Update on your GNC-OSA Portal registration";
+    $registerUrl = portalUrl('register.php');
+    $fbUrl       = osaFacebookUrl();   // exactly the FB_PAGE_URL set in config.local.php
+    if ($fbUrl !== '') {
+        // Main action: open the OSA Facebook page. Small secondary link to register again.
+        $registerBtn = emailButtonHtml($fbUrl, 'Visit OSA Facebook Page', '#1877F2')
+            . '<p style="color:#6B7280; font-size:12px; margin:0 0 14px;">Want to know more about why your registration was not approved? Visit our Facebook page and send us a message.</p>'
+            . '<p style="color:#6B7280; font-size:12px; margin:0 0 16px;">Want to try again? '
+            . '<a href="' . htmlspecialchars($registerUrl, ENT_QUOTES, 'UTF-8') . '" style="color:#991B1B;">Submit a new registration</a>.</p>';
+    } else {
+        $registerBtn = emailButtonHtml($registerUrl, 'Register Again', '#991B1B');
+    }
 
     // Optional reason entered by the admin when rejecting
     $reasonHtml = '';
@@ -223,6 +287,7 @@ function sendRejectionEmail(string $toEmail, string $toName, string $reason = ''
               If you believe this is a mistake or would like more details, please visit the OSA office.
             </p>
             {$reasonHtml}
+            {$registerBtn}
             <p style="color:#6B7280; font-size:12px; margin:0;">You're welcome to submit a new registration once any concerns are resolved.</p>
           </td>
         </tr>
@@ -241,10 +306,13 @@ HTML;
         $mail->Body    = $html;
         $mail->AltBody = "Hi {$toName}, your GNC-OSA Portal registration was not approved."
             . (trim($reason) !== '' ? " Reason: " . trim($reason) . "." : '')
-            . " Please visit the OSA office for details.";
+            . " Please visit the OSA office for details."
+            . ($fbUrl !== '' ? " Visit the OSA Facebook page to ask why: {$fbUrl}." : '')
+            . " Register again: {$registerUrl}";
         $mail->send();
         return true;
-    } catch (Exception $e) {
+    } catch (\Throwable $e) {
+        $GLOBALS['gnc_last_mail_error'] = $e->getMessage();
         error_log("GNC-OSA rejection mailer error for {$toEmail}: " . $e->getMessage());
         return false;
     }
@@ -257,7 +325,9 @@ HTML;
  * Fails silently (returns false + error_log) because the calling
  * page should not crash just for calling addNotification().
  */
-function sendNotificationEmail(string $toEmail, string $toName, string $message): bool {
+function sendNotificationEmail(string $toEmail, string $toName, string $message, string $loginUrl = ''): bool {
+    if ($loginUrl === '') $loginUrl = portalUrl('index.php');   // default: student login
+    $loginBtn = emailButtonHtml($loginUrl, 'Log in to the Portal');
     $subject = "GNC-OSA Portal: You have a new notification";
     $safeMsg = htmlspecialchars($message);
 
@@ -279,6 +349,7 @@ function sendNotificationEmail(string $toEmail, string $toName, string $message)
           <td style="padding:32px;">
             <p style="color:#374151; font-size:15px; margin:0 0 8px;">Hi {$toName},</p>
             <p style="color:#374151; font-size:14px; line-height:1.6; margin:0 0 20px;">{$safeMsg}</p>
+            {$loginBtn}
             <p style="color:#6B7280; font-size:12px; margin:0;">Log in to the GNC-OSA Portal to see the details.</p>
           </td>
         </tr>
@@ -303,12 +374,13 @@ HTML;
         $mail->isHTML(true);
         $mail->Subject = $subject;
         $mail->Body    = $html;
-        $mail->AltBody = "Hi {$toName},\n\n{$message}\n\nLog in to the GNC-OSA Portal to see the details.";
+        $mail->AltBody = "Hi {$toName},\n\n{$message}\n\nLog in to the GNC-OSA Portal to see the details: {$loginUrl}";
         $mail->send();
         @unlink($failFlag);
         return true;
     } catch (Exception $e) {
         @touch($failFlag);
+        $GLOBALS['gnc_last_mail_error'] = $e->getMessage();
         error_log("GNC-OSA notification mailer error for {$toEmail}: " . $e->getMessage());
         return false;
     }

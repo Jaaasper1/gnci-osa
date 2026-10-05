@@ -50,7 +50,7 @@ if (!$locked && $_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GNC-OSA Setup</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=25">
+    <link rel="stylesheet" href="assets/css/style.css?v=27">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
     <style>
         body { background: #4A0F1B; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }

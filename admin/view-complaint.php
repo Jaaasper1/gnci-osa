@@ -120,7 +120,7 @@ $isImage = $attachFile && preg_match('/\.(jpg|jpeg|png|gif|webp)$/i', $attachFil
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Complaint #<?= $id ?> — GNC-OSA Admin</title>
-    <link rel="stylesheet" href="../assets/css/style.css?v=25">
+    <link rel="stylesheet" href="../assets/css/style.css?v=27">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
     <style>
         .meta-row { display:flex; align-items:center; gap:8px; padding:10px 0; border-bottom:1px solid #F3F4F6; font-size:13px; }

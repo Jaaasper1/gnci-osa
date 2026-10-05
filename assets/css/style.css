@@ -303,7 +303,7 @@ body.has-login-video { background: var(--maroon-dark); }
 .login-page.has-video { background: transparent; }
 .login-bg-video { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; }
 .login-bg-overlay { position: fixed; inset: 0; background: rgba(74,15,27,0.60); z-index: -1; }
-@media (prefers-reduced-motion: reduce) { .login-bg-video { display: none; } }
+/* reduced motion: video is paused by JS and the poster image stays visible */
 .login-wrap { display: flex; align-items: flex-start; justify-content: center; }
 .login-box { width: 100%; max-width: 420px; }
 .login-logo { text-align: center; margin-bottom: 28px; }
@@ -891,7 +891,7 @@ body.auth-split-page { background: #fff; }
 /* ---- left: plain video ---- */
 .auth-brand { position: relative; overflow: hidden; isolation: isolate; background: var(--maroon-dark); }
 .auth-brand .login-bg-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
-@media (prefers-reduced-motion: reduce) { .auth-brand .login-bg-video { display: none; } }
+
 
 /* ---- right: form panel ---- */
 .auth-main { position: relative; background: #fff; display: flex; flex-direction: column; justify-content: center; padding: 72px 6% 96px; }
@@ -1026,4 +1026,11 @@ body.auth-split-page { background: #fff; }
     .io-group > .btn, .io-group > .xm > summary { width: 100%; box-sizing: border-box; justify-content: center; }
     .io-group > .xm { display: block; }
     .io-group > .xm > summary { display: flex; }
+}
+
+/* Event form: date/time fields stack on phones instead of overflowing sideways */
+.ev-row > .form-group { min-width: 0; }
+input[type="date"].form-control, input[type="time"].form-control, input[type="datetime-local"].form-control { min-width: 0; max-width: 100%; box-sizing: border-box; -webkit-appearance: none; appearance: none; }
+@media (max-width: 600px) {
+    .ev-row { flex-direction: column; gap: 0 !important; }
 }

@@ -18,10 +18,15 @@ define('MAILER_FROM_EMAIL',   'your-osa-gmail@gmail.com');
 define('MAILER_FROM_NAME',    'GNC-OSA-PORTAL');
 define('MAILER_APP_PASSWORD', 'xxxx xxxx xxxx xxxx');   // Google App Password (16 chars)
 
+// ── Portal public URL (used for links inside emails) ────────
+// Local: leave '' (auto-detect). Online: e.g. 'https://osa.yourschool.edu.ph'
+define('PORTAL_URL', '');
+
 // ── Facebook Page feed ──────────────────────────────────────
 define('FB_PAGE_ID',           'PASTE_YOUR_PAGE_ID_HERE');
 define('FB_PAGE_ACCESS_TOKEN', 'PASTE_YOUR_LONG_LIVED_PAGE_ACCESS_TOKEN_HERE');
 define('FB_API_VERSION',       'v26.0');
+define('FB_PAGE_URL',          '');   // optional: e.g. 'https://www.facebook.com/YourOSAPage' (used in rejection email; blank = built from FB_PAGE_ID)
 define('FB_FEED_CACHE_MINUTES', 10);
 
 // ── OneSignal push notifications (leave '' to disable push) ─
