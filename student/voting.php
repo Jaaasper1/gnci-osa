@@ -47,7 +47,7 @@ if (!$election) {
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Voting — GNC-OSA Portal</title>
-    <link rel="stylesheet" href="../assets/css/style.css?v=23">
+    <link rel="stylesheet" href="../assets/css/style.css?v=25">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 </head>
 <body class="theme-election">
@@ -79,7 +79,7 @@ if (!$election) {
         <a href="events.php" class="btn btn-outline" style="margin-top:16px;"><i class="ti ti-home"></i> Back to Events</a>
     </div>
 </div></div>
-<script src="../assets/js/sidebar.js?v=4"></script>
+<script src="../assets/js/sidebar.js?v=5"></script>
 </body>
 </html>
 <?php
@@ -94,7 +94,7 @@ if (!empty($election['is_hold'])) {
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Voting — GNC-OSA Portal</title>
-    <link rel="stylesheet" href="../assets/css/style.css?v=23">
+    <link rel="stylesheet" href="../assets/css/style.css?v=25">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 </head>
 <body class="theme-election">
@@ -130,7 +130,7 @@ if (!empty($election['is_hold'])) {
         <a href="events.php" class="btn btn-outline" style="margin-top:16px;"><i class="ti ti-home"></i> Back to Events</a>
     </div>
 </div></div>
-<script src="../assets/js/sidebar.js?v=4"></script>
+<script src="../assets/js/sidebar.js?v=5"></script>
 </body>
 </html>
 <?php
@@ -280,7 +280,7 @@ $error   = $error ?? '';
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Voting — GNC-OSA Portal</title>
-    <link rel="stylesheet" href="../assets/css/style.css?v=23">
+    <link rel="stylesheet" href="../assets/css/style.css?v=25">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 </head>
 <body class="theme-election">
@@ -584,6 +584,6 @@ function voteFormIsComplete() {
     return { valid: allFilled };
 }
 </script>
-<script src="../assets/js/sidebar.js?v=4"></script>
+<script src="../assets/js/sidebar.js?v=5"></script>
 </body>
 </html>

@@ -145,7 +145,7 @@ function buildUrl($overrides = []) {
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Complaints — GNC-OSA Admin</title>
-    <link rel="stylesheet" href="../assets/css/style.css?v=23">
+    <link rel="stylesheet" href="../assets/css/style.css?v=25">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
     <style>
         .filter-bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
@@ -431,7 +431,7 @@ function buildUrl($overrides = []) {
     </div>
 </div>
 
-<script src="../assets/js/table-tools.js?v=3"></script>
+<script src="../assets/js/table-tools.js?v=6"></script>
 <script>
 function openUnarchiveModal(id) {
     document.getElementById('unarchive-confirm-btn').href = 'complaints.php?unarchive=' + id;
@@ -529,6 +529,6 @@ document.addEventListener('tt:updated', syncClear);
     }, 30000); // every 30 seconds
 })();
 </script>
-<script src="../assets/js/sidebar.js?v=4"></script>
+<script src="../assets/js/sidebar.js?v=5"></script>
 <?php include __DIR__.'/../includes/push-widget.php'; ?>
 </body></html>

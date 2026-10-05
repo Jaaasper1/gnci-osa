@@ -106,7 +106,7 @@ $staffList = $pdo->query("SELECT * FROM osa_staff ORDER BY role DESC, last_name"
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OSA Staff — GNC-OSA Admin</title>
-    <link rel="stylesheet" href="../assets/css/style.css?v=23">
+    <link rel="stylesheet" href="../assets/css/style.css?v=25">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 </head>
 <body>
@@ -597,6 +597,6 @@ document.addEventListener('keydown', function(e) {
 </script>
 
 <script src="../assets/js/alerts.js"></script>
-<script src="../assets/js/sidebar.js?v=4"></script>
+<script src="../assets/js/sidebar.js?v=5"></script>
 <?php include __DIR__.'/../includes/push-widget.php'; ?>
 </body></html>

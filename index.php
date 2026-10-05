@@ -135,7 +135,7 @@ $pendingEmail = $_SESSION['login_pending']['email'] ?? '';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GNC-OSA Portal — Login</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=23">
+    <link rel="stylesheet" href="assets/css/style.css?v=25">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 </head>
 <body class="auth-split-page">
@@ -303,7 +303,7 @@ $pendingEmail = $_SESSION['login_pending']['email'] ?? '';
     if (p && p.catch) p.catch(function () { /* autoplay blocked: poster stays as the background */ });
 })();
 </script>
-<script src="assets/js/sidebar.js?v=4"></script>
+<script src="assets/js/sidebar.js?v=5"></script>
 <script src="assets/js/otp-input.js"></script>
 </body>
 </html>

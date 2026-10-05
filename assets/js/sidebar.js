@@ -466,3 +466,87 @@
         return html;
     };
 })();
+
+
+/* ============================================
+   MOBILE COMPACT ROWS
+   Tags wide tables (4+ columns) so style.css can show them as
+   2-line rows on phones: main field on top, details below,
+   actions behind a ⋯ button. No DOM is moved, so sorting,
+   search, filters and export keep working. Opt out: data-no-mr.
+   ============================================ */
+(function () {
+    'use strict';
+    var NUM = /^[#₱$]?\s*-?\d[\d,]*(?:\.\d+)?\s*%?$/;
+    var PRIMARY = [/name/i, /title/i, /candidate|party|event|subject|voucher|staff|position/i, /student/i];
+
+    function headersOf(table) {
+        if (!table.tHead || !table.tHead.rows.length) return null;
+        var row = table.tHead.rows[table.tHead.rows.length - 1], out = [];
+        for (var i = 0; i < row.cells.length; i++) out.push((row.cells[i].textContent || '').replace(/\s+/g, ' ').trim());
+        return out;
+    }
+    function pickPrimary(h, actionIdx) {
+        for (var p = 0; p < PRIMARY.length; p++)
+            for (var i = 0; i < h.length; i++) if (i !== actionIdx && PRIMARY[p].test(h[i])) return i;
+        return actionIdx === 0 ? 1 : 0;
+    }
+    function pickActions(table, h) {
+        var last = h.length - 1;
+        if (/action/i.test(h[last]) || h[last] === '') return last;
+        var r = table.tBodies[0] && table.tBodies[0].rows[0];
+        if (r && r.cells[last] && r.cells[last].querySelector('.btn, button, a.btn')) return last;
+        return -1;
+    }
+    function tag(table) {
+        if (table.hasAttribute('data-no-mr')) return;
+        var wrap = table.closest('.table-wrap');
+        if (!wrap) return;
+        var h = headersOf(table);
+        if (!h || h.length < 4) return;
+        var act = pickActions(table, h), pri = pickPrimary(h, act);
+        table.classList.add('mr'); wrap.classList.add('mr-wrap');
+        for (var b = 0; b < table.tBodies.length; b++) {
+            var rows = table.tBodies[b].rows;
+            for (var i = 0; i < rows.length; i++) {
+                var tr = rows[i];
+                if (tr.classList.contains('mr-r') || tr.classList.contains('tt-empty') || tr.cells.length !== h.length) continue;
+                tr.classList.add('mr-r');
+                var first = true;
+                for (var c = 0; c < tr.cells.length; c++) {
+                    var td = tr.cells[c], txt = td.textContent.replace(/\s+/g, ' ').trim();
+                    if (h[c]) td.setAttribute('data-label', h[c]);
+                    if (c === pri) { td.classList.add('mr-primary'); continue; }
+                    if (c === act) { td.classList.add('mr-actions'); continue; }
+                    td.classList.add('mr-meta');
+                    if (!txt && !td.querySelector('img,i,.badge')) { td.classList.add('mr-empty'); continue; }
+                    if (NUM.test(txt) && !/\b(id|code|no\.?|number)\b/i.test(h[c])) td.classList.add('mr-lbl');
+                    if (first) { td.classList.add('mr-first'); first = false; }
+                }
+                if (act > -1 && tr.cells[act] && tr.cells[act].children.length) {
+                    var btn = document.createElement('button');
+                    btn.type = 'button'; btn.className = 'mr-more';
+                    btn.setAttribute('aria-label', 'Actions');
+                    btn.textContent = '\u22EF';
+                    tr.appendChild(btn);
+                }
+            }
+        }
+    }
+    function run() {
+        var t = document.querySelectorAll('.table-wrap table');
+        for (var i = 0; i < t.length; i++) tag(t[i]);
+    }
+    document.addEventListener('click', function (e) {
+        var b = e.target.closest ? e.target.closest('.mr-more') : null;
+        if (!b) return;
+        e.stopPropagation();
+        b.parentNode.classList.toggle('mr-open');
+    });
+    var timer = null;
+    function later() { clearTimeout(timer); timer = setTimeout(run, 40); }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run); else run();
+    if (window.MutationObserver) {
+        new MutationObserver(later).observe(document.documentElement, { childList: true, subtree: true });
+    }
+})();

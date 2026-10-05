@@ -343,7 +343,7 @@ function stuUrl($overrides = []) {
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Students — GNC-OSA Admin</title>
-    <link rel="stylesheet" href="../assets/css/style.css?v=23">
+    <link rel="stylesheet" href="../assets/css/style.css?v=25">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 </head>
 <body>
@@ -932,12 +932,14 @@ function switchStuTab(tab) {
             <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                     <div class="card-title" style="margin-bottom:0;"><i class="ti ti-users"></i> Active Students (<span id="student-count"><?= $totalRows ?></span>)</div>
+                    <div class="io-group">
                     <button onclick="openStudentImportModal()" class="btn btn-outline btn-sm" style="color:#7C3AED;border-color:#7C3AED;gap:5px;white-space:nowrap;">
                         <i class="ti ti-file-spreadsheet"></i> Import Excel
                     </button>
                     <?php if ($anyActive): ?>
                     <?= exportMenu('export.php?type=students', 'btn btn-outline btn-sm', 'color:#059669;border-color:#059669;gap:5px;white-space:nowrap;') ?>
                     <?php endif; ?>
+                    </div>
                 </div>
                 <form id="student-filter-form" method="GET" action="students.php" onsubmit="return false;" style="position:relative;min-width:220px;margin:0;">
                     <?php if ($courseSel !== ''): ?><input type="hidden" name="course" value="<?= e($courseSel) ?>"><?php endif; ?>
@@ -1027,7 +1029,7 @@ document.addEventListener('keydown', function(e) {
 });
 </script>
 
-<script src="../assets/js/table-tools.js?v=4"></script>
+<script src="../assets/js/table-tools.js?v=6"></script>
 <script>
 // Live search + paging for the Active Students list (the server returns just the current page)
 (function () {
@@ -1586,6 +1588,6 @@ function doStudentImport() {
 }
 </script>
 <script src="../assets/js/alerts.js"></script>
-<script src="../assets/js/sidebar.js?v=4"></script>
+<script src="../assets/js/sidebar.js?v=5"></script>
 <?php include __DIR__.'/../includes/push-widget.php'; ?>
 </body></html>

@@ -36,7 +36,7 @@ $complaints = $stmt->fetchAll();
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Complaints — GNC-OSA Portal</title>
-    <link rel="stylesheet" href="../assets/css/style.css?v=23">
+    <link rel="stylesheet" href="../assets/css/style.css?v=25">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 </head>
 <body>
@@ -145,6 +145,6 @@ document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') closeDeleteModal();
 });
 </script>
-<script src="../assets/js/sidebar.js?v=4"></script>
+<script src="../assets/js/sidebar.js?v=5"></script>
 </body>
 </html>

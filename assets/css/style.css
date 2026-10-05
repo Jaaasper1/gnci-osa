@@ -983,3 +983,47 @@ body.auth-split-page { background: #fff; }
 
 /* maroon tint over the video (same as the original login: rgba(74,15,27,0.60)) */
 .auth-brand::after { content: ""; position: absolute; inset: 0; z-index: 1; background: rgba(74,15,27,0.60); pointer-events: none; }
+
+/* ============================================
+   MOBILE COMPACT ROWS (<=600px)
+   Wide tables become 2-line rows instead of side-scrolling.
+   Classes are added by assets/js/sidebar.js (see "mobile compact rows").
+   Opt out with <table data-no-mr>.
+   ============================================ */
+.mr-more { display: none; }
+@media (max-width: 600px) {
+    .table-wrap.mr-wrap { overflow: visible; }
+    table.mr { display: block; min-width: 0; width: 100%; }
+    table.mr thead { display: none; }
+    table.mr[data-tt] thead { display: block; position: sticky; top: var(--topnav-height, 56px); z-index: 20; background: #fff; border-bottom: 1px solid var(--gray-200); }
+    table.mr[data-tt] thead tr { display: flex; gap: 6px; overflow-x: auto; padding: 8px 2px; -webkit-overflow-scrolling: touch; }
+    table.mr[data-tt] thead th { display: none; }
+    table.mr[data-tt] thead th.tt-th { display: inline-flex; align-items: center; flex: 0 0 auto; padding: 5px 10px; font-size: 12px; border: 1px solid var(--gray-200); border-radius: 16px; background: #fff; color: var(--gray-600); }
+    table.mr[data-tt] thead th.tt-sorted, table.mr[data-tt] thead th.tt-filtered { border-color: var(--maroon); color: var(--maroon); }
+    table.mr tbody { display: block; }
+    table.mr tbody tr.mr-r { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; position: relative; padding: 10px 40px 10px 12px; border-bottom: 1px solid var(--gray-100); }
+    table.mr tbody tr.mr-r:last-child { border-bottom: none; }
+    table.mr tbody tr.mr-r > td { display: inline; padding: 0; border: 0; font-size: 12px; color: var(--gray-600); white-space: normal !important; max-width: none !important; overflow: visible !important; }
+    table.mr tbody tr.mr-r > td br { display: none; }
+    table.mr tbody tr.mr-r > td small { font-size: 12px; }
+    table.mr tbody tr.mr-r > td.mr-primary { order: -1; flex: 0 0 100%; font-size: 14px; font-weight: 600; color: var(--gray-800); margin-bottom: 3px; }
+    table.mr tbody tr.mr-r > td.mr-lbl::before { content: attr(data-label) ": "; color: var(--gray-400); }
+    table.mr tbody tr.mr-r > td.mr-empty { display: none; }
+    table.mr tbody tr.mr-r > td.mr-actions { display: none !important; order: 5; flex: 0 0 100%; margin-top: 8px; }
+    table.mr tbody tr.mr-r.mr-open > td.mr-actions { display: flex !important; flex-wrap: wrap; gap: 6px; }
+    table.mr tbody tr.mr-r > .mr-more { display: flex; align-items: center; justify-content: center; position: absolute; right: 6px; top: 6px; width: 32px; height: 32px; border: 0; border-radius: 50%; background: transparent; color: var(--gray-600); font-size: 22px; font-weight: 700; line-height: 1; cursor: pointer; }
+    table.mr tbody tr.mr-r.mr-open > .mr-more { background: var(--gray-100); color: var(--maroon); }
+    table.mr tbody tr.tt-empty { display: block; }
+    table.mr tbody tr.tt-empty > td { display: block; }
+}
+
+/* Import / Export / Add buttons: always kept together as one group */
+.io-group { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+@media (max-width: 600px) {
+    .io-group { flex: 0 0 100%; flex-wrap: wrap; }
+    .io-group > .io-full { flex: 0 0 100%; order: -1; justify-content: center; }
+    .io-group > :not(.io-full) { flex: 1 1 0; min-width: 0; }
+    .io-group > .btn, .io-group > .xm > summary { width: 100%; box-sizing: border-box; justify-content: center; }
+    .io-group > .xm { display: block; }
+    .io-group > .xm > summary { display: flex; }
+}

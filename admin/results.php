@@ -66,7 +66,7 @@ $overallAbstainPct = $positionsWithVotes > 0 ? round($totalAbstainPct / $positio
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Results — GNC-OSA Admin</title>
-    <link rel="stylesheet" href="../assets/css/style.css?v=23">
+    <link rel="stylesheet" href="../assets/css/style.css?v=25">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 </head>
 <body class="theme-election">
@@ -186,6 +186,6 @@ $overallAbstainPct = $positionsWithVotes > 0 ? round($totalAbstainPct / $positio
     <?php endforeach; ?>
     <?php else: ?><div class="alert alert-info"><i class="ti ti-info-circle"></i> No election selected.</div><?php endif; ?>
 </div></div>
-<script src="../assets/js/sidebar.js?v=4"></script>
+<script src="../assets/js/sidebar.js?v=5"></script>
 <?php include __DIR__.'/../includes/push-widget.php'; ?>
 </body></html>

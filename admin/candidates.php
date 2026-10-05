@@ -151,7 +151,7 @@ if ($eid) {
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Candidates — GNC-OSA Admin</title>
-    <link rel="stylesheet" href="../assets/css/style.css?v=23">
+    <link rel="stylesheet" href="../assets/css/style.css?v=25">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 </head>
 <body class="theme-election">
@@ -195,7 +195,8 @@ if ($eid) {
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
                 <div class="card-title" style="margin-bottom:0;"><i class="ti ti-users"></i> Candidates <span style="background:#6B1A2A;color:#fff;border-radius:20px;padding:2px 10px;font-size:11px;margin-left:6px;"><?= count($candidates) ?></span></div>
                 <?php if (!empty($elections)): ?>
-                <button onclick="openAddCandModal()" class="btn btn-primary btn-sm" style="display:flex;align-items:center;gap:6px;white-space:nowrap;">
+                <div class="io-group">
+                <button onclick="openAddCandModal()" class="btn btn-primary btn-sm io-full" style="display:flex;align-items:center;gap:6px;white-space:nowrap;">
                     <i class="ti ti-circle-plus"></i> Add Candidate
                 </button>
                 <button onclick="openImportModal()" class="btn btn-outline btn-sm" style="display:flex;align-items:center;gap:6px;white-space:nowrap;">
@@ -204,6 +205,7 @@ if ($eid) {
                 <?php if (!empty($candidates)): ?>
                 <?= exportMenu('export.php?type=candidates&election='.$eid, 'btn btn-outline btn-sm', 'white-space:nowrap;color:#059669;border-color:#059669;') ?>
                 <?php endif; ?>
+                </div>
                 <?php endif; ?>
             </div>
             <?php if (empty($elections)): ?>
@@ -700,8 +702,8 @@ function confirmDeleteCandidate(id, name, eid) {
 }
 </script>
 <script src="../assets/js/alerts.js"></script>
-<script src="../assets/js/sidebar.js?v=4"></script>
-<script src="../assets/js/table-tools.js?v=3"></script>
+<script src="../assets/js/sidebar.js?v=5"></script>
+<script src="../assets/js/table-tools.js?v=6"></script>
 <script src="../assets/js/client-pager.js?v=3"></script>
 
 <!-- ===== IMPORT EXCEL MODAL ===== -->

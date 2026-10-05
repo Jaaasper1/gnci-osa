@@ -50,7 +50,7 @@ $notifs = notifFetchPage($pdo, 'staff_notifications', (int)$staff_id, $filter, $
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Notifications — GNC-OSA Admin</title>
-    <link rel="stylesheet" href="../assets/css/style.css?v=23">
+    <link rel="stylesheet" href="../assets/css/style.css?v=25">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
     <style>
 <?php notifCss('#7C3AED', '#EDE9FE'); ?>
@@ -265,6 +265,6 @@ function markAllRead() {
     }).then(r => r.json()).then(d => { if (d.ok) location.reload(); });
 }
 </script>
-<script src="../assets/js/sidebar.js?v=4"></script>
+<script src="../assets/js/sidebar.js?v=5"></script>
 </body>
 </html>

@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GNC-OSA Portal — Staff / Admin Login</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=23">
+    <link rel="stylesheet" href="assets/css/style.css?v=25">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 </head>
 <body class="auth-split-page">
@@ -99,7 +99,7 @@ function toggleStaffLoginPw(el) {
     el.querySelector('i').className = isText ? 'ti ti-eye' : 'ti ti-eye-off';
 }
 </script>
-<script src="assets/js/sidebar.js?v=4"></script>
+<script src="assets/js/sidebar.js?v=5"></script>
 <script>
 (function () {
     var v = document.querySelector('.login-bg-video');
