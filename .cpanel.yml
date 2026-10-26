@@ -1,0 +1,5 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/gncipamp/public_html/osa.gncipampanga.com/
+    - /bin/tar --exclude='./.git' --exclude='./.github' --exclude='./.cpanel.yml' --exclude='./.gitignore' --exclude='./includes/config.local.php' --exclude='./tools' --exclude='./*.txt' --exclude='./*.md' --exclude='./performance-indexes.sql' -cf - . | /bin/tar -xf - -C "$DEPLOYPATH"
