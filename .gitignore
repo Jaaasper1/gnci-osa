@@ -16,3 +16,4 @@ Thumbs.db
 gnc_load_test/
 
 setup.php
+.env
