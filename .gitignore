@@ -11,9 +11,4 @@ uploads/fb_cache/*
 .DS_Store
 Thumbs.db
 
-*.zip
-*.sql
-gnc_load_test/
-
-setup.php
 .env
