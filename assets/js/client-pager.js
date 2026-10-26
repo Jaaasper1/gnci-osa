@@ -1,3 +1,4 @@
+window.__t = window.__t || function (s) { return s; };
 /* ============================================================
    GNC-OSA PORTAL - Client Pager
    Paginates an already-rendered table or list WITHOUT breaking
@@ -20,6 +21,7 @@
         var itemSel = box.getAttribute('data-pager-item');
         var isTable = box.tagName === 'TABLE';
         var page = 1, sig = '', busy = false;
+        var always = box.hasAttribute('data-pager-always'), unit = box.getAttribute('data-pager-unit') || '';
 
         var bar = document.createElement('div'); bar.className = 'gp-bar';
         var anchor = isTable ? (box.closest('.table-wrap') || box) : box;
@@ -42,18 +44,18 @@
             all.forEach(function (el) { el.classList.remove('pg-off'); });
             vis.forEach(function (el, i) { if (i < a || i >= b) el.classList.add('pg-off'); });
 
-            if (vis.length <= Math.min.apply(null, sizes)) { bar.style.display = 'none'; busy = false; return; }
+            if (!vis.length || (!always && vis.length <= Math.min.apply(null, sizes))) { bar.style.display = 'none'; busy = false; return; }
             bar.style.display = '';
-            var nav = '<button class="' + (page > 1 ? '' : 'dis') + '" data-go="' + (page - 1) + '">‹ Prev</button>';
+            var nav = '<button class="' + (page > 1 ? '' : 'dis') + '" data-go="' + (page - 1) + '">‹ ' + __t('Prev') + '</button>';
             var from = Math.max(1, page - 2), to = Math.min(pages, page + 2);
             if (from > 1) { nav += '<button data-go="1">1</button>'; if (from > 2) nav += '<span class="dis gap">…</span>'; }
             for (var i = from; i <= to; i++) nav += i === page ? '<span class="cur">' + i + '</span>' : '<button data-go="' + i + '">' + i + '</button>';
             if (to < pages) { if (to < pages - 1) nav += '<span class="dis gap">…</span>'; nav += '<button data-go="' + pages + '">' + pages + '</button>'; }
-            nav += '<button class="' + (page < pages ? '' : 'dis') + '" data-go="' + (page + 1) + '">Next ›</button>';
+            nav += '<button class="' + (page < pages ? '' : 'dis') + '" data-go="' + (page + 1) + '">' + __t('Next') + ' ›</button>';
             var opts = sizes.map(function (n) { return '<option' + (n === per ? ' selected' : '') + '>' + n + '</option>'; }).join('');
-            bar.innerHTML = '<span>Showing ' + (a + 1) + '–' + Math.min(b, vis.length) + ' of ' + vis.length + '</span>'
-                + '<nav class="gp-nav">' + nav + '</nav>'
-                + '<label class="gp-size">Rows <select>' + opts + '</select></label>';
+            bar.innerHTML = '<span>' + __t('Showing') + ' ' + (a + 1) + '–' + Math.min(b, vis.length) + ' ' + __t('of') + ' ' + vis.length + (unit ? ' ' + __t(unit) + (__t(unit) === unit && vis.length !== 1 ? 's' : '') : '') + '</span>'
+                + ((pages > 1 || !always) ? '<nav class="gp-nav">' + nav + '</nav>' : '')
+                + '<label class="gp-size">' + __t('Rows') + ' <select>' + opts + '</select></label>';
             setTimeout(function () { busy = false; }, 0);
         }
 

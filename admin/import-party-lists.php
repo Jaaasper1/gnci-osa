@@ -3,6 +3,7 @@ require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/functions.php';
 require_once '../vendor/autoload.php';
+if (!function_exists('t')) { require_once __DIR__ . '/../includes/lang.php'; }
 
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -11,7 +12,7 @@ use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
-requireAdmin();
+requireStaff();
 
 // ── Download template ──────────────────────────────────────────────
 if (isset($_GET['template'])) {
@@ -82,32 +83,34 @@ if (isset($_GET['template'])) {
 header('Content-Type: application/json; charset=utf-8');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    echo json_encode(['success' => false, 'message' => 'Invalid request.']);
+    echo json_encode(['success' => false, 'message' => t('msg.invalid_request_777f', 'Invalid request.')]);
     exit;
 }
 
 // preview=1 → work out what WOULD be added and send it back; nothing is saved.
 $previewOnly = !empty($_POST['preview']);
+require_once '../includes/admin-otp.php';
+if (!$previewOnly) adminOtpRequireGateJson('import_party_lists');
 
 $election_id = (int)($_POST['election_id'] ?? 0);
 if (!$election_id) {
-    echo json_encode(['success' => false, 'message' => 'No election selected.']);
+    echo json_encode(['success' => false, 'message' => t('msg.no_election_selected_c8ec', 'No election selected.')]);
     exit;
 }
 
 if (empty($_FILES['excel_file']['name'])) {
-    echo json_encode(['success' => false, 'message' => 'No file uploaded.']);
+    echo json_encode(['success' => false, 'message' => t('msg.no_file_uploaded_064d', 'No file uploaded.')]);
     exit;
 }
 
 $file = $_FILES['excel_file'];
 $ext  = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
 if (!in_array($ext, ['xlsx', 'xls'])) {
-    echo json_encode(['success' => false, 'message' => 'Invalid file type. Please upload .xlsx or .xls only.']);
+    echo json_encode(['success' => false, 'message' => t('msg.invalid_file_type_please_upload_xlsx_or__334c', 'Invalid file type. Please upload .xlsx or .xls only.')]);
     exit;
 }
 if ($file['size'] > 5 * 1024 * 1024) {
-    echo json_encode(['success' => false, 'message' => 'File too large. Max 5MB.']);
+    echo json_encode(['success' => false, 'message' => t('msg.file_too_large_max_5mb_d6c5', 'File too large. Max 5MB.')]);
     exit;
 }
 
@@ -138,7 +141,7 @@ try {
 }
 
 if (empty($rows) || count($rows) < 2) {
-    echo json_encode(['success' => false, 'message' => 'Excel file is empty or has no data rows.']);
+    echo json_encode(['success' => false, 'message' => t('msg.excel_file_is_empty_or_has_no_data_rows_1df4', 'Excel file is empty or has no data rows.')]);
     exit;
 }
 
@@ -171,7 +174,7 @@ $colorCol  = array_search('color', $header);
 $idCol     = array_search('id', $header);   // present in exported files → lets us UPDATE existing party lists
 
 if ($nameCol === false) {
-    echo json_encode(['success' => false, 'message' => 'Header row must have a "name" column.']);
+    echo json_encode(['success' => false, 'message' => t('msg.header_row_must_have_a_name_column_aca1', 'Header row must have a "name" column.')]);
     exit;
 }
 
@@ -287,6 +290,7 @@ try {
         $updated++;
     }
     $pdo->commit();
+    auditLog($pdo, 'import', 'party_list', (int)$election_id, [], ['added' => $added, 'updated' => $updated]);
 } catch (Exception $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
     echo json_encode(['success' => false, 'message' => 'Import failed, nothing was saved: ' . $e->getMessage()]);

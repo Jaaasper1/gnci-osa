@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/mailer.php';
+require_once __DIR__ . '/audit.php';
 
 // Sanitize output to prevent XSS
 function e($str) {
@@ -20,7 +21,7 @@ function getCourseOptions() {
 // election are both active at the same time, the course-specific one wins.
 function getActiveElection($pdo, $course = null) {
     if ($course) {
-        $stmt = $pdo->prepare("SELECT * FROM elections WHERE is_active = 1 AND (course = ? OR course = '' OR course IS NULL) AND start_date <= NOW() AND end_date >= NOW() ORDER BY (course = ?) DESC LIMIT 1");
+        $stmt = $pdo->prepare("SELECT * FROM elections WHERE is_active = 1 AND (LOWER(TRIM(course)) = LOWER(TRIM(?)) OR course = '' OR course IS NULL) AND start_date <= NOW() AND end_date >= NOW() ORDER BY (LOWER(TRIM(course)) = LOWER(TRIM(?))) DESC LIMIT 1");
         $stmt->execute([$course, $course]);
     } else {
         $stmt = $pdo->prepare("SELECT * FROM elections WHERE is_active = 1 AND start_date <= NOW() AND end_date >= NOW() LIMIT 1");
@@ -33,7 +34,7 @@ function getActiveElection($pdo, $course = null) {
 // Same "All Courses" (course = '') behavior as getActiveElection() above.
 function getAnyActiveOrRecentElection($pdo, $course = null) {
     if ($course) {
-        $stmt = $pdo->prepare("SELECT * FROM elections WHERE is_active = 1 AND (course = ? OR course = '' OR course IS NULL) ORDER BY (course = ?) DESC LIMIT 1");
+        $stmt = $pdo->prepare("SELECT * FROM elections WHERE is_active = 1 AND (LOWER(TRIM(course)) = LOWER(TRIM(?)) OR course = '' OR course IS NULL) ORDER BY (LOWER(TRIM(course)) = LOWER(TRIM(?))) DESC LIMIT 1");
         $stmt->execute([$course, $course]);
     } else {
         $stmt = $pdo->prepare("SELECT * FROM elections WHERE is_active = 1 LIMIT 1");
@@ -142,8 +143,8 @@ function uploadAttachment($file) {
     $maxSize = 5 * 1024 * 1024; // 5MB
 
     $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-    if (!in_array($ext, $allowed)) return ['error' => 'File type not allowed.'];
-    if ($file['size'] > $maxSize) return ['error' => 'File too large. Max 5MB.'];
+    if (!in_array($ext, $allowed)) return ['error' => t('msg.file_type_not_allowed_4d3e', 'File type not allowed.')];
+    if ($file['size'] > $maxSize) return ['error' => t('msg.file_too_large_max_5mb_d6c5', 'File too large. Max 5MB.')];
 
     $uploadDir = __DIR__ . '/../uploads/';
     if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
@@ -154,7 +155,7 @@ function uploadAttachment($file) {
     if (move_uploaded_file($file['tmp_name'], $dest)) {
         return ['success' => true, 'filename' => $filename];
     }
-    return ['error' => 'Upload failed. Make sure the uploads/ folder is writable.'];
+    return ['error' => t('msg.upload_failed_make_sure_the_uploads_fold_009a', 'Upload failed. Make sure the uploads/ folder is writable.')];
 }
 
 // Upload candidate photo (images only)
@@ -162,14 +163,14 @@ function uploadPhoto($file) {
     $allowed = ['jpg','jpeg','png'];
     $maxSize = 2 * 1024 * 1024; // 2MB
 
-    if ($file['error'] !== UPLOAD_ERR_OK) return ['error' => 'Photo upload failed. Please try again.'];
+    if ($file['error'] !== UPLOAD_ERR_OK) return ['error' => t('msg.photo_upload_failed_please_try_again_0c02', 'Photo upload failed. Please try again.')];
 
     $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-    if (!in_array($ext, $allowed)) return ['error' => 'Only JPG and PNG images are allowed.'];
-    if ($file['size'] > $maxSize) return ['error' => 'Photo is too large. Maximum size is 2MB.'];
+    if (!in_array($ext, $allowed)) return ['error' => t('msg.only_jpg_and_png_images_are_allowed_9778', 'Only JPG and PNG images are allowed.')];
+    if ($file['size'] > $maxSize) return ['error' => t('msg.photo_is_too_large_maximum_size_is_2mb_41c7', 'Photo is too large. Maximum size is 2MB.')];
 
     $imgInfo = @getimagesize($file['tmp_name']);
-    if (!$imgInfo) return ['error' => 'Invalid image file.'];
+    if (!$imgInfo) return ['error' => t('msg.invalid_image_file_a3e2', 'Invalid image file.')];
 
     $uploadDir = __DIR__ . '/../uploads/';
     if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
@@ -180,7 +181,7 @@ function uploadPhoto($file) {
     if (move_uploaded_file($file['tmp_name'], $dest)) {
         return ['success' => true, 'filename' => $filename];
     }
-    return ['error' => 'Upload failed. Make sure the uploads/ folder is writable.'];
+    return ['error' => t('msg.upload_failed_make_sure_the_uploads_fold_009a', 'Upload failed. Make sure the uploads/ folder is writable.')];
 }
 
 // Upload Certificate of Registration (COR) for student self-registration
@@ -189,12 +190,12 @@ function uploadCorFile($file) {
     $maxSize = 5 * 1024 * 1024; // 5MB
 
     if (!isset($file['error']) || $file['error'] !== UPLOAD_ERR_OK) {
-        return ['error' => 'Please attach a copy of your Certificate of Registration (COR).'];
+        return ['error' => t('msg.please_attach_a_copy_of_your_certificate_1c59', 'Please attach a copy of your Certificate of Registration (COR).')];
     }
 
     $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-    if (!in_array($ext, $allowed)) return ['error' => 'COR must be a JPG, PNG, or PDF file.'];
-    if ($file['size'] > $maxSize) return ['error' => 'COR file is too large. Max 5MB.'];
+    if (!in_array($ext, $allowed)) return ['error' => t('msg.cor_must_be_a_jpg_png_or_pdf_file_76ff', 'COR must be a JPG, PNG, or PDF file.')];
+    if ($file['size'] > $maxSize) return ['error' => t('msg.cor_file_is_too_large_max_5mb_e301', 'COR file is too large. Max 5MB.')];
 
     $uploadDir = __DIR__ . '/../uploads/';
     if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
@@ -205,12 +206,12 @@ function uploadCorFile($file) {
     if (move_uploaded_file($file['tmp_name'], $dest)) {
         return ['success' => true, 'filename' => $filename];
     }
-    return ['error' => 'Upload failed. Make sure the uploads/ folder is writable.'];
+    return ['error' => t('msg.upload_failed_make_sure_the_uploads_fold_009a', 'Upload failed. Make sure the uploads/ folder is writable.')];
 }
 
 // Format date to readable Filipino format
 function formatDate($date) {
-    return date('F j, Y · g:i A', strtotime($date));
+    return function_exists('tlDate') ? tlDate('F j, Y · g:i A', strtotime($date)) : date('F j, Y · g:i A', strtotime($date));
 }
 
 // Status badge HTML
@@ -223,7 +224,12 @@ function statusBadge($status) {
         'Closed'    => 'badge-closed',
     ];
     $class = $map[$status] ?? 'badge-new';
-    return '<span class="badge ' . $class . '">' . e($status) . '</span>';
+    $labels = [
+        'New' => 'status.new', 'In Review' => 'status.in_review', 'Resolved' => 'status.resolved',
+        'Rejected' => 'status.rejected', 'Closed' => 'status.closed',
+    ];
+    $label = (isset($labels[$status]) && function_exists('t')) ? t($labels[$status], $status) : $status;
+    return '<span class="badge ' . $class . '">' . e($label) . '</span>';
 }
 
 // Compute a display status for an event based on its dates / cancelled flag
@@ -246,23 +252,30 @@ function eventStatusBadge($status) {
         'Cancelled' => 'badge-rejected',
     ];
     $class = $map[$status] ?? 'badge-new';
-    return '<span class="badge ' . $class . '">' . e($status) . '</span>';
+    $labels = [
+        'New' => 'status.new', 'In Review' => 'status.in_review', 'Resolved' => 'status.resolved',
+        'Rejected' => 'status.rejected', 'Closed' => 'status.closed',
+    ];
+    $label = (isset($labels[$status]) && function_exists('t')) ? t($labels[$status], $status) : $status;
+    return '<span class="badge ' . $class . '">' . e($label) . '</span>';
 }
 
 // Auto-archive complaints resolved/rejected for 30+ days
 function autoArchiveComplaints($pdo) {
-    $pdo->exec(
+    $archived = $pdo->exec(
         "UPDATE complaints
          SET is_archived = 1
          WHERE is_archived = 0
            AND status IN ('Resolved','Rejected','Closed')
            AND updated_at <= NOW() - INTERVAL 30 DAY"
     );
-    $pdo->exec(
+    $deleted = $pdo->exec(
         "DELETE FROM complaints
          WHERE is_archived = 1
            AND updated_at <= NOW() - INTERVAL 30 DAY"
     );
+    if ($archived > 0) auditLogSystem($pdo, 'auto_archive', 'complaint', 0, ['archived' => $archived]);
+    if ($deleted > 0)  auditLogSystem($pdo, 'auto_delete', 'complaint', 0, ['deleted' => $deleted]);
 }
 
 require_once __DIR__ . '/export-helpers.php';

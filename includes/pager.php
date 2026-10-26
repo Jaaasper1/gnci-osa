@@ -1,4 +1,5 @@
 <?php
+if (!function_exists('t')) { require_once __DIR__ . '/lang.php'; }
 /**
  * Shared server-side pager. Styles live in assets/css/style.css (.gp-bar / .gp-nav / .gp-size),
  * the same look as assets/js/client-pager.js:  Showing a–b of N | ‹ Prev 1 2 3 Next › | Rows [n]
@@ -24,19 +25,19 @@ function gpBar(int $page, int $perPage, int $total, callable $url, array $sizes,
     $first = ($page - 1) * $perPage + 1; $last = min($page * $perPage, $total);
     ?>
     <div class="gp-bar">
-        <span>Showing <?= number_format($first) ?>–<?= number_format($last) ?> of <?= number_format($total) ?><?= $unit !== '' ? ' ' . e($unit) . ($total != 1 ? 's' : '') : '' ?></span>
+        <span><?= t('pg.showing', 'Showing') ?> <?= number_format($first) ?>–<?= number_format($last) ?> <?= t('ui.of_8bf8', 'of') ?> <?= number_format($total) ?><?php if ($unit !== ''): $__u = t('pg.unit.' . $unit, $unit); echo ' ' . e($__u) . (($__u === $unit && $total != 1) ? 's' : ''); endif; ?></span>
         <?php if ($pages > 1): ?>
-        <nav class="gp-nav" aria-label="Pages">
-            <?php if ($page > 1): ?><a href="<?= e($url($page - 1)) ?>" rel="prev">‹ Prev</a><?php else: ?><span class="dis">‹ Prev</span><?php endif; ?>
+        <nav class="gp-nav" aria-label="<?= htmlspecialchars(t('auto.pages_453a', 'Pages'), ENT_QUOTES) ?>">
+            <?php if ($page > 1): ?><a href="<?= e($url($page - 1)) ?>" rel="prev"><?= t('auto.prev_57ad', '‹ Prev') ?></a><?php else: ?><span class="dis"><?= t('auto.prev_57ad', '‹ Prev') ?></span><?php endif; ?>
             <?php if ($from > 1): ?><a href="<?= e($url(1)) ?>">1</a><?php if ($from > 2): ?><span class="dis gap">…</span><?php endif; endif; ?>
             <?php for ($i = $from; $i <= $to; $i++): ?>
                 <?php if ($i === $page): ?><span class="cur" aria-current="page"><?= $i ?></span><?php else: ?><a href="<?= e($url($i)) ?>"><?= $i ?></a><?php endif; ?>
             <?php endfor; ?>
             <?php if ($to < $pages): ?><?php if ($to < $pages - 1): ?><span class="dis gap">…</span><?php endif; ?><a href="<?= e($url($pages)) ?>"><?= $pages ?></a><?php endif; ?>
-            <?php if ($page < $pages): ?><a href="<?= e($url($page + 1)) ?>" rel="next">Next ›</a><?php else: ?><span class="dis">Next ›</span><?php endif; ?>
+            <?php if ($page < $pages): ?><a href="<?= e($url($page + 1)) ?>" rel="next"><?= t('auto.next_2d68', 'Next ›') ?></a><?php else: ?><span class="dis"><?= t('auto.next_2d68', 'Next ›') ?></span><?php endif; ?>
         </nav>
         <?php endif; ?>
-        <label class="gp-size">Rows
+        <label class="gp-size"><?= t('auto.rows_530f', 'Rows') ?>
             <select <?= $ajax ? '' : 'onchange="location.href=this.value"' ?>>
                 <?php foreach ($sizes as $s): ?>
                 <option value="<?= e($url(1, (int)$s)) ?>" <?= (int)$s === $perPage ? 'selected' : '' ?>><?= (int)$s ?></option>

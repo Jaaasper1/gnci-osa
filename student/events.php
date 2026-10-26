@@ -58,37 +58,37 @@ function evWhen(array $ev): string {
     $start = $ev['event_date'];
     $end   = !empty($ev['end_date']) ? $ev['end_date'] : $start;
     switch ($ev['_status']) {
-        case 'Cancelled': return 'Cancelled';
+        case 'Cancelled': return tx('Cancelled');
         case 'Ongoing':
             $left = evDays($today, $end);
-            return $left <= 0 ? 'Happening now · ends today' : 'Happening now · ' . $left . ' day' . ($left > 1 ? 's' : '') . ' left';
+            return $left <= 0 ? tx('Happening now · ends today') : tx($left > 1 ? 'Happening now · %d days left' : 'Happening now · %d day left', $left);
         case 'Upcoming':
             $d = evDays($today, $start);
-            if ($d === 1) return 'Tomorrow';
-            if ($d < 14)  return 'In ' . $d . ' days';
-            if ($d < 60)  return 'In ' . (int)round($d / 7) . ' weeks';
-            return 'In ' . (int)round($d / 30) . ' months';
+            if ($d === 1) return tx('Tomorrow');
+            if ($d < 14)  return tx('In %d days', $d);
+            if ($d < 60)  return tx('In %d weeks', (int)round($d / 7));
+            return tx('In %d months', (int)round($d / 30));
         default:
             $d = evDays($end, $today);
-            if ($d <= 1) return 'Ended yesterday';
-            if ($d < 14) return 'Ended ' . $d . ' days ago';
-            if ($d < 60) return 'Ended ' . (int)round($d / 7) . ' weeks ago';
-            return 'Ended ' . (int)round($d / 30) . ' months ago';
+            if ($d <= 1) return tx('Ended yesterday');
+            if ($d < 14) return tx('Ended %d days ago', $d);
+            if ($d < 60) return tx('Ended %d weeks ago', (int)round($d / 7));
+            return tx('Ended %d months ago', (int)round($d / 30));
     }
 }
 function evRange(array $ev): string {
-    $t = date('M j, Y', strtotime($ev['event_date']));
-    if (!empty($ev['end_date']) && $ev['end_date'] !== $ev['event_date']) $t .= ' – ' . date('M j, Y', strtotime($ev['end_date']));
+    $t = tlDate('M j, Y', strtotime($ev['event_date']));
+    if (!empty($ev['end_date']) && $ev['end_date'] !== $ev['event_date']) $t .= ' – ' . tlDate('M j, Y', strtotime($ev['end_date']));
     return $t;
 }
 /** Section header for the list. "All" is grouped by status, other tabs by month. */
 function evGroup(array $ev, string $filter): string {
-    $month = date('F Y', strtotime($ev['event_date']));
+    $month = tlDate('F Y', strtotime($ev['event_date']));
     if ($filter !== 'all') return $month;
     switch ($ev['_status']) {
-        case 'Ongoing':   return 'Happening now';
-        case 'Upcoming':  return 'Upcoming · ' . $month;
-        default:          return 'Past · ' . $month;
+        case 'Ongoing':   return tx('Happening now');
+        case 'Upcoming':  return tx('Upcoming · %s', $month);
+        default:          return tx('Past · %s', $month);
     }
 }
 
@@ -103,9 +103,9 @@ $listEvents = $featured ? array_slice($visibleAll, 1) : $visibleAll;
 // Data for the "View" popup (formatted server-side; rendered with textContent in JS)
 $evModalData = [];
 foreach ($filtered as $ev) {
-    $dateTxt = date('F j, Y', strtotime($ev['event_date']));
+    $dateTxt = tlDate('F j, Y', strtotime($ev['event_date']));
     if (!empty($ev['end_date']) && $ev['end_date'] !== $ev['event_date']) {
-        $dateTxt .= ' – ' . date('F j, Y', strtotime($ev['end_date']));
+        $dateTxt .= ' – ' . tlDate('F j, Y', strtotime($ev['end_date']));
     }
     $evModalData[(int)$ev['id']] = [
         'title'  => $ev['title'],
@@ -124,14 +124,14 @@ $openEventId = isset($_GET['event']) ? (int)$_GET['event'] : 0;
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Events — GNC-OSA Portal</title>
+<title><?= t('title.events', 'Events') ?> — GNC-OSA Portal</title>
 <link rel="stylesheet" href="../assets/css/style.css?v=27">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
-</head>
+<?php include __DIR__.'/../includes/pwa-head.php'; ?></head>
 <body class="theme-events">
 <nav class="topnav">
-    <button class="hamburger" id="hamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
-    <div class="brand"><img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);"><div class="brand-text"><div class="name">GNC-OSA Portal</div><div class="sub">Student</div></div></div>
+    <button class="hamburger" id="hamburger" aria-label="<?= t('ui.toggle_menu_641f', 'Toggle menu') ?>"><span></span><span></span><span></span></button>
+    <div class="brand"><img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);"><div class="brand-text"><div class="name">GNC-OSA Portal</div><div class="sub"><?= t('ui.student_f5c0', 'Student') ?></div></div></div>
     <div class="nav-right">
         <?php renderLangSwitcher(); ?>
         <button class="notif-btn" onclick="location.href='notifications.php'">
@@ -148,8 +148,8 @@ $openEventId = isset($_GET['event']) ? (int)$_GET['event'] : 0;
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
 <aside class="sidebar">
     <div class="sidebar-section"><?= t('sidebar.main', 'Main') ?></div>
-    <a class="sitem active" href="events.php"><i class="ti ti-calendar-event"></i> Events</a>
-    <a class="sitem" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.my_complaints', 'My Complaints') ?></a>
+    <a class="sitem active" href="events.php"><i class="ti ti-calendar-event"></i> <?= t('sidebar.events', 'Events') ?></a>
+    <a class="sitem" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.my_complaints', 'My Complaints') ?></a><a class="sitem" href="help.php"><i class="ti ti-book"></i> <?= t('sidebar.osa_guide', 'OSA Guide') ?></a>
     <a class="sitem" href="new-complaint.php"><i class="ti ti-circle-plus"></i> <?= t('sidebar.new_complaint', 'New Complaint') ?></a>
     <?php if ($election): ?>
     <div class="sidebar-section"><?= t('sidebar.election', 'Election') ?></div>
@@ -166,12 +166,12 @@ $openEventId = isset($_GET['event']) ? (int)$_GET['event'] : 0;
 <div class="main">
     <div class="content">
         <div class="page-header">
-            <h1><i class="ti ti-calendar-event"></i> Events</h1>
-            <p>School events and announcements from OSA</p>
+            <h1><i class="ti ti-calendar-event"></i> <?= t('ui.events_87f9', 'Events') ?></h1>
+            <p><?= t('ui.school_events_and_announcements_fr_b247', 'School events and announcements from OSA') ?></p>
         </div>
 
         <div class="ev-tabs" role="tablist">
-            <?php foreach (['all' => ['All', 'ti-layout-grid'], 'ongoing' => ['Ongoing', 'ti-player-play'], 'upcoming' => ['Upcoming', 'ti-calendar-time'], 'completed' => ['Past', 'ti-history']] as $k => [$lbl, $ic]): ?>
+            <?php foreach (['all' => [t('ev.tab_all', 'All'), 'ti-layout-grid'], 'ongoing' => [t('ev.tab_ongoing', 'Ongoing'), 'ti-player-play'], 'upcoming' => [t('ev.tab_upcoming', 'Upcoming'), 'ti-calendar-time'], 'completed' => [t('ev.tab_past', 'Past'), 'ti-history']] as $k => [$lbl, $ic]): ?>
             <a href="?status=<?= $k ?>" class="ev-tab<?= $filter === $k ? ' active' : '' ?>" role="tab" aria-selected="<?= $filter === $k ? 'true' : 'false' ?>">
                 <i class="ti <?= $ic ?>"></i> <?= $lbl ?> <span class="cnt"><?= (int)$evCounts[$k] ?></span>
             </a>
@@ -181,7 +181,7 @@ $openEventId = isset($_GET['event']) ? (int)$_GET['event'] : 0;
         <?php if (empty($filtered)): ?>
             <div class="card" style="text-align:center;padding:40px 20px;color:#9CA3AF;">
                 <i class="ti ti-calendar-off" style="font-size:32px;display:block;margin-bottom:10px;"></i>
-                No events to show yet. Check back soon!
+                <?= t('ui.no_events_to_show_yet_check_back_s_993b', 'No events to show yet. Check back soon!') ?>
             </div>
         <?php else: ?>
 
@@ -198,7 +198,7 @@ $openEventId = isset($_GET['event']) ? (int)$_GET['event'] : 0;
                     <?php if (!empty($ev['event_time'])): ?><span><i class="ti ti-clock"></i> <?= date('g:i A', strtotime($ev['event_time'])) ?></span><?php endif; ?>
                     <?php if (!empty($ev['location'])): ?><span><i class="ti ti-map-pin"></i> <?= e($ev['location']) ?></span><?php endif; ?>
                 </div>
-                <span class="ev-hero-cta">View details <i class="ti ti-arrow-right"></i></span>
+                <span class="ev-hero-cta"><?= t('ui.view_details_6e97', 'View details') ?> <i class="ti ti-arrow-right"></i></span>
             </div>
         </div>
         <?php endif; ?>
@@ -227,11 +227,11 @@ $openEventId = isset($_GET['event']) ? (int)$_GET['event'] : 0;
                     <div class="ev-rel<?= $st === 'Ongoing' ? ' live' : '' ?>"><?= e(evWhen($ev)) ?></div>
                     <div class="ev-meta">
                         <?php if (!empty($ev['event_time'])): ?><span><i class="ti ti-clock"></i> <?= date('g:i A', strtotime($ev['event_time'])) ?></span><?php endif; ?>
-                        <?php if (!empty($ev['end_date']) && $ev['end_date'] !== $ev['event_date']): ?><span><i class="ti ti-calendar-event"></i> until <?= date('M j', strtotime($ev['end_date'])) ?></span><?php endif; ?>
+                        <?php if (!empty($ev['end_date']) && $ev['end_date'] !== $ev['event_date']): ?><span><i class="ti ti-calendar-event"></i> <?= t('ui.until_3103', 'until') ?> <?= tlDate('M j', strtotime($ev['end_date'])) ?></span><?php endif; ?>
                         <?php if (!empty($ev['location'])): ?><span><i class="ti ti-map-pin"></i> <?= e($ev['location']) ?></span><?php endif; ?>
                     </div>
                     <?php if (!empty($ev['description'])): ?><p class="ev-desc-clamp"><?= e($ev['description']) ?></p><?php endif; ?>
-                    <div class="ev-more-link">Details <i class="ti ti-arrow-right"></i></div>
+                    <div class="ev-more-link"><?= t('ui.details_3ec3', 'Details') ?> <i class="ti ti-arrow-right"></i></div>
                 </div>
             </div>
             <?php endforeach; ?>
@@ -241,7 +241,7 @@ $openEventId = isset($_GET['event']) ? (int)$_GET['event'] : 0;
         <div class="ev-more-wrap">
             <div class="ev-more-info" id="ev-more-info"></div>
             <button type="button" class="btn btn-outline btn-sm" id="ev-more-btn"><i class="ti ti-chevron-down"></i> <span></span></button>
-            <button type="button" class="ev-less-btn" id="ev-less-btn" style="display:none;"><i class="ti ti-chevron-up"></i> Show less</button>
+            <button type="button" class="ev-less-btn" id="ev-less-btn" style="display:none;"><i class="ti ti-chevron-up"></i> <?= t('ui.show_less_c74e', 'Show less') ?></button>
         </div>
         <script>
         (function () {
@@ -260,9 +260,9 @@ $openEventId = isset($_GET['event']) ? (int)$_GET['event'] : 0;
                     k.style.display = (nx && !nx.classList.contains('ev-more')) ? '' : 'none';
                 });
                 var left = Math.max(0, cards.length - shown);
-                info.textContent = 'Showing ' + Math.min(shown, cards.length) + ' of ' + cards.length;
+                info.textContent = __t('Showing') + ' ' + Math.min(shown, cards.length) + ' ' + __t('of') + ' ' + cards.length;
                 btn.style.display = left ? '' : 'none';
-                btn.querySelector('span').textContent = 'Show ' + Math.min(step, left) + ' more (' + left + ' left)';
+                btn.querySelector('span').textContent = __t('Show %n more (%l left)').replace('%n', Math.min(step, left)).replace('%l', left);
                 less.style.display = shown > step ? '' : 'none';
             }
             btn.addEventListener('click', function () { shown += step; render(); });
@@ -279,8 +279,8 @@ $openEventId = isset($_GET['event']) ? (int)$_GET['event'] : 0;
         <!-- ===== FACEBOOK PAGE FEED ===== -->
         <div class="card" style="margin-top:20px;">
             <div class="card-title" style="justify-content:space-between;">
-                <span><i class="ti ti-brand-facebook" style="color:#1877F2;"></i> Facebook Page Feed</span>
-                <button type="button" id="fb-feed-refresh-btn" class="btn btn-outline btn-sm" onclick="fbFeedRefresh()"><i class="ti ti-refresh"></i> Refresh</button>
+                <span><i class="ti ti-brand-facebook" style="color:#1877F2;"></i> <?= t('ui.facebook_page_feed_db34', 'Facebook Page Feed') ?></span>
+                <button type="button" id="fb-feed-refresh-btn" class="btn btn-outline btn-sm" onclick="fbFeedRefresh()"><i class="ti ti-refresh"></i> <?= t('ui.refresh_63a6', 'Refresh') ?></button>
             </div>
             <div id="fb-feed-content">
                 <?php $fbUploadsPrefix = '../uploads/'; include __DIR__.'/../includes/fb-feed-partial.php'; ?>
@@ -405,7 +405,7 @@ $openEventId = isset($_GET['event']) ? (int)$_GET['event'] : 0;
                 <div class="icon-circle"><i class="ti ti-calendar-event"></i></div>
                 <div class="title-text"><div class="t" id="ev-modal-title"></div><div class="s" id="ev-modal-badge"></div></div>
             </div>
-            <button type="button" class="close-btn" onclick="closeEventModal()" aria-label="Close"><i class="ti ti-x"></i></button>
+            <button type="button" class="close-btn" onclick="closeEventModal()" aria-label="<?= t('ui.close_d3d2', 'Close') ?>"><i class="ti ti-x"></i></button>
         </div>
         <div class="modal-panel-body">
             <div class="ev-modal-row"><i class="ti ti-calendar"></i><span id="ev-modal-date"></span></div>
@@ -435,7 +435,7 @@ $openEventId = isset($_GET['event']) ? (int)$_GET['event'] : 0;
         $('ev-modal-place').textContent = ev.place;
         $('ev-modal-place-row').style.display = ev.place ? '' : 'none';
         var d = $('ev-modal-desc');
-        d.textContent = ev.desc || 'No additional details provided.';
+        d.textContent = ev.desc || __t('No additional details provided.');
         d.style.color = ev.desc ? '' : '#9CA3AF';
         var img = $('ev-modal-img');
         if (ev.image) { img.src = ev.image; img.style.display = 'block'; } else { img.removeAttribute('src'); img.style.display = 'none'; }
@@ -463,6 +463,6 @@ $openEventId = isset($_GET['event']) ? (int)$_GET['event'] : 0;
 
 <script src="../assets/js/sidebar.js?v=5"></script>
 <script src="../assets/js/show-more.js"></script>
-<?php include __DIR__.'/../includes/push-widget.php'; ?>
+<?php include __DIR__.'/../includes/ask-osa-widget.php'; ?>
 </body>
 </html>

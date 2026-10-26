@@ -14,10 +14,10 @@ function notifPerPage(): int { return pagerSize([10, 20, 50], NOTIF_PER_PAGE); }
 /** Staff/admin only ever receive complaint notifications, so they get fewer tabs. */
 function notifTabs(string $table = 'notifications'): array {
     if ($table === 'staff_notifications') {
-        return ['all' => 'All', 'unread' => 'Unread', 'complaints' => 'Complaints'];
+        return ['all' => t('notif.tab_all', 'All'), 'unread' => t('notif.tab_unread', 'Unread'), 'complaints' => t('notif.tab_complaints', 'Complaints')];
     }
-    return ['all' => 'All', 'unread' => 'Unread', 'complaints' => 'Complaints',
-            'voting' => 'Voting', 'events' => 'Events', 'account' => 'Account'];
+    return ['all' => t('notif.tab_all', 'All'), 'unread' => t('notif.tab_unread', 'Unread'), 'complaints' => t('notif.tab_complaints', 'Complaints'),
+            'voting' => t('notif.tab_voting', 'Voting'), 'events' => t('notif.tab_events', 'Events'), 'account' => t('notif.tab_account', 'Account')];
 }
 
 /** SQL fragment per filter. Only hard-coded strings, never user input. */
@@ -107,22 +107,22 @@ function notifHandleBulk(PDO $pdo, string $table, int $ownerId): bool {
 
 function notifType(string $msg): array {
     $m = strtolower($msg);
-    if (strpos($m, 'complaint') !== false) return ['ti-message-report', 'Complaint'];
-    if (strpos($m, 'vote') !== false || strpos($m, 'election') !== false) return ['ti-checkbox', 'Voting'];
-    if (strpos($m, 'event') !== false)     return ['ti-calendar-event', 'Event'];
-    if (strpos($m, 'account') !== false)   return ['ti-user-check', 'Account'];
-    return ['ti-bell', 'Notification'];
+    if (strpos($m, 'complaint') !== false) return ['ti-message-report', tx('Complaint')];
+    if (strpos($m, 'vote') !== false || strpos($m, 'election') !== false) return ['ti-checkbox', tx('Voting')];
+    if (strpos($m, 'event') !== false)     return ['ti-calendar-event', tx('Event')];
+    if (strpos($m, 'account') !== false)   return ['ti-user-check', tx('Account')];
+    return ['ti-bell', tx('Notification')];
 }
 
 function notifGroupLabel(string $dt): string {
     $d    = strtotime(date('Y-m-d', strtotime($dt)));
     $today = strtotime(date('Y-m-d'));
     $diff = (int)round(($today - $d) / 86400);
-    if ($diff <= 0)  return 'Today';
-    if ($diff === 1) return 'Yesterday';
-    if ($diff < 7)   return 'This week';
-    if ($diff < 30)  return 'This month';
-    return 'Older';
+    if ($diff <= 0)  return tx('Today');
+    if ($diff === 1) return tx('Yesterday');
+    if ($diff < 7)   return tx('This week');
+    if ($diff < 30)  return tx('This month');
+    return tx('Older');
 }
 
 function notifTimeAgo(string $dt): string {
@@ -238,32 +238,32 @@ function notifRenderCard(array $rows, array $counts, string $filter, int $page, 
         </div>
 
         <div class="notif-bulkbar" id="notif-bulkbar">
-            <label><input type="checkbox" id="sel-all" onchange="notifSelectAll(this.checked)"> <span class="b-lbl">All</span></label>
-            <span class="sel-count" id="sel-count">0 selected</span>
-            <button type="button" id="b-read"   onclick="notifBulk('mark_read_many')"   disabled title="Mark as read"><i class="ti ti-mail-opened"></i><span class="b-lbl">Mark read</span></button>
-            <button type="button" id="b-unread" onclick="notifBulk('mark_unread_many')" disabled title="Mark as unread"><i class="ti ti-mail"></i><span class="b-lbl">Mark unread</span></button>
-            <button type="button" id="b-del" class="b-del" onclick="notifBulkDelete()" disabled title="Delete"><i class="ti ti-trash"></i><span class="b-lbl">Delete</span></button>
-            <button type="button" onclick="notifExitSelect()" title="Cancel"><i class="ti ti-x"></i><span class="b-lbl">Cancel</span></button>
+            <label><input type="checkbox" id="sel-all" onchange="notifSelectAll(this.checked)"> <span class="b-lbl"><?= t('notif.all', 'All') ?></span></label>
+            <span class="sel-count" id="sel-count">0 <?= t('notif.selected', 'selected') ?></span>
+            <button type="button" id="b-read"   onclick="notifBulk('mark_read_many')"   disabled title="<?= htmlspecialchars(t('notif.mark_as_read', 'Mark as read'), ENT_QUOTES) ?>"><i class="ti ti-mail-opened"></i><span class="b-lbl"><?= t('notif.mark_read', 'Mark read') ?></span></button>
+            <button type="button" id="b-unread" onclick="notifBulk('mark_unread_many')" disabled title="<?= htmlspecialchars(t('notif.mark_as_unread', 'Mark as unread'), ENT_QUOTES) ?>"><i class="ti ti-mail"></i><span class="b-lbl"><?= t('notif.mark_unread', 'Mark unread') ?></span></button>
+            <button type="button" id="b-del" class="b-del" onclick="notifBulkDelete()" disabled title="<?= htmlspecialchars(t('notif.delete', 'Delete'), ENT_QUOTES) ?>"><i class="ti ti-trash"></i><span class="b-lbl"><?= t('notif.delete', 'Delete') ?></span></button>
+            <button type="button" onclick="notifExitSelect()" title="<?= htmlspecialchars(t('notif.cancel', 'Cancel'), ENT_QUOTES) ?>"><i class="ti ti-x"></i><span class="b-lbl"><?= t('notif.cancel', 'Cancel') ?></span></button>
         </div>
 
         <div class="notif-header-row" id="notif-header" <?= ($counts['all'] ?? 0) == 0 ? 'style="display:none"' : '' ?>>
             <span style="font-size:13px;color:#6B7280;">
                 <?php if ($totalForFilter > 0): ?>
-                    <?= number_format($totalForFilter) ?> notification<?= $totalForFilter != 1 ? 's' : '' ?>
-                <?php else: ?>0 notifications<?php endif; ?>
+                    <?= number_format($totalForFilter) ?> <?= tx($totalForFilter != 1 ? 'notifications' : 'notification') ?>
+                <?php else: ?>0 <?= tx('notifications') ?><?php endif; ?>
             </span>
             <div class="notif-actions">
-                <button class="btn-select" type="button" onclick="notifEnterSelect()"><i class="ti ti-checkbox"></i> Select</button>
+                <button class="btn-select" type="button" onclick="notifEnterSelect()"><i class="ti ti-checkbox"></i> <?= t('notif.select', 'Select') ?></button>
                 <?php if (($counts['unread'] ?? 0) > 0): ?>
-                <button class="btn-mark-read" onclick="markAllRead()"><i class="ti ti-checks"></i> Mark all as read</button>
+                <button class="btn-mark-read" onclick="markAllRead()"><i class="ti ti-checks"></i> <?= t('notif.mark_all_read', 'Mark all as read') ?></button>
                 <?php endif; ?>
-                <button class="btn-delete-all" onclick="askDeleteAll()"><i class="ti ti-trash"></i> Delete All</button>
+                <button class="btn-delete-all" onclick="askDeleteAll()"><i class="ti ti-trash"></i> <?= t('notif.delete_all', 'Delete All') ?></button>
             </div>
         </div>
 
         <div class="notif-empty" id="no-notifs" style="display:<?= empty($rows) ? 'flex' : 'none' ?>;">
             <div class="ne-ic"><i class="ti ti-bell-off"></i></div>
-            <div><?= ($counts['all'] ?? 0) == 0 ? 'No notifications yet.' : 'No notifications in this view.' ?></div>
+            <div><?= ($counts['all'] ?? 0) == 0 ? tx('No notifications yet.') : tx('No notifications in this view.') ?></div>
         </div>
 
         <div id="notif-list">
@@ -274,19 +274,19 @@ function notifRenderCard(array $rows, array $counts, string $filter, int $page, 
             $unread = !$n['is_read'];
         ?>
             <div class="notif-row <?= $unread ? 'unread' : '' ?>" id="notif-<?= (int)$n['id'] ?>" data-id="<?= (int)$n['id'] ?>">
-                <input type="checkbox" class="notif-check" aria-label="Select notification" onclick="event.stopPropagation(); notifToggle(<?= (int)$n['id'] ?>, this.checked)">
+                <input type="checkbox" class="notif-check" aria-label="<?= htmlspecialchars(t('notif.select_notification', 'Select notification'), ENT_QUOTES) ?>" onclick="event.stopPropagation(); notifToggle(<?= (int)$n['id'] ?>, this.checked)">
                 <div class="notif-icon"><i class="ti <?= $icon ?>" style="color:var(--nacc);font-size:17px;"></i></div>
                 <div class="notif-body">
-                    <div class="notif-msg"><?= $unread ? '<span class="notif-dot"></span>' : '' ?><?= e($n['message']) ?></div>
+                    <div class="notif-msg"><?= $unread ? '<span class="notif-dot"></span>' : '' ?><?= e(tlNotifMsg($n['message'])) ?></div>
                     <div class="notif-time"><span class="notif-type"><?= e($typeLabel) ?></span><?= e(notifTimeAgo($n['created_at'])) ?></div>
-                    <?php if ($n['link']): ?><a href="<?= e($n['link']) ?>" class="notif-link">View →</a><?php endif; ?>
+                    <?php if ($n['link']): ?><a href="<?= e($n['link']) ?>" class="notif-link"><?= t('notif.view', 'View →') ?></a><?php endif; ?>
                 </div>
                 <?php if ($unread): ?>
                 <button class="notif-read-btn" onclick="markOneRead(<?= (int)$n['id'] ?>)" title="Mark as read"><i class="ti ti-check"></i></button>
                 <?php else: ?>
                 <button class="notif-unread-btn" onclick="markOneUnread(<?= (int)$n['id'] ?>)" title="Mark as unread"><i class="ti ti-mail"></i></button>
                 <?php endif; ?>
-                <button class="notif-delete-btn" onclick="askDeleteOne(<?= (int)$n['id'] ?>)" title="Delete"><i class="ti ti-x"></i></button>
+                <button class="notif-delete-btn" onclick="askDeleteOne(<?= (int)$n['id'] ?>)" title="<?= htmlspecialchars(t('notif.delete', 'Delete'), ENT_QUOTES) ?>"><i class="ti ti-x"></i></button>
             </div>
         <?php endforeach; ?>
         </div>
@@ -364,7 +364,7 @@ function notifRender() {
         const cb = r.querySelector('.notif-check'); if (cb) cb.checked = on;
     });
     const n = notifSel.size;
-    document.getElementById('sel-count').textContent = n + ' selected';
+    document.getElementById('sel-count').textContent = n + ' ' + <?= json_encode(t('notif.selected', 'selected')) ?>;
     const all = document.getElementById('sel-all');
     all.checked = n > 0 && n === rows.length;
     all.indeterminate = n > 0 && n < rows.length;
@@ -409,8 +409,8 @@ function notifBulk(action) {
 function notifBulkDelete() {
     const n = notifSel.size; if (!n) return;
     openModal(
-        'Delete ' + n + ' notification' + (n > 1 ? 's' : ''),
-        'The selected notification' + (n > 1 ? 's' : '') + ' will be permanently removed. This cannot be undone.',
+        <?= json_encode(t('notif.del_n', 'Delete %d notification(s)')) ?>.replace('%d', n),
+        <?= json_encode(t('notif.del_n_msg', 'The selected notification(s) will be permanently removed. This cannot be undone.')) ?>,
         () => notifPost('delete_many').then(d => { if (d.ok) location.reload(); })
     );
 }

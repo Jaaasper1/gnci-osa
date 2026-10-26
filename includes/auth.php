@@ -1,4 +1,6 @@
 <?php
+if (!function_exists('t')) { require_once __DIR__ . '/lang.php'; }
+require_once __DIR__ . '/audit.php';
 
 // ============================================================
 // LOGIN OTP THROTTLE (stops someone from spamming a student's
@@ -74,30 +76,20 @@ function otpThrottleRecord($pdo, $studentId) {
 
 // Friendly "wait X" text.
 function otpWaitMessage($seconds) {
-    if ($seconds >= 90) return 'Too many code requests. Please try again in about ' . ceil($seconds / 60) . ' minutes.';
-    return 'Please wait ' . max(1, (int)$seconds) . ' second' . ($seconds == 1 ? '' : 's') . ' before requesting another code.';
+    if ($seconds >= 90) return sprintf(t('msg.too_many_code_requests', 'Too many code requests. Please try again in about %d minutes.'), ceil($seconds / 60));
+    return sprintf(t('msg.wait_seconds', 'Please wait %d second(s) before requesting another code.'), max(1, (int)$seconds));
 }
 
 
-// Hide most of an email address (e.g. ja***@g***.com) so the login OTP screen
-// doesn't reveal a student's full email to whoever typed their Student ID.
-// Uses a fixed number of asterisks so the real length isn't leaked either.
+// Show only the first 2 characters of an email, then asterisks for the rest.
+// Used anywhere an email is only displayed (never for editing or sending).
 if (!function_exists('maskEmail')) {
     function maskEmail($email) {
         $email = trim((string)$email);
-        $at = strrpos($email, '@');
-        if ($at === false || $at < 1) return '***';
-        $local  = substr($email, 0, $at);
-        $domain = substr($email, $at + 1);
-        $keep   = strlen($local) >= 4 ? 2 : 1;
-        $lm     = substr($local, 0, $keep) . '***';
-        $dot    = strrpos($domain, '.');
-        if ($dot === false || $dot < 1) {
-            $dm = substr($domain, 0, 1) . '***';
-        } else {
-            $dm = substr($domain, 0, 1) . '***' . substr($domain, $dot);
-        }
-        return $lm . '@' . $dm;
+        $len = mb_strlen($email);
+        if ($len === 0) return '';
+        if ($len <= 2) return str_repeat('*', $len);
+        return mb_substr($email, 0, 2) . str_repeat('*', $len - 2);
     }
 }
 
@@ -170,6 +162,24 @@ function loginStaff($pdo, $username, $password) {
     return false;
 }
 
+// Looks up an active staff/admin account by username WITHOUT starting a
+// session — used by the passwordless (Gmail OTP) staff login flow.
+function findActiveStaffByUsername($pdo, $username) {
+    $stmt = $pdo->prepare("SELECT * FROM osa_staff WHERE username = ? AND is_active = 1");
+    $stmt->execute([$username]);
+    return $stmt->fetch() ?: false;
+}
+
+// Starts the logged-in session for an already-verified staff/admin row.
+// Regenerates the session id to prevent session fixation.
+function finalizeStaffSession($staff) {
+    session_regenerate_id(true);
+    $_SESSION['user_id']   = $staff['id'];
+    $_SESSION['user_type'] = $staff['role'];
+    $_SESSION['name']      = $staff['first_name'] . ' ' . $staff['last_name'];
+    $_SESSION['username']  = $staff['username'];
+}
+
 function requireStudent() {
     if (session_status() === PHP_SESSION_NONE) session_start();
     if (!isset($_SESSION['user_type']) || $_SESSION['user_type'] !== 'student') {
@@ -203,6 +213,10 @@ function verifyAdminPassword($pdo, $adminId, $password) {
 
 function logout() {
     if (session_status() === PHP_SESSION_NONE) session_start();
+    global $pdo;
+    if (!empty($_SESSION['user_id']) && isset($pdo)) {
+        auditLog($pdo, 'logout', 'account', (int)$_SESSION['user_id'], [], ['role' => $_SESSION['user_type'] ?? '']);
+    }
     session_destroy();
     _loginRedirect();
 }

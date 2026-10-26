@@ -154,7 +154,7 @@ a { text-decoration: none; color: var(--maroon); }
 .event-grid, .ev-grid, .fb-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 @media (max-width: 1000px) { .event-grid, .ev-grid, .fb-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px)  { .event-grid, .ev-grid, .fb-grid { grid-template-columns: 1fr; } }
-[data-more-group]:not(.show-all) > .more-item { display: none; }
+[data-more-group]:not(.show-all) > .more-item { display: none !important; } /* !important: .fb-post sets display:flex inline */
 .more-wrap { display: flex; justify-content: center; margin-top: 16px; }
 .event-card { background: var(--white); border: 1px solid var(--gray-200); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; transition: box-shadow 0.15s, transform 0.15s; }
 .event-card:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.10); transform: translateY(-2px); }
@@ -508,7 +508,8 @@ body.has-login-video { background: var(--maroon-dark); }
 .cand-photo img { width: 100%; height: 100%; object-fit: cover; }
 .cand-tile .cname { font-size: 12px; font-weight: 600; color: var(--gray-800); margin-bottom: 2px; line-height: 1.3; }
 .cand-tile .cpos  { font-size: 10px; color: var(--gray-400); margin-bottom: 10px; }
-.vote-select-btn { width: 100%; padding: 5px 0; border-radius: 7px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1.5px solid var(--maroon); color: var(--maroon); background: transparent; }
+.cand-tile .ccred { margin-bottom: 10px; }
+.vote-select-btn { width: 100%; padding: 5px 0; border-radius: 7px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1.5px solid var(--maroon); color: var(--maroon); background: transparent; margin-top: auto; }
 .vote-select-btn.selected { background: var(--maroon); color: #fff; border-color: var(--maroon); }
 .abstain-row { margin-top: 12px; display: flex; justify-content: flex-end; }
 .abstain-btn { padding: 6px 14px; border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1.5px dashed var(--gray-400); color: var(--gray-400); background: transparent; display: flex; align-items: center; gap: 5px; transition: border-color 0.15s, color 0.15s, background 0.15s; }

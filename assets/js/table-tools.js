@@ -1,3 +1,4 @@
+window.__t = window.__t || function (s) { return s; };
 /* ============================================================
    GNC-OSA PORTAL — Table Tools (sorting + dynamic search)
    ------------------------------------------------------------
@@ -102,6 +103,7 @@
         return 'text';
     }
     function toDate(s) {
+        if (/^\d{9,11}$/.test(s)) return parseInt(s, 10) * 1000;   // data-sort holds a unix timestamp
         var m = s.match(DATE_RE);
         if (!m) return 0;
         var t = Date.parse(m[0]);
@@ -118,10 +120,10 @@
     function toNum(s) { return parseFloat(s.replace(/[^\d.\-]/g, '')) || 0; }
 
     var LABELS = {
-        num:  ['Lowest first', 'Highest first'],
+        num:  [__t('Lowest first'), __t('Highest first')],
         text: ['A to Z', 'Z to A'],
-        date: ['Oldest first', 'Newest first'],
-        voting: ['Not voted first', 'Voted first']
+        date: [__t('Oldest first'), __t('Newest first')],
+        voting: [__t('Not voted first'), __t('Voted first')]
     };
 
     var COLLATOR = (window.Intl && Intl.Collator) ? new Intl.Collator(undefined, { numeric: true }) : null;
@@ -139,7 +141,7 @@
         table.insertBefore(body, next);
     }
 
-    var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    var MONTHS = [__t('January'),__t('February'),__t('March'),__t('April'),__t('May'),__t('June'),__t('July'),__t('August'),__t('September'),__t('October'),__t('November'),__t('December')];
 
     // ── Sorting menu (a single menu for the whole page) ──────────────
     var menu = document.createElement('div');
@@ -180,7 +182,7 @@
         if (th.hasAttribute('data-tt-date'))   { openDateMenu(th); return; }
         menu.classList.remove('win-menu');
         var key = thKey(th), type = columnType(th), cur = currentSort(th);
-        var l = LABELS[type] || LABELS.text;
+        var l = th.getAttribute('data-tt-labels') ? th.getAttribute('data-tt-labels').split('|') : (LABELS[type] || LABELS.text);
         var items = [['asc', l[0], 'ti-arrow-up'], ['desc', l[1], 'ti-arrow-down']];
         menu.innerHTML = '';
         items.forEach(function (it) {
@@ -295,6 +297,7 @@
             if (v === '' || v === null || v === undefined) params.delete(k); else params.set(k, v);
         });
         params.set('page', '1');
+        params.delete('p');   // pages that paginate with ?p= (Audit Log) go back to page 1 too
         var url = window.location.pathname + '?' + params.toString();
         var live = document.getElementById(table.getAttribute('data-tt-live') || '');
         if (!live || !window.fetch) { window.location.href = url; return; }
@@ -381,11 +384,24 @@
         }
         refilter(table);
     }
+    // Client-side date range: rows carry data-ym="YYYY-MM"; table._ttDate = {y, m, mt}
+    function rowDateOk(table, r) {
+        var d = table._ttDate;
+        if (!d || !d.y) return true;
+        var p = (r.getAttribute('data-ym') || '').split('-');
+        if (!p[0] || p[0] !== String(d.y)) return false;
+        var m = parseInt(p[1], 10) || 0, lo = d.m || 1, hi = d.m ? (d.mt || d.m) : 12;
+        return m >= lo && m <= hi;
+    }
     function refilter(table) {
         if (typeof table._ttApply === 'function') { table._ttApply(); return; }
-        var f = table._ttFilters || {}, rows = dataRows(table), shown = 0;
+        var f = table._ttFilters || {}, terms = table._ttTerms || [], rows = dataRows(table), shown = 0;
         rows.forEach(function (r) {
-            var ok = Object.keys(f).every(function (k) { return (r.getAttribute(k) || '') === f[k]; });
+            var ok = Object.keys(f).every(function (k) { return (r.getAttribute(k) || '') === f[k]; }) && rowDateOk(table, r);
+            if (ok && terms.length) {
+                var hay = (r.hasAttribute('data-search') ? r.getAttribute('data-search') : r.textContent).toLowerCase();
+                ok = terms.every(function (w) { return hay.indexOf(w) !== -1; });
+            }
             r.style.display = ok ? '' : 'none';
             if (ok) shown++;
         });
@@ -401,10 +417,29 @@
         } else if (empty) {
             empty.parentNode.removeChild(empty);
         }
+        if (typeof table._ttAfterFilter === 'function') table._ttAfterFilter(shown, rows.length);
     }
 
     // Date menu (Windows-style): Sort by > / Filter by > (month range) / Clear filter
-    function dateState() {
+    function isLive(table) { return table.hasAttribute('data-tt-live'); }
+    // Live (server) tables keep the range in the URL; tables that are fully loaded keep it on the table.
+    function dateGo(table, ch) {
+        if (isLive(table)) { go(table, ch); return; }
+        var d = table._ttDate = table._ttDate || {};
+        if ('dyear' in ch) d.y = ch.dyear ? String(ch.dyear) : '';
+        if ('dmonth' in ch) d.m = parseInt(ch.dmonth, 10) || 0;
+        if ('dmonth_to' in ch) d.mt = parseInt(ch.dmonth_to, 10) || 0;
+        if (!d.y) { d.m = 0; d.mt = 0; }
+        var th = table.querySelector('th[data-tt-date]');
+        if (th) {
+            th.setAttribute('data-tt-year', d.y || ''); th.setAttribute('data-tt-month', d.m || ''); th.setAttribute('data-tt-month-to', d.mt || '');
+            var old = th.querySelector('.tt-badge'); if (old) old.parentNode.removeChild(old);
+            filterBadge(th);
+        }
+        refilter(table);
+    }
+    function dateState(table) {
+        if (table && !isLive(table)) { var d = table._ttDate || {}; return { m: d.m || 0, mt: d.mt || 0, y: d.y || '' }; }
         var p = urlParams();
         return { m: parseInt(p.get('dmonth'), 10) || 0, mt: parseInt(p.get('dmonth_to'), 10) || 0, y: p.get('dyear') || '' };
     }
@@ -437,24 +472,24 @@
         }
 
         // Sort by
-        var subSort = addParent('ti-arrows-sort', 'Sort by');
-        [['asc', 'Oldest first', 'ti-arrow-up'], ['desc', 'Newest first', 'ti-arrow-down']].forEach(function (it) {
+        var subSort = addParent('ti-arrows-sort', __t('Sort by'));
+        [['asc', __t('Oldest first'), 'ti-arrow-up'], ['desc', __t('Newest first'), 'ti-arrow-down']].forEach(function (it) {
             addItem(subSort, it[2], it[1], cur.key === key && cur.dir === it[0], function () {
                 closeMenu(); applySort(th, key, 'date', it[0]);
             });
         });
 
         // Filter by → month range
-        var subFilter = addParent('ti-filter', 'Filter by');
+        var subFilter = addParent('ti-filter', __t('Filter by'));
         var sec = document.createElement('div');
         sec.className = 'tt-hint';
         sec.style.cssText = 'text-align:left;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:4px 4px 6px;';
-        sec.textContent = 'Month range';
+        sec.textContent = __t('Month range');
         subFilter.appendChild(sec);
 
         var years = Object.keys(months).sort(function (a, b) { return parseInt(a, 10) - parseInt(b, 10); });
         if (!years.length) years = [String(new Date().getFullYear())];
-        var st0 = dateState();
+        var st0 = dateState(table);
         var viewYear = st0.y || years[years.length - 1];
         if (years.indexOf(viewYear) === -1) {
             years.push(viewYear);
@@ -478,13 +513,13 @@
             b.textContent = name.slice(0, 3);
             b.addEventListener('click', function (e) {
                 e.stopPropagation();
-                var n = i + 1, st = dateState();
+                var n = i + 1, st = dateState(table);
                 if (rangePending && st.y === viewYear && st.m) {
                     var lo = Math.min(st.m, n), hi = Math.max(st.m, n);
-                    go(table, { dyear: viewYear, dmonth: lo, dmonth_to: hi === lo ? '' : hi }); // 2nd click = end of range
+                    dateGo(table, { dyear: viewYear, dmonth: lo, dmonth_to: hi === lo ? '' : hi }); // 2nd click = end of range
                     rangePending = false;
                 } else {
-                    go(table, { dyear: viewYear, dmonth: n, dmonth_to: '' });                   // 1st click = start month
+                    dateGo(table, { dyear: viewYear, dmonth: n, dmonth_to: '' });                   // 1st click = start month
                     rangePending = true;
                 }
                 refresh();
@@ -502,12 +537,12 @@
         var dv = document.createElement('div');
         dv.className = 'tt-divider';
         menu.appendChild(dv);
-        var clearItem = addItem(menu, 'ti-filter-off', 'Clear filter', false, function () {
-            closeMenu(); go(table, { dmonth: '', dyear: '', dmonth_to: '' });
+        var clearItem = addItem(menu, 'ti-filter-off', __t('Clear filter'), false, function () {
+            closeMenu(); dateGo(table, { dmonth: '', dyear: '', dmonth_to: '' });
         });
 
         function refresh() {
-            var st = dateState(), i = years.indexOf(viewYear);
+            var st = dateState(table), i = years.indexOf(viewYear);
             yearLbl.textContent = viewYear;
             prevBtn.disabled = i <= 0;
             nextBtn.disabled = i >= years.length - 1;
@@ -520,15 +555,15 @@
                 b.classList.toggle('inrange', !!(inYear && st.m && n > st.m && n < end));
                 b.classList.toggle('empty', !have[n]);
             });
-            hint.textContent = rangePending ? 'Now pick the end month' : 'Pick a start month, then an end month';
+            hint.textContent = rangePending ? 'Now pick the end month' : __t('Pick a start month, then an end month');
             clearItem.classList.toggle('disabled', !(st.m || st.y));
         }
         function stepYear(d) {
             var i = years.indexOf(viewYear) + d;
             if (i < 0 || i >= years.length) return;
             viewYear = years[i];
-            var st = dateState();
-            go(table, { dyear: viewYear, dmonth: st.m || '', dmonth_to: st.mt || '' });
+            var st = dateState(table);
+            dateGo(table, { dyear: viewYear, dmonth: st.m || '', dmonth_to: st.mt || '' });
             rangePending = false;
             refresh();
         }
@@ -612,7 +647,7 @@
                 if (ok) shown++;
             });
             clear.style.display = input.value ? 'block' : 'none';
-            count.textContent = terms.length ? ('Showing ' + shown + ' of ' + rows.length) : '';
+            count.textContent = terms.length ? (__t('Showing') + ' ' + shown + ' ' + __t('of') + ' ' + rows.length) : '';
             var body = table.tBodies[0];
             var empty = body.querySelector('.tt-empty');
             if (terms.length && rows.length && shown === 0) {
@@ -674,5 +709,5 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { init(); });
     else init();
 
-    window.TableTools = { init: init };
+    window.TableTools = { init: init, refilter: refilter };
 })();

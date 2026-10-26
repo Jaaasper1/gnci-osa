@@ -26,19 +26,19 @@ $notifCount  = getUnreadNotifCount($pdo, $student_id);
 // instead of silently bouncing back to Events.
 if (!$election) {
     $anyElection = getAnyActiveOrRecentElection($pdo, $student_course);
-    $naTitle   = 'No Election Right Now';
-    $naMessage = 'There is no ongoing election at the moment. Please check back later.';
+    $naTitle   = tx('No Election Right Now');
+    $naMessage = tx('There is no ongoing election at the moment. Please check back later.');
 
     if ($anyElection) {
         $now = time();
         if ($now < strtotime($anyElection['start_date'])) {
-            $naTitle   = 'Voting Not Yet Open';
-            $naMessage = 'Voting for "' . htmlspecialchars($anyElection['title']) . '" hasn\'t opened yet. It opens on '
-                       . date('M j, Y \a\t g:i A', strtotime($anyElection['start_date'])) . '.';
+            $naTitle   = tx('Voting Not Yet Open');
+            $naMessage = tx('Voting for "%s" hasn\'t opened yet. It opens on %s.', htmlspecialchars($anyElection['title']),
+                       tlDate('M j, Y', strtotime($anyElection['start_date'])) . ' ' . (getCurrentLang() === 'tl' ? 'ng ' : 'at ') . date('g:i A', strtotime($anyElection['start_date'])));
         } elseif ($now > strtotime($anyElection['end_date'])) {
-            $naTitle   = 'Voting Has Closed';
-            $naMessage = 'Voting for "' . htmlspecialchars($anyElection['title']) . '" has already closed'
-                       . (!empty($anyElection['show_results']) ? '. You can view the results from the Events page.' : '.');
+            $naTitle   = tx('Voting Has Closed');
+            $naMessage = tx('Voting for "%s" has already closed', htmlspecialchars($anyElection['title']))
+                       . (!empty($anyElection['show_results']) ? tx('. You can view the results from the Events page.') : '.');
         }
     }
     ?>
@@ -46,22 +46,22 @@ if (!$election) {
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voting — GNC-OSA Portal</title>
+    <title><?= t('title.voting', 'Voting') ?> — GNC-OSA Portal</title>
     <link rel="stylesheet" href="../assets/css/style.css?v=27">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
-</head>
+<?php include __DIR__.'/../includes/pwa-head.php'; ?></head>
 <body class="theme-election">
 <nav class="topnav">
-    <button class="hamburger" id="hamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
-    <div class="brand"><img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);"><div class="brand-text"><div class="name">GNC-OSA Portal</div><div class="sub">Voting Portal</div></div></div>
+    <button class="hamburger" id="hamburger" aria-label="<?= t('ui.toggle_menu_641f', 'Toggle menu') ?>"><span></span><span></span><span></span></button>
+    <div class="brand"><img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);"><div class="brand-text"><div class="name">GNC-OSA Portal</div><div class="sub"><?= t('ui.voting_portal_91e2', 'Voting Portal') ?></div></div></div>
     <div class="nav-right">
         <?php renderLangSwitcher(); ?><i class="ti ti-lock" style="color:rgba(255,255,255,0.6);font-size:18px;"></i><span style="font-size:12px;color:rgba(255,255,255,0.6);"><?= t('voting.secure', 'Secure voting') ?></span><div class="avatar"><?= strtoupper(substr($_SESSION['name'],0,2)) ?></div></div>
 </nav>
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
 <aside class="sidebar">
     <div class="sidebar-section"><?= t('sidebar.main', 'Main') ?></div>
-    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> Events</a>
-    <a class="sitem" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.my_complaints', 'My Complaints') ?></a>
+    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> <?= t('sidebar.events', 'Events') ?></a>
+    <a class="sitem" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.my_complaints', 'My Complaints') ?></a><a class="sitem" href="help.php"><i class="ti ti-book"></i> <?= t('sidebar.osa_guide', 'OSA Guide') ?></a>
     <a class="sitem" href="new-complaint.php"><i class="ti ti-circle-plus"></i> <?= t('sidebar.new_complaint', 'New Complaint') ?></a>
     <div class="sidebar-section"><?= t('sidebar.account', 'Account') ?></div>
     <a class="sitem" href="settings.php"><i class="ti ti-settings"></i> <?= t('nav.settings', 'Settings') ?></a>
@@ -76,10 +76,11 @@ if (!$election) {
         <i class="ti ti-calendar-off" style="font-size:52px;color:#9CA3AF;"></i>
         <h2 style="margin:12px 0 6px;color:#374151;"><?= htmlspecialchars($naTitle) ?></h2>
         <p style="color:#9CA3AF;max-width:420px;margin:0 auto;"><?= $naMessage ?></p>
-        <a href="events.php" class="btn btn-outline" style="margin-top:16px;"><i class="ti ti-home"></i> Back to Events</a>
+        <a href="events.php" class="btn btn-outline" style="margin-top:16px;"><i class="ti ti-home"></i> <?= t('ui.back_to_events_f1d4', 'Back to Events') ?></a>
     </div>
 </div></div>
 <script src="../assets/js/sidebar.js?v=5"></script>
+<?php include __DIR__.'/../includes/ask-osa-widget.php'; ?>
 </body>
 </html>
 <?php
@@ -93,21 +94,21 @@ if (!empty($election['is_hold'])) {
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voting — GNC-OSA Portal</title>
+    <title><?= t('title.voting', 'Voting') ?> — GNC-OSA Portal</title>
     <link rel="stylesheet" href="../assets/css/style.css?v=27">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
-</head>
+<?php include __DIR__.'/../includes/pwa-head.php'; ?></head>
 <body class="theme-election">
 <nav class="topnav">
-    <button class="hamburger" id="hamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
-    <div class="brand"><img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);"><div class="brand-text"><div class="name">GNC-OSA Portal</div><div class="sub">Voting Portal</div></div></div>
+    <button class="hamburger" id="hamburger" aria-label="<?= t('ui.toggle_menu_641f', 'Toggle menu') ?>"><span></span><span></span><span></span></button>
+    <div class="brand"><img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);"><div class="brand-text"><div class="name">GNC-OSA Portal</div><div class="sub"><?= t('ui.voting_portal_91e2', 'Voting Portal') ?></div></div></div>
     <div class="nav-right">
         <?php renderLangSwitcher(); ?><i class="ti ti-lock" style="color:rgba(255,255,255,0.6);font-size:18px;"></i><span style="font-size:12px;color:rgba(255,255,255,0.6);"><?= t('voting.secure', 'Secure voting') ?></span><div class="avatar"><?= strtoupper(substr($_SESSION['name'],0,2)) ?></div></div>
 </nav>
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
 <aside class="sidebar">
     <div class="sidebar-section"><?= t('sidebar.main', 'Main') ?></div>
-    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> Events</a>
+    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> <?= t('sidebar.events', 'Events') ?></a>
     <a class="sitem" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.my_complaints', 'My Complaints') ?></a>
     <a class="sitem" href="new-complaint.php"><i class="ti ti-circle-plus"></i> <?= t('sidebar.new_complaint', 'New Complaint') ?></a>
     <div class="sidebar-section"><?= t('sidebar.account', 'Account') ?></div>
@@ -121,13 +122,11 @@ if (!empty($election['is_hold'])) {
     <div class="page-header"><h1><?= t('voting.title', 'Student Council Election') ?></h1></div>
     <div class="card" style="text-align:center;padding:40px;">
         <i class="ti ti-player-pause" style="font-size:52px;color:#F59E0B;"></i>
-        <h2 style="margin:12px 0 6px;color:#374151;">Voting Temporarily Paused</h2>
+        <h2 style="margin:12px 0 6px;color:#374151;"><?= t('ui.voting_temporarily_paused_5c22', 'Voting Temporarily Paused') ?></h2>
         <p style="color:#9CA3AF;max-width:420px;margin:0 auto;">
-            Voting for "<?= htmlspecialchars($election['title']) ?>" has been paused by OSA
-            (for example, due to a class suspension). Your progress and the election schedule are safe —
-            please check back once voting resumes.
+            <?= t('ui.voting_for_8697', 'Voting for "') ?><?= htmlspecialchars($election['title']) ?><?= t('ui.has_been_paused_by_osa_for_example_f879', '" has been paused by OSA (for example, due to a class suspension). Your progress and the election schedule are safe — please check back once voting resumes.') ?>
         </p>
-        <a href="events.php" class="btn btn-outline" style="margin-top:16px;"><i class="ti ti-home"></i> Back to Events</a>
+        <a href="events.php" class="btn btn-outline" style="margin-top:16px;"><i class="ti ti-home"></i> <?= t('ui.back_to_events_f1d4', 'Back to Events') ?></a>
     </div>
 </div></div>
 <script src="../assets/js/sidebar.js?v=5"></script>
@@ -157,7 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['voucher_code']) && !$
         $_SESSION['voucher_verified'][$election_id] = true;
         $voucherVerified = true;
     } else {
-        $voucherError = 'Invalid or already used voucher code. Please check and try again.';
+        $voucherError = tx('Invalid or already used voucher code. Please check and try again.');
     }
 }
 
@@ -193,7 +192,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['votes'])) {
     }
 
     if (!empty($missingPositions)) {
-        $error = 'Please select a candidate or choose Abstain for each position.';
+        $error = t('msg.please_select_a_candidate_or_choose_abst_df32', 'Please select a candidate or choose Abstain for each position.');
     } else {
         $valid = true;
         $validatedVotes = [];
@@ -210,7 +209,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['votes'])) {
                 $check = $pdo->prepare("SELECT id FROM candidates WHERE id = ? AND position_id = ? AND election_id = ? AND is_approved = 1");
                 $check->execute([$candidate_id, $position_id, $election_id]);
                 if (!$check->fetch()) {
-                    $error = 'Invalid candidate selection. Please try again.';
+                    $error = t('msg.invalid_candidate_selection_please_try_a_5f61', 'Invalid candidate selection. Please try again.');
                     $valid = false;
                     break;
                 }
@@ -246,7 +245,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['votes'])) {
                 }
             } catch (Exception $e) {
                 $pdo->rollBack();
-                $error = 'A server error occurred. Please try again.';
+                $error = t('msg.a_server_error_occurred_please_try_again_e70d', 'A server error occurred. Please try again.');
                 $valid = false;
             }
             if ($valid) {
@@ -272,28 +271,28 @@ $positions = $pdo->prepare("SELECT * FROM positions WHERE election_id = ? ORDER 
 $positions->execute([$election_id]);
 $positions = $positions->fetchAll();
 
-$success = isset($_GET['voted']) ? 'Your vote has been recorded! Thank you for participating.' : '';
+$success = isset($_GET['voted']) ? tx('Your vote has been recorded! Thank you for participating.') : '';
 $error   = $error ?? '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voting — GNC-OSA Portal</title>
+    <title><?= t('title.voting', 'Voting') ?> — GNC-OSA Portal</title>
     <link rel="stylesheet" href="../assets/css/style.css?v=27">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
-</head>
+<?php include __DIR__.'/../includes/pwa-head.php'; ?></head>
 <body class="theme-election">
 <nav class="topnav">
-    <button class="hamburger" id="hamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
-    <div class="brand"><img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);"><div class="brand-text"><div class="name">GNC-OSA Portal</div><div class="sub">Voting Portal</div></div></div>
+    <button class="hamburger" id="hamburger" aria-label="<?= t('ui.toggle_menu_641f', 'Toggle menu') ?>"><span></span><span></span><span></span></button>
+    <div class="brand"><img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);"><div class="brand-text"><div class="name">GNC-OSA Portal</div><div class="sub"><?= t('ui.voting_portal_91e2', 'Voting Portal') ?></div></div></div>
     <div class="nav-right">
         <?php renderLangSwitcher(); ?><i class="ti ti-lock" style="color:rgba(255,255,255,0.6);font-size:18px;"></i><span style="font-size:12px;color:rgba(255,255,255,0.6);"><?= t('voting.secure', 'Secure voting') ?></span><div class="avatar"><?= strtoupper(substr($_SESSION['name'],0,2)) ?></div></div>
 </nav>
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
 <aside class="sidebar">
     <div class="sidebar-section"><?= t('sidebar.main', 'Main') ?></div>
-    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> Events</a>
+    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> <?= t('sidebar.events', 'Events') ?></a>
     <a class="sitem" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.my_complaints', 'My Complaints') ?></a>
     <a class="sitem" href="new-complaint.php"><i class="ti ti-circle-plus"></i> <?= t('sidebar.new_complaint', 'New Complaint') ?></a>
     <?php if ($election): ?>
@@ -319,12 +318,12 @@ $error   = $error ?? '';
         <?php endif; ?>
         <div class="card vote-success-card" style="text-align:center;padding:40px;">
             <i class="ti ti-circle-check" style="font-size:52px;color:#059669;"></i>
-            <h2 style="margin:12px 0 6px;color:#065F46;">You have already voted!</h2>
-            <p style="color:#9CA3AF;">Your vote has been recorded for <?= htmlspecialchars($election['title']) ?>.</p>
+            <h2 style="margin:12px 0 6px;color:#065F46;"><?= t('ui.you_have_already_voted_c56f', 'You have already voted!') ?></h2>
+            <p style="color:#9CA3AF;"><?= t('ui.your_vote_has_been_recorded_for_ccbe', 'Your vote has been recorded for') ?> <?= htmlspecialchars($election['title']) ?>.</p>
             <?php if ($election['show_results']): ?>
-                <a href="results.php?id=<?= $election_id ?>" class="btn btn-primary" style="margin-top:16px;">View Live Results</a>
+                <a href="results.php?id=<?= $election_id ?>" class="btn btn-primary" style="margin-top:16px;"><?= t('ui.view_live_results_e222', 'View Live Results') ?></a>
             <?php endif; ?>
-            <a href="events.php" class="btn btn-outline" style="margin-top:16px;margin-left:8px;"><i class="ti ti-home"></i> Back to Events</a>
+            <a href="events.php" class="btn btn-outline" style="margin-top:16px;margin-left:8px;"><i class="ti ti-home"></i> <?= t('ui.back_to_events_f1d4', 'Back to Events') ?></a>
         </div>
 
     <?php else: ?>
@@ -335,8 +334,8 @@ $error   = $error ?? '';
         <div style="width:56px;height:56px;border-radius:50%;background:var(--maroon-pale);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
             <i class="ti ti-ticket" style="font-size:28px;color:var(--maroon);"></i>
         </div>
-        <h2 style="font-size:17px;font-weight:600;color:var(--maroon-dark);margin-bottom:6px;">Enter Your Voting Voucher</h2>
-        <p style="font-size:13px;color:#6B7280;margin-bottom:20px;line-height:1.5;">You need a one-time voucher code to access the ballot. Get your code from the OSA or your election officer.</p>
+        <h2 style="font-size:17px;font-weight:600;color:var(--maroon-dark);margin-bottom:6px;"><?= t('ui.enter_your_voting_voucher_3f89', 'Enter Your Voting Voucher') ?></h2>
+        <p style="font-size:13px;color:#6B7280;margin-bottom:20px;line-height:1.5;"><?= t('ui.you_need_a_one_time_voucher_code_t_cb33', 'You need a one-time voucher code to access the ballot. Get your code from the OSA or your election officer.') ?></p>
         <?php if ($voucherError): ?>
             <div class="alert alert-error" style="text-align:left;"><i class="ti ti-alert-circle"></i><?= e($voucherError) ?></div>
         <?php endif; ?>
@@ -347,7 +346,7 @@ $error   = $error ?? '';
                    style="text-align:center;font-size:18px;font-family:'Courier New',monospace;font-weight:700;letter-spacing:2px;margin-bottom:14px;text-transform:uppercase;"
                    maxlength="14" required autofocus
                    oninput="formatVoucher(this)">
-            <button type="submit" class="btn btn-primary btn-block"><i class="ti ti-lock-open"></i> Unlock Ballot</button>
+            <button type="submit" class="btn btn-primary btn-block"><i class="ti ti-lock-open"></i> <?= t('ui.unlock_ballot_25f3', 'Unlock Ballot') ?></button>
         </form>
     </div>
 
@@ -370,12 +369,12 @@ $error   = $error ?? '';
             return !empty($partyTickets[$p['id']]);
         });
     ?>
-    <div class="alert alert-info"><i class="ti ti-info-circle"></i> Select <strong>one candidate</strong> for each position, or click <strong>Abstain</strong> if you wish to skip a position. This cannot be changed after submitting.</div>
+    <div class="alert alert-info"><i class="ti ti-info-circle"></i> <?= t('ui.select_e062', 'Select') ?> <strong><?= t('ui.one_candidate_aa9d', 'one candidate') ?></strong> <?= t('ui.for_each_position_or_click_f5ea', 'for each position, or click') ?> <strong><?= tx('Abstain') ?></strong> <?= t('ui.if_you_wish_to_skip_a_position_thi_7649', 'if you wish to skip a position. This cannot be changed after submitting.') ?></div>
 
     <?php if (!empty($partiesWithCandidates)): ?>
     <div class="card" style="margin-bottom:18px;">
-        <div class="card-title" style="margin-bottom:4px;"><i class="ti ti-flag"></i> Vote a Whole Party Ticket</div>
-        <p style="font-size:12px;color:#6B7280;margin-bottom:14px;">Click a party to instantly select all of its candidates. You can still change individual picks afterwards, and positions the party isn't running in will need to be selected manually.</p>
+        <div class="card-title" style="margin-bottom:4px;"><i class="ti ti-flag"></i> <?= t('ui.vote_a_whole_party_ticket_1368', 'Vote a Whole Party Ticket') ?></div>
+        <p style="font-size:12px;color:#6B7280;margin-bottom:14px;"><?= t('ui.click_a_party_to_instantly_select__bda6', 'Click a party to instantly select all of its candidates. You can still change individual picks afterwards, and positions the party isn\'t running in will need to be selected manually.') ?></p>
         <div style="display:flex;flex-wrap:wrap;gap:10px;">
             <?php foreach ($partiesWithCandidates as $pl): ?>
             <button type="button" class="party-ticket-btn" id="party-btn-<?= $pl['id'] ?>" onclick="voteTicket(<?= $pl['id'] ?>)"
@@ -394,12 +393,12 @@ $error   = $error ?? '';
     <?php endif; ?>
 
     <form method="POST" class="confirm-submit-form"
-          data-confirm-title="Submit your vote?"
-          data-confirm-message="This action cannot be undone. Once submitted, you will not be able to change or resubmit your vote."
-          data-confirm-btn="Yes, Submit Vote"
+          data-confirm-title="<?= htmlspecialchars(t('auto.submit_your_vote_e414', 'Submit your vote?'), ENT_QUOTES) ?>"
+          data-confirm-message="<?= htmlspecialchars(t('msg.this_action_cannot_be_undone_once_submit_d9a4', 'This action cannot be undone. Once submitted, you will not be able to change or resubmit your vote.'), ENT_QUOTES) ?>"
+          data-confirm-btn="<?= htmlspecialchars(t('msg.yes_submit_vote_c519', 'Yes, Submit Vote'), ENT_QUOTES) ?>"
           data-confirm-danger="1"
           data-confirm-validate="voteFormIsComplete"
-          data-loading-overlay="Recording your vote...">
+          data-loading-overlay="<?= htmlspecialchars(tx('Recording your vote...'), ENT_QUOTES) ?>">
         <?= csrfField() ?>
         <?php foreach ($positions as $pos): ?>
         <?php
@@ -425,7 +424,7 @@ $error   = $error ?? '';
                     <i class="ti ti-flag" style="margin-right:3px;"></i><?= htmlspecialchars($cand['party_name']) ?>
                 </div>
                 <?php else: ?>
-                <div class="cparty" style="font-size:11px;color:#9CA3AF;margin:1px 0 2px;">Independent</div>
+                <div class="cparty" style="font-size:11px;color:#9CA3AF;margin:1px 0 2px;"><?= tx('Independent') ?></div>
                 <?php endif; ?>
                 <div class="cpos"><?= htmlspecialchars($cand['course']) ?></div>
                 <?php if (!empty($cand['credentials'])): ?>
@@ -434,7 +433,7 @@ $error   = $error ?? '';
                 <button type="button" class="vote-select-btn"
                         data-position="<?= $pos['id'] ?>"
                         data-candidate="<?= $cand['id'] ?>"
-                        onclick="unhighlightAllPartyButtons(); activeTicketParty=null; selectVote(this)">Vote</button>
+                        onclick="unhighlightAllPartyButtons(); activeTicketParty=null; selectVote(this)"><?= t('ui.vote_7f31', 'Vote') ?></button>
             </div>
             <?php endforeach; ?>
             </div>
@@ -442,15 +441,15 @@ $error   = $error ?? '';
                 <button type="button" class="abstain-btn" id="abstain-btn-<?= $pos['id'] ?>"
                         data-position="<?= $pos['id'] ?>"
                         onclick="unhighlightAllPartyButtons(); activeTicketParty=null; selectAbstain(this)">
-                    <i class="ti ti-ban"></i> Abstain for this position
+                    <i class="ti ti-ban"></i> <?= t('ui.abstain_for_this_position_0b36', 'Abstain for this position') ?>
                 </button>
             </div>
             <input type="hidden" name="votes[<?= $pos['id'] ?>]" id="vote-input-<?= $pos['id'] ?>" value="">
         </div>
         <?php endforeach; ?>
         <div style="display:flex;justify-content:flex-end;gap:10px;">
-            <a href="events.php" class="btn btn-outline">Back</a>
-            <button type="submit" class="btn btn-primary"><i class="ti ti-checkbox"></i> Submit Vote</button>
+            <a href="events.php" class="btn btn-outline"><?= t('ui.back_0557', 'Back') ?></a>
+            <button type="submit" class="btn btn-primary"><i class="ti ti-checkbox"></i> <?= t('ui.submit_vote_39e2', 'Submit Vote') ?></button>
         </div>
     </form>
     <?php endif; // voucherVerified ?>
@@ -528,7 +527,7 @@ function selectVote(btn, forceSelect) {
     var alreadySelected = btn.classList.contains('selected');
     document.querySelectorAll('[data-position="' + posId + '"].vote-select-btn').forEach(function(b) {
         b.classList.remove('selected');
-        b.textContent = 'Vote';
+        b.textContent = __t('Vote');
         b.closest('.cand-tile').classList.remove('selected');
     });
     var abstainBtn = document.getElementById('abstain-btn-' + posId);
@@ -537,7 +536,7 @@ function selectVote(btn, forceSelect) {
         document.getElementById('vote-input-' + posId).value = '';
     } else {
         btn.classList.add('selected');
-        btn.textContent = '\u2713 Selected';
+        btn.textContent = __t('\u2713 Selected');
         btn.closest('.cand-tile').classList.add('selected');
         document.getElementById('vote-input-' + posId).value = btn.dataset.candidate;
     }
@@ -548,16 +547,16 @@ function selectAbstain(btn) {
     var alreadyAbstained = btn.classList.contains('selected');
     document.querySelectorAll('[data-position="' + posId + '"].vote-select-btn').forEach(function(b) {
         b.classList.remove('selected');
-        b.textContent = 'Vote';
+        b.textContent = __t('Vote');
         b.closest('.cand-tile').classList.remove('selected');
     });
     if (alreadyAbstained) {
         btn.classList.remove('selected');
-        btn.innerHTML = '<i class="ti ti-ban"></i> Abstain for this position';
+        btn.innerHTML = '<i class="ti ti-ban"></i> ' + __t('Abstain for this position');
         document.getElementById('vote-input-' + posId).value = '';
     } else {
         btn.classList.add('selected');
-        btn.innerHTML = '<i class="ti ti-ban"></i> \u2713 Abstaining';
+        btn.innerHTML = '<i class="ti ti-ban"></i> ' + __t('\u2713 Abstaining');
         document.getElementById('vote-input-' + posId).value = 'abstain';
     }
 }
@@ -577,7 +576,7 @@ function voteFormIsComplete() {
         if (existing) existing.remove();
         var div = document.createElement('div');
         div.className = 'alert alert-error';
-        div.innerHTML = '<i class="ti ti-alert-circle"></i> Please select a candidate or choose Abstain for each position.';
+        div.innerHTML = '<i class="ti ti-alert-circle"></i> ' + __t('Please select a candidate or choose Abstain for each position.');
         document.querySelector('form').insertAdjacentElement('beforebegin', div);
         window.scrollTo({top: 0, behavior: 'smooth'});
     }

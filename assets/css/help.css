@@ -1,0 +1,46 @@
+/* ===== OSA Guide page: official help-center layout ===== */
+.help-page { max-width:860px; margin:0 auto; }
+
+.help-hero { display:flex; align-items:center; gap:18px; background:#6B1A2A; color:#fff; border-radius:16px; padding:22px 24px; margin-bottom:18px; }
+.help-logo { width:64px; height:64px; border-radius:50%; object-fit:cover; border:3px solid rgba(255,255,255,0.35); background:#fff; flex-shrink:0; }
+.help-hero h1 { font-size:24px; margin:0 0 4px; color:#fff; }
+.help-hero p { margin:0; font-size:14px; color:rgba(255,255,255,0.85); }
+
+.help-search { display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #DCDAD2; border-radius:12px; padding:10px 14px; margin-bottom:24px; }
+.help-search i { color:#8A8880; font-size:18px; }
+.help-search input { flex:1; border:none; outline:none; font-size:15px; background:transparent; }
+
+.help-section { margin-bottom:28px; }
+.help-section h2 { font-size:16px; font-weight:600; color:#1F1E1D; margin:0 0 12px; }
+
+.help-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(360px, 1fr)); gap:12px; }
+.help-card { background:#fff; border:1px solid #E5E3DC; border-radius:14px; overflow:hidden; }
+.help-card[open] { border-color:#D9C2C8; }
+.help-card summary, .help-faq-item summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:12px; padding:14px 16px; }
+.help-card summary::-webkit-details-marker, .help-faq-item summary::-webkit-details-marker { display:none; }
+.help-icon { width:36px; height:36px; border-radius:10px; background:#F6E7EA; color:#6B1A2A; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+.help-card-text { flex:1; display:flex; flex-direction:column; }
+.help-card-title { font-weight:600; color:#1F1E1D; font-size:15px; }
+.help-card-intro { font-size:13px; color:#6B6A64; margin-top:2px; }
+.help-caret { color:#8A8880; transition:transform .15s; }
+details[open] > summary .help-caret { transform:rotate(180deg); }
+
+.help-steps { margin:0; padding:0 18px 16px 52px; color:#2F2E2B; font-size:14px; line-height:1.7; }
+.help-steps li { margin-bottom:4px; }
+.help-steps b { color:#1F1E1D; }
+
+.help-faq { background:#fff; border:1px solid #E5E3DC; border-radius:14px; overflow:hidden; }
+.help-faq-item { border-top:1px solid #F0EEE8; }
+.help-faq-item:first-child { border-top:none; }
+.help-faq-item summary { font-weight:600; font-size:14px; color:#1F1E1D; }
+.help-faq-answer { padding:0 16px 16px 16px; font-size:14px; line-height:1.65; color:#2F2E2B; }
+
+.help-empty { color:#8A8880; font-size:14px; text-align:center; padding:16px; }
+
+.help-contact { display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; background:#FAF9F5; border:1px solid #E5E3DC; border-radius:14px; padding:18px 20px; }
+.help-contact strong { color:#1F1E1D; font-size:15px; }
+.help-contact p { margin:4px 0 0; font-size:13px; color:#6B6A64; }
+.help-contact-btn { display:inline-flex; align-items:center; gap:6px; background:#6B1A2A; color:#fff; text-decoration:none; border-radius:10px; padding:9px 16px; font-size:14px; font-weight:600; }
+.help-contact-btn:hover { background:#561421; }
+
+@media (max-width: 700px) { .help-grid { grid-template-columns:1fr; } }

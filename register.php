@@ -8,7 +8,7 @@ require_once 'includes/mailer.php';
 
 if (isLoggedIn()) {
     if ($_SESSION['user_type'] === 'student') header('Location: student/dashboard.php');
-    elseif ($_SESSION['user_type'] === 'staff')  header('Location: osa/dashboard.php');
+    elseif ($_SESSION['user_type'] === 'staff')  header('Location: admin/dashboard.php');
     elseif ($_SESSION['user_type'] === 'admin')  header('Location: admin/dashboard.php');
     exit;
 }
@@ -48,11 +48,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['step'] ?? '') === 'details
     $lname  = trim($_POST['last_name']  ?? '');
     $email  = trim($_POST['email']      ?? '');
     $course = trim($_POST['course']     ?? '');
+    $pw     = (string)($_POST['password'] ?? '');
+    $pw2    = (string)($_POST['password_confirm'] ?? '');
 
-    if (!$sid || !$fname || !$lname || !$email) {
+    if (!$sid || !$fname || !$lname || !$email || !$course) {
         $error = t('register.err_required', 'Please fill in all required fields.');
     } elseif (!preg_match('/^\d{6,12}$/', $sid)) {
         $error = t('register.err_sid_format', 'Invalid Student ID format. Numbers only, no dashes (e.g. 20193372).');
+    } elseif (!in_array($course, $courses, true)) {
+        $error = 'Please select a valid course from the list.';
+    } elseif (mb_strlen($pw) < 8) {
+        $error = 'Password must be at least 8 characters.';
+    } elseif ($pw !== $pw2) {
+        $error = 'The passwords do not match.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = t('register.err_email', 'Invalid email address.');
     } elseif (!preg_match('/@gmail\.com$/i', $email)) {
@@ -83,6 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['step'] ?? '') === 'details
                         'last_name'   => $lname,
                         'email'       => $email,
                         'course'      => $course,
+                        'password_hash' => password_hash($pw, PASSWORD_DEFAULT),
                         'cor_file'    => $corResult['filename'],
                         'otp'         => $otp,
                         'expires_at'  => time() + 600, // 10 minutes
@@ -128,7 +137,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['step'] ?? '') === 'verify'
                 unset($_SESSION['reg_pending']);
                 $stage = 'form';
             } else {
-                $unusedHash = password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT);
+                // Use the password the student chose. Older pending sessions without one get a random hash.
+                $unusedHash = $pending['password_hash'] ?? password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT);
                 $pdo->prepare("INSERT INTO students (student_id, first_name, last_name, email, course, cor_file, password, is_active)
                                VALUES (?, ?, ?, ?, ?, ?, ?, 0)")
                     ->execute([
@@ -174,9 +184,9 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register — GNC-OSA Portal</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=27">
+    <link rel="stylesheet" href="assets/css/style.css?v=29">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
-</head>
+<?php include __DIR__.'/includes/pwa-head.php'; ?></head>
 <body class="auth-split-page">
 <div class="auth-split">
     <?php include 'includes/auth-brand.php'; ?>
@@ -252,10 +262,10 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
                 <button type="submit" form="otpVerifyFormReg" class="auth-btn">Verify OTP</button>
 
             <?php else: ?>
-                <!-- REGISTER FORM (STEP 1, no password) -->
+                <!-- REGISTER FORM (STEP 1) -->
                 <a href="index.php" class="auth-back" data-loading-text="Back to login..."><i class="ti ti-arrow-left"></i> <?= t('common.go_back', 'Go back') ?></a>
                 <h1 class="auth-title"><?= t('login.register', 'Register') ?></h1>
-                <p class="auth-sub"><?= t('register.subtitle_otp', "Create an account — no password needed, we'll email you a code each time you log in.") ?></p>
+                <p class="auth-sub"><?= t('register.subtitle_otp', "Create an account. Set a password, or log in with an email code each time.") ?></p>
 
                 <?php if ($error): ?>
                     <div class="alert alert-error"><i class="ti ti-alert-circle"></i> <?= htmlspecialchars($error) ?></div>
@@ -316,13 +326,32 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
 
                     <!-- Course -->
                     <div class="form-group" style="margin-bottom:0;">
-                        <label><?= t('register.course', 'Course') ?></label>
-                        <select name="course" class="form-control">
+                        <label><?= t('register.course', 'Course') ?> <span style="color:#EF4444;">*</span></label>
+                        <select name="course" class="form-control" required>
                             <option value="">— <?= t('common.select', 'Select') ?> —</option>
                             <?php foreach ($courses as $c): ?>
                                 <option value="<?= $c ?>" <?= (($_POST['course'] ?? '') === $c) ? 'selected' : '' ?>><?= $c ?></option>
                             <?php endforeach; ?>
                         </select>
+                    </div>
+
+                    <div style="height:12px;"></div>
+
+                    <!-- Password (used with Student ID to log in, or leave it and use the email code) -->
+                    <div class="form-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Password <span style="color:#991B1B;">*</span></label>
+                            <input type="password" name="password" class="form-control" minlength="8"
+                                   placeholder="At least 8 characters" autocomplete="new-password" required>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Confirm password <span style="color:#991B1B;">*</span></label>
+                            <input type="password" name="password_confirm" class="form-control" minlength="8"
+                                   placeholder="Retype password" autocomplete="new-password" required>
+                        </div>
+                    </div>
+                    <div style="font-size:12px;color:#6B7280;margin-top:4px;">
+                        <i class="ti ti-info-circle"></i> You can log in with your password, or use the email code.
                     </div>
 
                     <div style="height:12px;"></div>

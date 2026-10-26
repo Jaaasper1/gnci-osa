@@ -1,6 +1,16 @@
 <?php
+// Keep the response JSON even if PHP hits a fatal error, and say what went wrong.
+ini_set('display_errors', '0');
+register_shutdown_function(function () {
+    $err = error_get_last();
+    if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR], true)) {
+        if (!headers_sent()) header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'message' => 'Server error: ' . $err['message'] . ' (' . basename($err['file']) . ':' . $err['line'] . ')']);
+    }
+});
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/lang.php';
 require_once '../includes/functions.php';
 require_once '../vendor/autoload.php';
 
@@ -11,7 +21,7 @@ use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
-requireAdmin();
+requireStaff();
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -88,30 +98,32 @@ if (isset($_GET['template'])) {
 
 // ── Import POST ────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    echo json_encode(['success' => false, 'message' => 'Invalid request.']); exit;
+    echo json_encode(['success' => false, 'message' => t('msg.invalid_request_777f', 'Invalid request.')]); exit;
 }
 
 // CSRF check (JSON-friendly version of requireCsrf())
 $sentToken = $_POST['csrf_token'] ?? '';
 if (empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $sentToken)) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Your session expired. Please refresh the page and try again.']); exit;
+    echo json_encode(['success' => false, 'message' => t('msg.your_session_expired_please_refresh_the__4fe0', 'Your session expired. Please refresh the page and try again.')]); exit;
 }
 
 // preview=1 → only work out what WOULD change and send it back; nothing is saved.
 $previewOnly = !empty($_POST['preview']);
+require_once '../includes/admin-otp.php';
+if (!$previewOnly) adminOtpRequireGateJson('import_students');
 
 if (empty($_FILES['excel_file']['name'])) {
-    echo json_encode(['success' => false, 'message' => 'No file uploaded.']); exit;
+    echo json_encode(['success' => false, 'message' => t('msg.no_file_uploaded_064d', 'No file uploaded.')]); exit;
 }
 
 $file = $_FILES['excel_file'];
 $ext  = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
 if (!in_array($ext, ['xlsx', 'xls'])) {
-    echo json_encode(['success' => false, 'message' => 'Invalid file type. Upload .xlsx or .xls only.']); exit;
+    echo json_encode(['success' => false, 'message' => t('msg.invalid_file_type_upload_xlsx_or_xls_onl_e08e', 'Invalid file type. Upload .xlsx or .xls only.')]); exit;
 }
 if ($file['size'] > 10 * 1024 * 1024) {
-    echo json_encode(['success' => false, 'message' => 'File too large. Max 10MB.']); exit;
+    echo json_encode(['success' => false, 'message' => t('msg.file_too_large_max_10mb_51fe', 'File too large. Max 10MB.')]); exit;
 }
 
 try {
@@ -123,7 +135,7 @@ try {
 }
 
 if (count($rows) < 2) {
-    echo json_encode(['success' => false, 'message' => 'File is empty or has no data rows.']); exit;
+    echo json_encode(['success' => false, 'message' => t('msg.file_is_empty_or_has_no_data_rows_7bcc', 'File is empty or has no data rows.')]); exit;
 }
 
 // Find the actual header row. A plain import template has headers on row 1,
@@ -164,7 +176,7 @@ $cols = [
 ];
 
 if ($cols['student_id'] === false || $cols['first_name'] === false || $cols['last_name'] === false) {
-    echo json_encode(['success' => false, 'message' => 'Missing required columns: Student ID, First Name, Last Name.']); exit;
+    echo json_encode(['success' => false, 'message' => t('msg.missing_required_columns_student_id_firs_a690', 'Missing required columns: Student ID, First Name, Last Name.')]); exit;
 }
 
 // ── Work out what each row would do (used by BOTH preview and real import,
@@ -236,6 +248,11 @@ for ($i = $headerRowIdx + 1; $i < count($rows); $i++) {
                           'new' => ($isActive ? 'Active' : 'Inactive')];
         }
         $entry['action']   = $changes ? 'update' : 'unchanged';
+        // Show masked emails in the preview only; the comparison above used the real values
+        foreach ($changes as &$__c) {
+            if ($__c['field'] === 'Email') { $__c['old'] = maskEmail($__c['old']); $__c['new'] = maskEmail($__c['new']); }
+        }
+        unset($__c);
         $entry['changes']  = $changes;
         $entry['old_name'] = trim($existing['first_name'] . ' ' . $existing['last_name']);
     }
@@ -279,6 +296,7 @@ if ($previewOnly) {
 // ── REAL IMPORT: apply the plan ─────────────────────────────────────────────
 $added   = 0;
 $updated = 0;
+$details = [];   // what actually changed, sent back to the page
 
 foreach ($plan as $p) {
     try {
@@ -288,6 +306,7 @@ foreach ($plan as $p) {
                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)")
                 ->execute([$p['sid'], $p['fname'], $p['lname'], $p['course'] ?: null, $p['email'] ?: null, $hashed, $p['is_active'], $p['is_active'] ? date('Y-m-d H:i:s') : null]);
             $added++;
+            $details[] = ['action' => 'add', 'student_id' => $p['sid'], 'name' => trim($p['fname'] . ' ' . $p['lname']), 'changes' => []];
         } elseif ($p['action'] === 'update') {
             if ($cols['status'] !== false) {
                 // If this import (re)activates the student, stamp approved_at the
@@ -301,6 +320,7 @@ foreach ($plan as $p) {
                     ->execute([$p['fname'], $p['lname'], $p['course'] ?: null, $p['email'] ?: null, $p['db_id']]);
             }
             $updated++;
+            $details[] = ['action' => 'update', 'student_id' => $p['sid'], 'name' => trim($p['fname'] . ' ' . $p['lname']), 'changes' => $p['changes']];
         }
     } catch (PDOException $e) {
         $skipped[] = "Row {$p['row']}: Could not save this row (" . $e->getMessage() . ").";
@@ -312,6 +332,7 @@ if ($added)     $msgParts[] = "$added added";
 if ($updated)   $msgParts[] = "$updated updated";
 if ($countSame) $msgParts[] = "$countSame unchanged";
 $message = ($added || $updated) ? implode(', ', $msgParts) . '.' : 'No changes made.';
+if ($added || $updated) auditLog($pdo, 'import', 'student', 0, [], ['added' => $added, 'updated' => $updated]);
 
 echo json_encode([
     'success'   => true,
@@ -320,4 +341,5 @@ echo json_encode([
     'unchanged' => $countSame,
     'skipped'   => $skipped,
     'message'   => $message,
-]);
+    'details'   => $details,
+], JSON_INVALID_UTF8_SUBSTITUTE);

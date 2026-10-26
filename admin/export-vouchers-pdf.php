@@ -1,8 +1,13 @@
 <?php
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/audit.php';
 require_once '../includes/functions.php';
-requireAdmin();
+requireStaff();
+require_once '../includes/admin-otp.php';
+if (!function_exists('t')) { require_once __DIR__ . '/../includes/lang.php'; }
+adminOtpRequireGate('export_vouchers');
+auditLog($pdo, 'export', 'voucher', (int)($_GET['election_id'] ?? 0), [], ['file' => basename(__FILE__, '.php')]);
 
 $elections = $pdo->query("SELECT * FROM elections WHERE is_active=1 ORDER BY created_at DESC")->fetchAll();
 $election_id = (int)($_GET['election_id'] ?? ($elections[0]['id'] ?? 0));
@@ -214,26 +219,26 @@ $showAll = isset($_GET['all']) && $_GET['all'] == '1';
 <div class="toolbar">
     <div class="brand">
         <i class="ti ti-file-type-pdf" style="font-size:20px;"></i>
-        PDF Export — Voting Vouchers
+        <?= t('auto.pdf_export_voting_vouchers_370f', 'PDF Export — Voting Vouchers') ?>
     </div>
     <div class="actions">
         <?php if ($election): ?>
         <span class="ctrl-info"><?= count($vouchers) ?> voucher<?= count($vouchers) !== 1 ? 's' : '' ?></span>
         <?php if (!$showAll): ?>
         <a class="btn-t btn-toggle" href="?election_id=<?= $election_id ?>&all=1">
-            <i class="ti ti-eye"></i> Include Used
+            <i class="ti ti-eye"></i> <?= t('auto.include_used_75da', 'Include Used') ?>
         </a>
         <?php else: ?>
         <a class="btn-t btn-toggle" href="?election_id=<?= $election_id ?>">
-            <i class="ti ti-eye-off"></i> Active Only
+            <i class="ti ti-eye-off"></i> <?= t('auto.active_only_def8', 'Active Only') ?>
         </a>
         <?php endif; ?>
         <button class="btn-t btn-print" onclick="window.print()">
-            <i class="ti ti-printer"></i> Print / Save as PDF
+            <i class="ti ti-printer"></i> <?= t('auto.print_save_as_pdf_d6c6', 'Print / Save as PDF') ?>
         </button>
         <?php endif; ?>
         <a class="btn-t btn-back" href="vouchers.php<?= $election_id ? '?election_id='.$election_id : '' ?>">
-            <i class="ti ti-arrow-left"></i> Back
+            <i class="ti ti-arrow-left"></i> <?= t('auto.back_0557', 'Back') ?>
         </a>
     </div>
 </div>
@@ -241,7 +246,7 @@ $showAll = isset($_GET['all']) && $_GET['all'] == '1';
 <!-- Election selector (screen only) -->
 <?php if (!empty($elections)): ?>
 <div class="election-bar">
-    <label>Election:</label>
+    <label><?= t('auto.election_27ae', 'Election:') ?></label>
     <select onchange="location.href='?election_id='+this.value+(<?= $showAll ? 'true' : 'false' ?> ? '&all=1' : '')">
         <?php foreach ($elections as $el): ?>
         <option value="<?= $el['id'] ?>" <?= $el['id'] == $election_id ? 'selected' : '' ?>>
@@ -254,9 +259,9 @@ $showAll = isset($_GET['all']) && $_GET['all'] == '1';
 
 <div class="print-area">
 <?php if (!$election): ?>
-    <div class="empty-state"><i class="ti ti-ticket"></i> No active election selected.</div>
+    <div class="empty-state"><i class="ti ti-ticket"></i> <?= t('auto.no_active_election_selected_8189', 'No active election selected.') ?></div>
 <?php elseif (empty($vouchers)): ?>
-    <div class="empty-state"><i class="ti ti-ticket-off"></i> No vouchers found.</div>
+    <div class="empty-state"><i class="ti ti-ticket-off"></i> <?= t('auto.no_vouchers_found_b45b', 'No vouchers found.') ?></div>
 <?php else: ?>
 
     <div class="page-header-block">
@@ -284,7 +289,7 @@ $showAll = isset($_GET['all']) && $_GET['all'] == '1';
                     <div class="slip-portal-name">Office of Student Affairs — OSA Portal</div>
                 </div>
                 <div class="slip-ticket-label">
-                    <i class="ti ti-ticket" style="font-size:11px;"></i> VOTING VOUCHER
+                    <i class="ti ti-ticket" style="font-size:11px;"></i> <?= t('auto.voting_voucher_80a1', 'VOTING VOUCHER') ?>
                 </div>
             </div>
             <div class="slip-body">
@@ -298,7 +303,7 @@ $showAll = isset($_GET['all']) && $_GET['all'] == '1';
                 <div class="slip-code-label">Voucher Code</div>
                 <div class="slip-code <?= $isUsed ? 'used' : '' ?>"><?= e($v['code']) ?></div>
                 <div class="slip-footer">
-                    <div class="slip-note">Enter this code on the voting page.<br>One-time use only. Keep confidential.</div>
+                    <div class="slip-note"><?= t('auto.enter_this_code_on_the_voting_page_f502', 'Enter this code on the voting page.') ?><br><?= t('auto.one_time_use_only_keep_confidential_044d', 'One-time use only. Keep confidential.') ?></div>
                     <div class="slip-status <?= $isUsed ? 'used' : 'active' ?>">
                         <?= $isUsed ? '✓ USED' : '● ACTIVE' ?>
                     </div>
@@ -319,6 +324,5 @@ $showAll = isset($_GET['all']) && $_GET['all'] == '1';
         <?php endif; ?>
     });
 </script>
-<?php include __DIR__.'/../includes/push-widget.php'; ?>
 </body>
 </html>

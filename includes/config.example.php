@@ -32,3 +32,8 @@ define('FB_FEED_CACHE_MINUTES', 10);
 // ── OneSignal push notifications (leave '' to disable push) ─
 define('ONESIGNAL_APP_ID',       '');
 define('ONESIGNAL_REST_API_KEY', '');
+
+// ── AI FAQ assistant for OSA messages (Google Gemini) ───────
+// Leave GEMINI_API_KEY '' to disable the AI (messages then go straight to OSA staff).
+define('GEMINI_API_KEY', '');
+define('GEMINI_MODEL',   'gemini-3.5-flash-lite');

@@ -14,7 +14,7 @@ $election = getAnyActiveOrRecentElection($pdo);
 $stmt = $pdo->prepare("SELECT c.*, st.first_name as staff_fn, st.last_name as staff_ln FROM complaints c LEFT JOIN osa_staff st ON c.assigned_to=st.id WHERE c.id=? AND c.student_id=?");
 $stmt->execute([$id, $student_id]);
 $complaint = $stmt->fetch();
-if (!$complaint) { echo 'Not found.'; exit; }
+if (!$complaint) { echo tx('Not found.'); exit; }
 
 // Fetch existing review
 $revStmt = $pdo->prepare("SELECT * FROM complaint_reviews WHERE complaint_id=? AND student_id=?");
@@ -30,18 +30,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reaction'])) {
     $allowed  = ['😊','👍','😐','👎','😢'];
 
     if (!in_array($reaction, $allowed)) {
-        $review_error = 'Please select a valid reaction.';
+        $review_error = t('msg.please_select_a_valid_reaction_5fae', 'Please select a valid reaction.');
     } elseif (!in_array($complaint['status'], ['Resolved','Closed'])) {
-        $review_error = 'You can only leave a review on resolved or closed complaints.';
+        $review_error = t('msg.you_can_only_leave_a_review_on_resolved__80b0', 'You can only leave a review on resolved or closed complaints.');
     } else {
         if ($existing_review) {
             $pdo->prepare("UPDATE complaint_reviews SET reaction=?, comment=? WHERE complaint_id=? AND student_id=?")
                 ->execute([$reaction, $comment ?: null, $id, $student_id]);
-            $review_success = 'Your review has been updated!';
+            $review_success = t('msg.your_review_has_been_updated_c7d8', 'Your review has been updated!');
         } else {
             $pdo->prepare("INSERT INTO complaint_reviews (complaint_id, student_id, reaction, comment) VALUES (?,?,?,?)")
                 ->execute([$id, $student_id, $reaction, $comment ?: null]);
-            $review_success = 'Thank you for your feedback!';
+            $review_success = t('msg.thank_you_for_your_feedback_d629', 'Thank you for your feedback!');
         }
 
         // Notify the assigned staff member that a review was left
@@ -88,7 +88,7 @@ $canReview = in_array($complaint['status'], ['Resolved','Closed']);
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>View Complaint — GNC-OSA Portal</title>
+<title><?= t('title.view_complaint', 'View Complaint') ?> — GNC-OSA Portal</title>
 <link rel="stylesheet" href="../assets/css/style.css?v=27">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <style>
@@ -124,10 +124,10 @@ $canReview = in_array($complaint['status'], ['Resolved','Closed']);
     .existing-meta { font-size:12px; color:#9CA3AF; margin-top:2px; }
     .existing-comment { font-size:13px; color:#4B5563; margin-top:6px; line-height:1.6; font-style:italic; }
 </style>
-</head>
+<?php include __DIR__.'/../includes/pwa-head.php'; ?></head>
 <body>
 <nav class="topnav">
-    <button class="hamburger" id="hamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
+    <button class="hamburger" id="hamburger" aria-label="<?= t('ui.toggle_menu_641f', 'Toggle menu') ?>"><span></span><span></span><span></span></button>
     <div class="brand">
         <img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);">
         <div class="brand-text"><div class="name">GNC-OSA Portal</div><div class="sub"><?= t('nav.student_portal', 'Student Portal') ?></div></div>
@@ -141,8 +141,8 @@ $canReview = in_array($complaint['status'], ['Resolved','Closed']);
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
 <aside class="sidebar">
     <div class="sidebar-section"><?= t('sidebar.main', 'Main') ?></div>
-    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> Events</a>
-    <a class="sitem active" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.my_complaints', 'My Complaints') ?></a>
+    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> <?= t('sidebar.events', 'Events') ?></a>
+    <a class="sitem active" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.my_complaints', 'My Complaints') ?></a><a class="sitem" href="help.php"><i class="ti ti-book"></i> <?= t('sidebar.osa_guide', 'OSA Guide') ?></a>
     <a class="sitem" href="new-complaint.php"><i class="ti ti-circle-plus"></i> <?= t('sidebar.new_complaint', 'New Complaint') ?></a>
     <?php if ($election): ?>
     <div class="sidebar-section"><?= t('sidebar.election', 'Election') ?></div>
@@ -166,7 +166,7 @@ $canReview = in_array($complaint['status'], ['Resolved','Closed']);
                 <div style="font-size:12px;color:#9CA3AF;margin-top:3px;">
                     <?= e($complaint['category']) ?> · <?= formatDate($complaint['created_at']) ?>
                     <?php if ($complaint['is_anonymous']): ?>
-                    · <span style="color:#059669;font-size:11px;font-weight:600;">Anonymous</span>
+                    · <span style="color:#059669;font-size:11px;font-weight:600;"><?= tx('Anonymous') ?></span>
                     <?php endif; ?>
                 </div>
             </div>
@@ -182,7 +182,7 @@ $canReview = in_array($complaint['status'], ['Resolved','Closed']);
         <?php if ($complaint['attachment']): ?>
         <div style="margin-top:12px;">
             <a href="../uploads/<?= e($complaint['attachment']) ?>" target="_blank" class="btn btn-outline btn-sm">
-                <i class="ti ti-paperclip"></i> View Attachment
+                <i class="ti ti-paperclip"></i> <?= t('ui.view_attachment_8d31', 'View Attachment') ?>
             </a>
         </div>
         <?php endif; ?>
@@ -191,7 +191,7 @@ $canReview = in_array($complaint['status'], ['Resolved','Closed']);
         <?php if ($complaint['staff_fn']): ?>
         <div style="margin-top:14px;font-size:12px;color:#6B7280;">
             <i class="ti ti-user-check" style="margin-right:4px;"></i>
-            Assigned to: <strong><?= e($complaint['staff_fn'].' '.$complaint['staff_ln']) ?></strong>
+            <?= t('ui.assigned_to_0b76', 'Assigned to:') ?> <strong><?= e($complaint['staff_fn'].' '.$complaint['staff_ln']) ?></strong>
         </div>
         <?php endif; ?>
 
@@ -200,7 +200,7 @@ $canReview = in_array($complaint['status'], ['Resolved','Closed']);
         <div style="margin-top:16px;border-top:1px solid #E5E7EB;padding-top:14px;">
             <div style="font-size:12px;font-weight:600;color:var(--maroon);margin-bottom:6px;">
                 <i class="ti ti-message-circle" style="margin-right:4px;"></i>
-                Response from OSA<?= $complaint['staff_fn'] ? ' ('.e($complaint['staff_fn'].' '.$complaint['staff_ln']).')' : '' ?>:
+                <?= t('ui.response_from_osa_e9dd', 'Response from OSA') ?><?= $complaint['staff_fn'] ? ' ('.e($complaint['staff_fn'].' '.$complaint['staff_ln']).')' : '' ?>:
             </div>
             <?php if ($complaint['admin_remarks']): ?>
             <div style="background:var(--maroon-pale);border-radius:8px;padding:12px;font-size:13px;color:#4B5563;line-height:1.7;">
@@ -212,11 +212,11 @@ $canReview = in_array($complaint['status'], ['Resolved','Closed']);
             <div style="margin-top:10px;">
                 <?php if ($aIsImg): ?>
                 <a href="../uploads/<?= e($aaf) ?>" target="_blank">
-                    <img src="../uploads/<?= e($aaf) ?>" alt="OSA Attachment" style="max-width:100%;max-height:220px;border-radius:8px;border:1px solid #E5E7EB;">
+                    <img src="../uploads/<?= e($aaf) ?>" alt="<?= htmlspecialchars(t('auto.osa_attachment_13fa', 'OSA Attachment'), ENT_QUOTES) ?>" style="max-width:100%;max-height:220px;border-radius:8px;border:1px solid #E5E7EB;">
                 </a>
                 <?php else: ?>
                 <a href="../uploads/<?= e($aaf) ?>" target="_blank" class="btn btn-outline btn-sm">
-                    <i class="ti ti-file-download"></i> Download OSA Attachment
+                    <i class="ti ti-file-download"></i> <?= t('ui.download_osa_attachment_5d62', 'Download OSA Attachment') ?>
                 </a>
                 <?php endif; ?>
             </div>
@@ -227,7 +227,7 @@ $canReview = in_array($complaint['status'], ['Resolved','Closed']);
         <!-- Still pending notice -->
         <?php if (!$complaint['admin_remarks'] && !in_array($complaint['status'], ['Resolved','Closed','Rejected'])): ?>
         <div style="margin-top:14px;" class="alert alert-info">
-            <i class="ti ti-clock"></i> The OSA is still reviewing your complaint. Please wait for an update.
+            <i class="ti ti-clock"></i> <?= t('ui.the_osa_is_still_reviewing_your_co_7eba', 'The OSA is still reviewing your complaint. Please wait for an update.') ?>
         </div>
         <?php endif; ?>
     </div>
@@ -252,8 +252,8 @@ $canReview = in_array($complaint['status'], ['Resolved','Closed']);
         <div class="review-card done">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
                 <i class="ti ti-star-filled" style="color:#D97706;font-size:18px;"></i>
-                <div class="review-title">Your Review</div>
-                <span style="font-size:11px;color:#9CA3AF;margin-left:auto;"><?= date('M j, Y', strtotime($existing_review['created_at'])) ?></span>
+                <div class="review-title"><?= t('ui.your_review_08d9', 'Your Review') ?></div>
+                <span style="font-size:11px;color:#9CA3AF;margin-left:auto;"><?= tlDate('M j, Y', strtotime($existing_review['created_at'])) ?></span>
             </div>
             <div class="existing-review">
                 <div class="existing-emoji"><?= $existing_review['reaction'] ?></div>
@@ -264,7 +264,7 @@ $canReview = in_array($complaint['status'], ['Resolved','Closed']);
                         echo $labels[$existing_review['reaction']] ?? $existing_review['reaction'];
                         ?>
                     </div>
-                    <div class="existing-meta">Submitted on <?= date('F j, Y \a\t g:i A', strtotime($existing_review['created_at'])) ?></div>
+                    <div class="existing-meta"><?= t('ui.submitted_on_0834', 'Submitted on') ?> <?= tlDate('F j, Y \a\t g:i A', strtotime($existing_review['created_at'])) ?></div>
                     <?php if ($existing_review['comment']): ?>
                     <div class="existing-comment">"<?= e($existing_review['comment']) ?>"</div>
                     <?php endif; ?>
@@ -272,7 +272,7 @@ $canReview = in_array($complaint['status'], ['Resolved','Closed']);
             </div>
             <button onclick="document.getElementById('edit-review-form').style.display='block';this.style.display='none';"
                 style="margin-top:14px;background:none;border:1.5px solid #6B1A2A;color:#6B1A2A;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;">
-                <i class="ti ti-edit"></i> Edit Review
+                <i class="ti ti-edit"></i> <?= t('ui.edit_review_e9f1', 'Edit Review') ?>
             </button>
 
             <!-- Edit form (hidden by default) -->
@@ -290,12 +290,12 @@ $canReview = in_array($complaint['status'], ['Resolved','Closed']);
                     </div>
                     <input type="hidden" name="reaction" id="reaction-input-edit" value="<?= e($existing_review['reaction']) ?>">
                     <div class="comment-wrap">
-                        <label>Additional comment <span style="color:#9CA3AF;">(optional)</span></label>
-                        <textarea name="review_comment" placeholder="Tell us more about your experience..."><?= e($existing_review['comment'] ?? '') ?></textarea>
+                        <label><?= t('ui.additional_comment_b369', 'Additional comment') ?> <span style="color:#9CA3AF;"><?= t('ui.optional_f53d', '(optional)') ?></span></label>
+                        <textarea name="review_comment" placeholder="<?= htmlspecialchars(t('auto.tell_us_more_about_your_experience_38d5', 'Tell us more about your experience...'), ENT_QUOTES) ?>"><?= e($existing_review['comment'] ?? '') ?></textarea>
                     </div>
-                    <button type="submit" class="btn btn-primary btn-sm"><i class="ti ti-send"></i> Update Review</button>
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="ti ti-send"></i> <?= t('ui.update_review_0e7b', 'Update Review') ?></button>
                     <button type="button" onclick="document.getElementById('edit-review-form').style.display='none';document.querySelector('.review-card .reaction-btn+button, .review-card>button[onclick*=edit]').style.display='inline-flex';"
-                        style="margin-left:8px;" class="btn btn-outline btn-sm">Cancel</button>
+                        style="margin-left:8px;" class="btn btn-outline btn-sm"><?= t('ui.cancel_ea47', 'Cancel') ?></button>
                 </form>
             </div>
         </div>
@@ -305,10 +305,10 @@ $canReview = in_array($complaint['status'], ['Resolved','Closed']);
         <div class="review-card">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
                 <i class="ti ti-star" style="color:#D97706;font-size:18px;"></i>
-                <div class="review-title">How was your experience?</div>
+                <div class="review-title"><?= t('ui.how_was_your_experience_73da', 'How was your experience?') ?></div>
             </div>
             <div class="review-sub">
-                Your complaint has been <?= strtolower($complaint['status']) ?>. Let us know how satisfied you are with the resolution.
+                <?= t('ui.your_complaint_has_been_af9d', 'Your complaint has been') ?> <?= strtolower($complaint['status']) ?><?= t('ui.let_us_know_how_satisfied_you_are__c90a', '. Let us know how satisfied you are with the resolution.') ?>
             </div>
 
             <form method="POST">
@@ -325,15 +325,15 @@ $canReview = in_array($complaint['status'], ['Resolved','Closed']);
                 <input type="hidden" name="reaction" id="reaction-input-new" value="">
 
                 <div class="comment-wrap">
-                    <label>Additional comment <span style="color:#9CA3AF;">(optional)</span></label>
-                    <textarea name="review_comment" placeholder="Tell us more about your experience with how your complaint was handled..."></textarea>
+                    <label><?= t('ui.additional_comment_b369', 'Additional comment') ?> <span style="color:#9CA3AF;"><?= t('ui.optional_f53d', '(optional)') ?></span></label>
+                    <textarea name="review_comment" placeholder="<?= htmlspecialchars(t('auto.tell_us_more_about_your_experience_with__a9c4', 'Tell us more about your experience with how your complaint was handled...'), ENT_QUOTES) ?>"></textarea>
                 </div>
 
                 <button type="submit" id="review-submit-btn" class="btn btn-primary" disabled style="opacity:0.5;cursor:not-allowed;">
-                    <i class="ti ti-send"></i> Submit Review
+                    <i class="ti ti-send"></i> <?= t('ui.submit_review_c94e', 'Submit Review') ?>
                 </button>
                 <div style="font-size:11px;color:#9CA3AF;margin-top:8px;">
-                    <i class="ti ti-info-circle" style="font-size:13px;"></i> Please select a reaction to submit your review.
+                    <i class="ti ti-info-circle" style="font-size:13px;"></i> <?= t('ui.please_select_a_reaction_to_submit_2b43', 'Please select a reaction to submit your review.') ?>
                 </div>
             </form>
         </div>
@@ -366,5 +366,6 @@ function selectReaction(emoji, groupId, inputId) {
 }
 </script>
 <script src="../assets/js/sidebar.js?v=5"></script>
+<?php include __DIR__.'/../includes/ask-osa-widget.php'; ?>
 </body>
 </html>

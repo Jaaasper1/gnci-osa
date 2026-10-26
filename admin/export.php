@@ -1,10 +1,14 @@
 <?php
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/audit.php';
 require_once '../includes/functions.php';
 require_once '../includes/lang.php';
 require_once '../includes/export-helpers.php';
-requireAdmin();
+requireStaff();
+require_once '../includes/admin-otp.php';
+adminOtpRequireGate('export_data');
+auditLog($pdo, 'export', 'report', 0, [], ['type' => $_GET['type'] ?? '']);
 
 require_once '../vendor/autoload.php';
 
@@ -16,6 +20,14 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
 
 $type = $_GET['type'] ?? '';
 $eid  = (int)($_GET['election'] ?? 0);
+
+// Optional row selection: ?ids=1,2,3 exports only those records.
+// Missing/empty ids = export everything (old behaviour).
+$selIds = array_values(array_unique(array_filter(array_map('intval', explode(',', (string)($_GET['ids'] ?? ''))))));
+$hasSel = !empty($selIds);
+function keepSelected(array $rows, string $key, array $ids): array {
+    return array_values(array_filter($rows, fn($r) => in_array((int)$r[$key], $ids, true)));
+}
 
 $ALLOWED = ['candidates','results','students','complaints','voters','party_lists','winners'];
 if (!in_array($type, $ALLOWED)) { http_response_code(400); die('Invalid export type.'); }
@@ -60,15 +72,32 @@ $sheet = $spreadsheet->getActiveSheet();
 // CANDIDATES
 // ══════════════════════════════════════════════════════════════════
 if ($type === 'candidates') {
-    if (!$eid) die('No election selected.');
+    if (!$eid) die(t('msg.no_election_selected_c8ec', 'No election selected.'));
     $elStmt = $pdo->prepare("SELECT * FROM elections WHERE id=?"); $elStmt->execute([$eid]);
     $election = $elStmt->fetch();
 
-    $rows = $pdo->prepare("SELECT p.title as position, s.student_id as sid, s.first_name, s.last_name, s.course, pl.name as party_name FROM candidates c JOIN positions p ON c.position_id=p.id JOIN students s ON c.student_id=s.id LEFT JOIN party_lists pl ON c.party_list_id=pl.id WHERE c.election_id=? ORDER BY p.sort_order, s.last_name");
+    $rows = $pdo->prepare("SELECT c.id as cid, p.title as position, s.student_id as sid, s.first_name, s.last_name, s.course, pl.name as party_name, c.party_list_id AS plid, c.position_id AS posid FROM candidates c JOIN positions p ON c.position_id=p.id JOIN students s ON c.student_id=s.id LEFT JOIN party_lists pl ON c.party_list_id=pl.id WHERE c.election_id=? ORDER BY p.sort_order, s.last_name");
     $rows->execute([$eid]); $candidates = $rows->fetchAll();
+    if ($hasSel) $candidates = keepSelected($candidates, 'cid', $selIds);
+
+    // Filters: party list (0 = Independent) and position
+    $fParty = exportFilterInts('party'); $fPos = exportFilterInts('position'); $note = [];
+    if ($fParty) {
+        $candidates = array_values(array_filter($candidates, fn($c) => in_array((int)$c['plid'], $fParty, true)));
+        $names = []; $pl = $pdo->prepare("SELECT id, name FROM party_lists WHERE election_id=?"); $pl->execute([$eid]);
+        foreach ($pl->fetchAll() as $r) if (in_array((int)$r['id'], $fParty, true)) $names[] = $r['name'];
+        if (in_array(0, $fParty, true)) $names[] = 'Independent';
+        $note[] = 'Party: '.implode(', ', $names);
+    }
+    if ($fPos) {
+        $candidates = array_values(array_filter($candidates, fn($c) => in_array((int)$c['posid'], $fPos, true)));
+        $ps = $pdo->prepare("SELECT id, title FROM positions WHERE election_id=? ORDER BY sort_order"); $ps->execute([$eid]);
+        $names = []; foreach ($ps->fetchAll() as $r) if (in_array((int)$r['id'], $fPos, true)) $names[] = $r['title'];
+        $note[] = 'Position: '.implode(', ', $names);
+    }
 
     $sheet->setTitle('Candidates');
-    titleBlock($sheet, 'GUAGUA NATIONAL COLLEGE', 'Office of Student Affairs — Candidates List', $election['title'].' · Exported: '.date('F j, Y'), 7);
+    titleBlock($sheet, 'GUAGUA NATIONAL COLLEGE', 'Office of Student Affairs — Candidates List', $election['title'].' · Exported: '.date('F j, Y').exportFilterNote($note), 7);
 
     foreach (['#','Position','Student ID','Last Name','First Name','Course','Party List'] as $i=>$h) {
         $sheet->setCellValue(chr(65+$i).'5', $h);
@@ -99,12 +128,15 @@ elseif ($type === 'party_lists') {
     // Party lists WITH the candidates inside each one.
     // xlsx / pdf / docx: grouped (a coloured banner per party, its candidates beneath).
     // csv: flat table (party name repeated on every row) so it opens cleanly in any tool.
-    if (!$eid) die('No election selected.');
+    if (!$eid) die(t('msg.no_election_selected_c8ec', 'No election selected.'));
     $elStmt = $pdo->prepare("SELECT * FROM elections WHERE id=?"); $elStmt->execute([$eid]);
     $election = $elStmt->fetch();
 
     $plStmt = $pdo->prepare("SELECT id, name, platform, color FROM party_lists WHERE election_id=? ORDER BY name");
     $plStmt->execute([$eid]); $partyLists = $plStmt->fetchAll();
+    if ($hasSel) $partyLists = keepSelected($partyLists, 'id', $selIds);
+    $fParty = exportFilterInts('party');          // 0 = Independent group
+    if ($fParty) $partyLists = array_values(array_filter($partyLists, fn($pl) => in_array((int)$pl['id'], $fParty, true)));
 
     $cStmt = $pdo->prepare("SELECT c.party_list_id, p.title AS position, s.student_id AS sid, s.last_name, s.first_name, s.course
                             FROM candidates c
@@ -120,13 +152,13 @@ elseif ($type === 'party_lists') {
     foreach ($partyLists as $pl) {
         $groups[] = ['name'=>$pl['name'], 'platform'=>$pl['platform'], 'color'=>$pl['color'], 'cands'=>$byParty[(int)$pl['id']] ?? []];
     }
-    if (!empty($byParty[0])) {
+    if (!empty($byParty[0]) && !$hasSel && (!$fParty || in_array(0, $fParty, true))) {
         $groups[] = ['name'=>'Independent (no party list)', 'platform'=>'', 'color'=>'6B7280', 'cands'=>$byParty[0]];
     }
     $isCsv = strtolower($_GET['format'] ?? '') === 'csv';
 
     $sheet->setTitle('Party Lists & Candidates');
-    titleBlock($sheet, 'GUAGUA NATIONAL COLLEGE', 'Office of Student Affairs — Party Lists & Candidates', $election['title'].' · Exported: '.date('F j, Y'), 6);
+    titleBlock($sheet, 'GUAGUA NATIONAL COLLEGE', 'Office of Student Affairs — Party Lists & Candidates', $election['title'].' · Exported: '.date('F j, Y').exportFilterNote($fParty ? [implode(', ', array_merge(array_column($partyLists, 'name'), in_array(0, $fParty, true) ? ['Independent'] : []))] : []), 6);
 
     $headers = $isCsv ? ['Party List','Position','Student ID','Last Name','First Name','Course']
                       : ['#','Position','Student ID','Last Name','First Name','Course'];
@@ -245,7 +277,7 @@ elseif ($type === 'party_lists') {
 // RESULTS
 // ══════════════════════════════════════════════════════════════════
 elseif ($type === 'results') {
-    if (!$eid) die('No election selected.');
+    if (!$eid) die(t('msg.no_election_selected_c8ec', 'No election selected.'));
     $elStmt = $pdo->prepare("SELECT * FROM elections WHERE id=?"); $elStmt->execute([$eid]);
     $election = $elStmt->fetch();
 
@@ -257,6 +289,13 @@ elseif ($type === 'results') {
 
     $posStmt = $pdo->prepare("SELECT * FROM positions WHERE election_id=? ORDER BY sort_order");
     $posStmt->execute([$eid]); $positions = $posStmt->fetchAll();
+
+    // Filter: position(s) ticked in the Export Results menu (?f_position[]=ID). Nothing ticked = all.
+    $fPos = exportFilterInts('position'); $note = [];
+    if ($fPos) {
+        $positions = array_values(array_filter($positions, fn($p) => in_array((int)$p['id'], $fPos, true)));
+        $note[] = 'Position: '.implode(', ', array_column($positions, 'title'));
+    }
     foreach ($positions as &$p) {
         $cStmt = $pdo->prepare("SELECT s.first_name, s.last_name, s.student_id as sid, s.course, COUNT(v.id) as votes FROM candidates c JOIN students s ON c.student_id=s.id LEFT JOIN votes v ON v.candidate_id=c.id AND v.election_id=? WHERE c.position_id=? GROUP BY c.id ORDER BY votes DESC");
         $cStmt->execute([$eid,$p['id']]); $p['candidates']=$cStmt->fetchAll();
@@ -264,7 +303,7 @@ elseif ($type === 'results') {
     } unset($p);
 
     $sheet->setTitle('Election Results');
-    titleBlock($sheet, 'GUAGUA NATIONAL COLLEGE', 'Office of Student Affairs — Official Election Results', $election['title'].' · Exported: '.date('F j, Y \a\t g:i A'), 7);
+    titleBlock($sheet, 'GUAGUA NATIONAL COLLEGE', 'Office of Student Affairs — Official Election Results', $election['title'].' · Exported: '.date('F j, Y \a\t g:i A').exportFilterNote($note), 7);
 
     foreach (['Total Students','Total Voters','Did Not Vote','Voter Turnout'] as $i=>$label) {
         $col=chr(65+$i);
@@ -310,10 +349,23 @@ elseif ($type === 'results') {
 // STUDENTS
 // ══════════════════════════════════════════════════════════════════
 elseif ($type === 'students') {
-    $students = $pdo->query("SELECT student_id, first_name, last_name, course, email, is_active, created_at FROM students ORDER BY last_name, first_name")->fetchAll();
+    $students = $pdo->query("SELECT id, student_id, first_name, last_name, course, email, is_active, created_at FROM students ORDER BY last_name, first_name")->fetchAll();
+    if ($hasSel) $students = keepSelected($students, 'id', $selIds);
+
+    // Filters: course(s) and status
+    $fCourse = exportFilter('course'); $fStatus = exportFilter('status'); $note = [];
+    if ($fCourse) {
+        $students = keepCourses($students, $fCourse);
+        $note[] = 'Course: '.implode(', ', array_map(fn($c) => $c === '__none__' ? '(No course)' : $c, $fCourse));
+    }
+    if ($fStatus && count(array_intersect($fStatus, ['active','inactive'])) === 1) {
+        $wantActive = in_array('active', $fStatus, true);
+        $students = array_values(array_filter($students, fn($s) => (bool)$s['is_active'] === $wantActive));
+        $note[] = 'Status: '.($wantActive ? 'Active' : 'Inactive');
+    }
 
     $sheet->setTitle('Students');
-    titleBlock($sheet, 'GUAGUA NATIONAL COLLEGE', 'Office of Student Affairs — Student Masterlist', 'Exported: '.date('F j, Y \a\t g:i A').' · Total: '.count($students).' student(s)', 9);
+    titleBlock($sheet, 'GUAGUA NATIONAL COLLEGE', 'Office of Student Affairs — Student Masterlist', 'Exported: '.date('F j, Y \a\t g:i A').' · Total: '.count($students).' student(s)'.exportFilterNote($note), 9);
 
     foreach (['#','Student ID','Last Name','First Name','Course','Email','Status'] as $i=>$h) $sheet->setCellValue(chr(65+$i).'5',$h);
     $sheet->getStyle('A5:G5')->applyFromArray(hStyle($MAROON)); $sheet->getRowDimension(5)->setRowHeight(22);
@@ -340,7 +392,8 @@ elseif ($type === 'students') {
 // COMPLAINTS
 // ══════════════════════════════════════════════════════════════════
 elseif ($type === 'complaints') {
-    $complaints = $pdo->query("SELECT c.title, c.category, c.status, c.is_anonymous, c.created_at, c.updated_at, s.first_name, s.last_name, s.student_id as sid, st.first_name as staff_fn, st.last_name as staff_ln FROM complaints c JOIN students s ON c.student_id=s.id LEFT JOIN osa_staff st ON c.assigned_to=st.id ORDER BY c.created_at DESC")->fetchAll();
+    $complaints = $pdo->query("SELECT c.id AS cid, c.title, c.category, c.status, c.is_anonymous, c.created_at, c.updated_at, s.first_name, s.last_name, s.student_id as sid, st.first_name as staff_fn, st.last_name as staff_ln FROM complaints c JOIN students s ON c.student_id=s.id LEFT JOIN osa_staff st ON c.assigned_to=st.id ORDER BY c.created_at DESC")->fetchAll();
+    if ($hasSel) $complaints = keepSelected($complaints, 'cid', $selIds);
 
     $sheet->setTitle('Complaints');
     titleBlock($sheet, 'GUAGUA NATIONAL COLLEGE', 'Office of Student Affairs — Complaints Report', 'Exported: '.date('F j, Y \a\t g:i A').' · Total: '.count($complaints).' complaint(s)', 8);
@@ -387,19 +440,26 @@ elseif ($type === 'complaints') {
 // VOTERS LIST
 // ══════════════════════════════════════════════════════════════════
 elseif ($type === 'voters') {
-    if (!$eid) die('No election selected.');
+    if (!$eid) die(t('msg.no_election_selected_c8ec', 'No election selected.'));
     $elStmt = $pdo->prepare("SELECT * FROM elections WHERE id=?"); $elStmt->execute([$eid]);
     $election = $elStmt->fetch();
 
-    $voted = $pdo->prepare("SELECT DISTINCT s.student_id, s.first_name, s.last_name, s.course, MIN(v.voted_at) as voted_at FROM votes v JOIN students s ON v.student_id=s.id WHERE v.election_id=? GROUP BY s.id ORDER BY s.last_name");
+    $voted = $pdo->prepare("SELECT DISTINCT s.id AS pk, s.student_id, s.first_name, s.last_name, s.course, MIN(v.voted_at) as voted_at FROM votes v JOIN students s ON v.student_id=s.id WHERE v.election_id=? GROUP BY s.id ORDER BY s.last_name");
     $voted->execute([$eid]); $voters = $voted->fetchAll();
+    if ($hasSel) $voters = keepSelected($voters, 'pk', $selIds);
 
-    $notVoted = $pdo->prepare("SELECT s.student_id, s.first_name, s.last_name, s.course FROM students s WHERE s.is_active=1 AND s.id NOT IN (SELECT DISTINCT student_id FROM votes WHERE election_id=?) ORDER BY s.last_name");
+    $notVoted = $pdo->prepare("SELECT s.id AS pk, s.student_id, s.first_name, s.last_name, s.course FROM students s WHERE s.is_active=1 AND s.id NOT IN (SELECT DISTINCT student_id FROM votes WHERE election_id=?) ORDER BY s.last_name");
     $notVoted->execute([$eid]); $nonVoters = $notVoted->fetchAll();
+    if ($hasSel) $nonVoters = keepSelected($nonVoters, 'pk', $selIds);
+
+    // Filter: course(s) — applies to both the "Voted" and "Did Not Vote" sheets
+    $fCourse = exportFilter('course');
+    if ($fCourse) { $voters = keepCourses($voters, $fCourse); $nonVoters = keepCourses($nonVoters, $fCourse); }
+    $vNote = $fCourse ? exportFilterNote(['Course: '.implode(', ', array_map(fn($c) => $c === '__none__' ? '(No course)' : $c, $fCourse))]) : '';
 
     // Sheet 1 — Voted
     $sheet->setTitle('Voted');
-    titleBlock($sheet, 'GUAGUA NATIONAL COLLEGE', 'Office of Student Affairs — Voters List', $election['title'].' · Exported: '.date('F j, Y').' · '.count($voters).' voted', 7);
+    titleBlock($sheet, 'GUAGUA NATIONAL COLLEGE', 'Office of Student Affairs — Voters List', $election['title'].' · Exported: '.date('F j, Y').' · '.count($voters).' voted'.$vNote, 7);
 
     foreach (['#','Student ID','Last Name','First Name','Course','Time Voted'] as $i=>$h) $sheet->setCellValue(chr(65+$i).'5',$h);
     $sheet->getStyle('A5:H5')->applyFromArray(hStyle('059669')); $sheet->getRowDimension(5)->setRowHeight(22);
@@ -422,7 +482,7 @@ elseif ($type === 'voters') {
     $sheet2->getStyle('A1')->applyFromArray(['font'=>['bold'=>true,'size'=>14,'color'=>['rgb'=>$MAROON]],'alignment'=>['horizontal'=>Alignment::HORIZONTAL_CENTER]]);
     $sheet2->mergeCells('A2:G2'); $sheet2->setCellValue('A2','Students Who Did Not Vote — '.$election['title']);
     $sheet2->getStyle('A2')->applyFromArray(['font'=>['bold'=>true,'size'=>11,'color'=>['rgb'=>$GRAY_T]],'alignment'=>['horizontal'=>Alignment::HORIZONTAL_CENTER]]);
-    $sheet2->mergeCells('A3:G3'); $sheet2->setCellValue('A3',count($nonVoters).' student(s) · Exported: '.date('F j, Y'));
+    $sheet2->mergeCells('A3:G3'); $sheet2->setCellValue('A3',count($nonVoters).' student(s) · Exported: '.date('F j, Y').$vNote);
     $sheet2->getStyle('A3')->applyFromArray(['font'=>['italic'=>true,'size'=>10,'color'=>['rgb'=>'9CA3AF']],'alignment'=>['horizontal'=>Alignment::HORIZONTAL_CENTER]]);
     $sheet2->getRowDimension(4)->setRowHeight(8);
 
@@ -450,10 +510,10 @@ elseif ($type === 'voters') {
 //   - only for elections that are no longer Active
 // ══════════════════════════════════════════════════════════════════
 elseif ($type === 'winners') {
-    if (!$eid) die('No election selected.');
+    if (!$eid) die(t('msg.no_election_selected_c8ec', 'No election selected.'));
     $elStmt = $pdo->prepare("SELECT * FROM elections WHERE id=?"); $elStmt->execute([$eid]);
     $election = $elStmt->fetch();
-    if (!$election) die('Election not found.');
+    if (!$election) die(t('msg.election_not_found_fee4', 'Election not found.'));
     if (!empty($election['is_active'])) {
         http_response_code(400);
         die('This election is still Active, so the results are not final yet. Close the election first, then export the winners.');

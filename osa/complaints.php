@@ -1,5 +1,6 @@
 <?php
 require_once '../includes/db.php';
+require_once '../includes/audit.php';
 require_once '../includes/auth.php';
 require_once '../includes/functions.php';
 require_once '../includes/lang.php';
@@ -13,6 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'claim
     // Only allow claiming if it is still unassigned (avoid race with another staff member)
     $stmt = $pdo->prepare("UPDATE complaints SET assigned_to=?, assigned_to_name=? WHERE id=? AND assigned_to IS NULL");
     $stmt->execute([$staff_id, $_SESSION['name'] ?? null, $claimId]);
+    auditLog($pdo, 'claim', 'complaint', $claimId, [], ['assigned_to' => $staff_id]);
     header('Location: complaints.php?tab=mine&claimed=1');
     exit;
 }
@@ -24,6 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'uncla
     // still New/In Review (already-Resolved/Rejected/Closed cases shouldn't be orphaned)
     $stmt = $pdo->prepare("UPDATE complaints SET assigned_to=NULL, assigned_to_name=NULL WHERE id=? AND assigned_to=? AND status IN ('New','In Review')");
     $stmt->execute([$unclaimId, $staff_id]);
+    auditLog($pdo, 'unclaim', 'complaint', $unclaimId, ['assigned_to' => $staff_id], ['assigned_to' => null]);
     header('Location: complaints.php?tab=mine&unclaimed=1');
     exit;
 }
@@ -40,13 +43,13 @@ if ($tab === 'unclaimed') {
     $complaints = $complaints->fetchAll();
 }
 ?>
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>My Complaints — OSA</title><link rel="stylesheet" href="../assets/css/style.css?v=27"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"></head>
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title><?= t('title.my_complaints', 'My Complaints') ?> — OSA</title><link rel="stylesheet" href="../assets/css/style.css?v=27"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"><?php include __DIR__.'/../includes/pwa-head.php'; ?></head>
 <body>
-<nav class="topnav"><button class="hamburger" id="hamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
-    <div class="brand"><img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);"><div class="brand-text"><div class="name">GNC-OSA Portal</div><div class="sub">OSA Staff</div></div></div><div class="nav-right">
+<nav class="topnav"><button class="hamburger" id="hamburger" aria-label="<?= t('ui.toggle_menu_641f', 'Toggle menu') ?>"><span></span><span></span><span></span></button>
+    <div class="brand"><img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);"><div class="brand-text"><div class="name">GNC-OSA Portal</div><div class="sub"><?= t('ui.osa_staff_e4b4', 'OSA Staff') ?></div></div></div><div class="nav-right">
         <?php renderLangSwitcher(); ?><button class="notif-btn" onclick="location.href='notifications.php'"><i class="ti ti-bell"></i><?php if ($notifCount > 0): ?><span class="notif-badge"><?= $notifCount ?></span><?php endif; ?></button><div class="avatar"><?= strtoupper(substr($_SESSION['name'],0,2)) ?></div><span class="uname"><?= e($_SESSION['name']) ?></span></div></nav>
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
-<aside class="sidebar"><div class="sidebar-section"><?= t('sidebar.main', 'Main') ?></div><a class="sitem" href="dashboard.php"><i class="ti ti-layout-dashboard"></i> <?= t('sidebar.dashboard', 'Dashboard') ?></a><a class="sitem active" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.complaints', 'Complaints') ?></a><div class="sidebar-section">Events</div><a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> Events</a><div class="sidebar-section"><?= t('sidebar.account', 'Account') ?></div><a class="sitem" href="settings.php"><i class="ti ti-settings"></i> <?= t('nav.settings', 'Settings') ?></a><a class="sitem" href="notifications.php"><i class="ti ti-bell"></i> <?= t('nav.notifications', 'Notifications') ?><?php if ($notifCount > 0): ?><span class="badge-count"><?= $notifCount ?></span><?php endif; ?></a><a class="sitem" href="../logout.php"><i class="ti ti-logout"></i> <?= t('nav.logout', 'Log out') ?></a></aside>
+<aside class="sidebar"><div class="sidebar-section"><?= t('sidebar.main', 'Main') ?></div><a class="sitem" href="dashboard.php"><i class="ti ti-layout-dashboard"></i> <?= t('sidebar.dashboard', 'Dashboard') ?></a><a class="sitem active" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.complaints', 'Complaints') ?></a><a class="sitem" href="messages.php"><i class="ti ti-messages"></i> <?= t('sidebar.messages', 'Messages') ?></a><div class="sidebar-section"><?= t('sidebar.events', 'Events') ?></div><a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> <?= t('sidebar.events', 'Events') ?></a><div class="sidebar-section"><?= t('sidebar.account', 'Account') ?></div><a class="sitem" href="settings.php"><i class="ti ti-settings"></i> <?= t('nav.settings', 'Settings') ?></a><a class="sitem" href="notifications.php"><i class="ti ti-bell"></i> <?= t('nav.notifications', 'Notifications') ?><?php if ($notifCount > 0): ?><span class="badge-count"><?= $notifCount ?></span><?php endif; ?></a><a class="sitem" href="../logout.php"><i class="ti ti-logout"></i> <?= t('nav.logout', 'Log out') ?></a></aside>
 <div class="main"><div class="content">
 <div class="page-header"><h1><?= t('sidebar.my_complaints', 'My Complaints') ?></h1></div>
 

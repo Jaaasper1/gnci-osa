@@ -87,7 +87,7 @@ $isLive    = ($curStatus === 'active');
     <title>Live Election Results — GNC-OSA Portal</title>
     <link rel="stylesheet" href="assets/css/style.css?v=27">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
-</head>
+<?php include __DIR__.'/includes/pwa-head.php'; ?></head>
 <body class="theme-election">
 <nav class="topnav">
     <div class="brand"><img src="assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);"><div class="brand-text"><div class="name">GNC-OSA Portal</div><div class="sub">Live Election Results</div></div></div>
@@ -135,7 +135,28 @@ $isLive    = ($curStatus === 'active');
         <div class="stat-card abstain-stat"><div class="stat-num" id="stat-abstain"><?= $overallAbstainPct ?>%</div><div class="stat-label">Overall Abstain Rate</div></div>
     </div>
 
-    <div class="res-acc-tools"><button type="button" class="btn btn-sm btn-outline" onclick="document.querySelectorAll('.res-acc').forEach(function(d){d.open=true})"><i class="ti ti-chevrons-down"></i> Expand all</button> <button type="button" class="btn btn-sm btn-outline" onclick="document.querySelectorAll('.res-acc').forEach(function(d){d.open=false})"><i class="ti ti-chevrons-up"></i> Collapse all</button></div>
+    <div class="res-acc-tools"><button type="button" class="btn btn-sm btn-outline" id="res-acc-toggle" data-state="expand"><i class="ti ti-chevrons-down"></i> <span>Expand all</span></button></div>
+<script>
+(function(){
+    var btn = document.getElementById('res-acc-toggle');
+    if (!btn) return;
+    function items(){ return document.querySelectorAll('.res-acc'); }
+    function allOpen(){ var l = items(); if (!l.length) return false; for (var i=0;i<l.length;i++) if (!l[i].open) return false; return true; }
+    function sync(){
+        var open = allOpen();
+        btn.dataset.state = open ? 'collapse' : 'expand';
+        btn.querySelector('span').textContent = open ? 'Collapse all' : 'Expand all';
+        btn.querySelector('i').className = 'ti ' + (open ? 'ti-chevrons-up' : 'ti-chevrons-down');
+    }
+    btn.addEventListener('click', function(){
+        var open = allOpen();
+        items().forEach(function(d){ d.open = !open; });
+        sync();
+    });
+    document.addEventListener('toggle', function(e){ if (e.target.classList && e.target.classList.contains('res-acc')) sync(); }, true);
+    sync();
+})();
+</script>
     <div class="live-positions-grid">
     <?php foreach ($positions as $pos): ?>
     <details class="card res-acc" style="margin-bottom:0;">

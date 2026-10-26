@@ -1,5 +1,6 @@
 <?php
 require_once '../includes/db.php';
+require_once '../includes/audit.php';
 require_once '../includes/auth.php';
 require_once '../includes/functions.php';
 require_once '../includes/lang.php';
@@ -26,7 +27,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $pdo->prepare("UPDATE students SET email=? WHERE id=?")
             ->execute([$email ?: null, $student_id]);
-        $success = 'Profile updated successfully!';
+        auditLog($pdo, 'update', 'account', (int)$student_id, [], ['email' => $email]);
+        $success = t('msg.profile_updated_successfully_260c', 'Profile updated successfully!');
         $student['email'] = $email;
     }
 }
@@ -38,15 +40,15 @@ $election = getAnyActiveOrRecentElection($pdo);
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Settings — GNC-OSA Portal</title>
+    <title><?= t('title.settings', 'Settings') ?> — GNC-OSA Portal</title>
     <link rel="stylesheet" href="../assets/css/style.css?v=27">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
-</head>
+<?php include __DIR__.'/../includes/pwa-head.php'; ?></head>
 <body>
 
 <!-- TOPNAV -->
 <nav class="topnav">
-    <button class="hamburger" id="hamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
+    <button class="hamburger" id="hamburger" aria-label="<?= t('ui.toggle_menu_641f', 'Toggle menu') ?>"><span></span><span></span><span></span></button>
     <div class="brand">
         <img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);">
         <div class="brand-text">
@@ -71,8 +73,8 @@ $election = getAnyActiveOrRecentElection($pdo);
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
 <aside class="sidebar">
     <div class="sidebar-section"><?= t('sidebar.main', 'Main') ?></div>
-    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> Events</a>
-    <a class="sitem" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.my_complaints', 'My Complaints') ?></a>
+    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> <?= t('sidebar.events', 'Events') ?></a>
+    <a class="sitem" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.my_complaints', 'My Complaints') ?></a><a class="sitem" href="help.php"><i class="ti ti-book"></i> <?= t('sidebar.osa_guide', 'OSA Guide') ?></a>
     <a class="sitem" href="new-complaint.php"><i class="ti ti-circle-plus"></i> <?= t('sidebar.new_complaint', 'New Complaint') ?></a>
     <?php if ($election): ?>
     <div class="sidebar-section"><?= t('sidebar.election', 'Election') ?></div>
@@ -89,7 +91,7 @@ $election = getAnyActiveOrRecentElection($pdo);
 <div class="main"><div class="content">
     <div class="page-header">
         <h1><?= t('settings.title', 'Account Settings') ?></h1>
-        <p>Update your profile information</p>
+        <p><?= t('ui.update_your_profile_information_1f95', 'Update your profile information') ?></p>
     </div>
 
     <?php if ($success): ?>
@@ -108,36 +110,36 @@ $election = getAnyActiveOrRecentElection($pdo);
 
         <!-- Basic Info -->
         <div class="card">
-            <div class="card-title"><i class="ti ti-user"></i> Basic Information</div>
+            <div class="card-title"><i class="ti ti-user"></i> <?= t('ui.basic_information_87ca', 'Basic Information') ?></div>
             <form method="POST">
                 <?= csrfField() ?>
                 <input type="hidden" name="action" value="update_info">
                 <div class="form-grid-2">
                     <div class="form-group">
-                        <label>First Name</label>
+                        <label><?= t('ui.first_name_bc91', 'First Name') ?></label>
                         <input type="text" class="form-control" value="<?= e($student['first_name']) ?>" disabled style="background:#F9FAFB;color:#9CA3AF;">
                     </div>
                     <div class="form-group">
-                        <label>Last Name</label>
+                        <label><?= t('ui.last_name_7758', 'Last Name') ?></label>
                         <input type="text" class="form-control" value="<?= e($student['last_name']) ?>" disabled style="background:#F9FAFB;color:#9CA3AF;">
                     </div>
                 </div>
-                <div style="font-size:11px;color:#9CA3AF;margin:-6px 0 14px;"><i class="ti ti-info-circle"></i> Your name is permanent and can't be changed. Contact the OSA/admin if there's an error.</div>
+                <div style="font-size:11px;color:#9CA3AF;margin:-6px 0 14px;"><i class="ti ti-info-circle"></i> <?= t('ui.your_name_is_permanent_and_can_t_b_2a66', 'Your name is permanent and can\'t be changed. Contact the OSA/admin if there\'s an error.') ?></div>
                 <div class="form-group">
-                    <label>Email</label>
+                    <label><?= tx('Email') ?></label>
                     <input type="email" name="email" class="form-control" value="<?= e($student['email'] ?? '') ?>" placeholder="yourname@gnc.edu.ph">
                 </div>
                 <div class="form-group">
-                        <label>Course</label>
+                        <label><?= t('ui.course_3730', 'Course') ?></label>
                         <input type="text" class="form-control" value="<?= e($student['course'] ?? '') ?>" disabled style="background:#F9FAFB;color:#9CA3AF;">
-                        <div style="font-size:11px;color:#9CA3AF;margin-top:3px;"><i class="ti ti-info-circle"></i> Contact admin to change.</div>
+                        <div style="font-size:11px;color:#9CA3AF;margin-top:3px;"><i class="ti ti-info-circle"></i> <?= t('ui.contact_admin_to_change_b839', 'Contact admin to change.') ?></div>
                     </div>
                 <div class="form-group">
-                    <label>Student ID</label>
+                    <label><?= tx('Student ID') ?></label>
                     <input type="text" class="form-control" value="<?= e($student['student_id']) ?>" disabled style="background:#F9FAFB;color:#9CA3AF;">
-                    <div style="font-size:11px;color:#9CA3AF;margin-top:3px;"><i class="ti ti-info-circle"></i> Cannot be changed.</div>
+                    <div style="font-size:11px;color:#9CA3AF;margin-top:3px;"><i class="ti ti-info-circle"></i> <?= t('ui.cannot_be_changed_a44a', 'Cannot be changed.') ?></div>
                 </div>
-                <button type="submit" class="btn btn-primary btn-block"><i class="ti ti-device-floppy"></i> Save Changes</button>
+                <button type="submit" class="btn btn-primary btn-block"><i class="ti ti-device-floppy"></i> <?= t('ui.save_changes_f5d6', 'Save Changes') ?></button>
             </form>
         </div>
 
@@ -145,5 +147,6 @@ $election = getAnyActiveOrRecentElection($pdo);
 </div></div>
 
 <script src="../assets/js/sidebar.js?v=5"></script>
+<?php include __DIR__.'/../includes/ask-osa-widget.php'; ?>
 </body>
 </html>

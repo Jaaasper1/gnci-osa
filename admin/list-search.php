@@ -1,4 +1,5 @@
 <?php
+if (!function_exists('t')) { require_once __DIR__ . '/../includes/lang.php'; }
 /**
  * Shared live-search bar for admin list tables (candidates.php, party-lists.php).
  *
@@ -18,7 +19,7 @@ function renderListSearch(string $tableId, string $placeholder, array $filters =
         <div class="ls-box">
             <i class="ti ti-search"></i>
             <input type="text" id="ls-q-<?= $id ?>" placeholder="<?= htmlspecialchars($placeholder, ENT_QUOTES) ?>" autocomplete="off">
-            <button type="button" class="ls-clear" id="ls-clear-<?= $id ?>" title="Clear" style="display:none;"><i class="ti ti-x"></i></button>
+            <button type="button" class="ls-clear" id="ls-clear-<?= $id ?>" title="<?= htmlspecialchars(t('auto.clear_dc30', 'Clear'), ENT_QUOTES) ?>" style="display:none;"><i class="ti ti-x"></i></button>
         </div>
         <?php foreach ($filters as $i => $f): ?>
         <select class="ls-filter" id="ls-f<?= $i ?>-<?= $id ?>" data-attr="<?= htmlspecialchars($f['attr'], ENT_QUOTES) ?>">
@@ -91,7 +92,7 @@ function renderListSearch(string $tableId, string $placeholder, array $filters =
             });
             var filtering = tokens.length > 0 || Array.prototype.some.call(filters, function (f) { return f.value; })
                 || Object.keys(table._ttFilters || {}).length > 0;
-            count.textContent = filtering ? 'Showing ' + shown + ' of ' + rows.length : rows.length + ' total';
+            count.textContent = filtering ? __t('Showing') + ' ' + shown + ' ' + __t('of') + ' ' + rows.length : rows.length + ' ' + __t('total');
             clear.style.display = q.value ? '' : 'none';
             if (!shown) {
                 if (!noneRow) {

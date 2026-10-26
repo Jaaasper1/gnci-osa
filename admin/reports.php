@@ -1,9 +1,11 @@
 <?php
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/csrf.php';
+require_once '../includes/audit.php';
 require_once '../includes/functions.php';
 require_once '../includes/lang.php';
-requireAdmin();
+requireStaff();
 $notifCount = getUnreadStaffNotifCount($pdo, $_SESSION['user_id']);
 
 $totalComplaints = (int)$pdo->query("SELECT COUNT(*) FROM complaints")->fetchColumn();
@@ -71,6 +73,7 @@ $comparisonRows = [
 // ── Custom Date Range ────────────────────────────────────────────
 $rangeStart = $_GET['start_date'] ?? '';
 $rangeEnd   = $_GET['end_date'] ?? '';
+auditLog($pdo, 'view', 'report', 0, [], ['page' => 'reports']);
 $customCategoryBreakdown = null;
 $customReactionBreakdown = null;
 $validRange = false;
@@ -94,7 +97,7 @@ if ($rangeStart && $rangeEnd && preg_match('/^\d{4}-\d{2}-\d{2}$/', $rangeStart)
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reports — GNC-OSA Portal</title>
+    <title><?= t('title.reports', 'Reports') ?> — GNC-OSA Portal</title>
     <link rel="stylesheet" href="../assets/css/style.css?v=27">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
     <style>
@@ -105,34 +108,34 @@ if ($rangeStart && $rangeEnd && preg_match('/^\d{4}-\d{2}-\d{2}$/', $rangeStart)
             .report-range-grid{grid-template-columns:1fr;}
         }
     </style>
-</head>
+<?php include __DIR__.'/../includes/pwa-head.php'; ?></head>
 <body>
 <nav class="topnav">
-    <button class="hamburger" id="hamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
-    <div class="brand"><img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);"><div class="brand-text"><div class="name">GNC-OSA Admin</div><div class="sub">Administrator</div></div></div>
+    <button class="hamburger" id="hamburger" aria-label="<?= t('ui.toggle_menu_641f', 'Toggle menu') ?>"><span></span><span></span><span></span></button>
+    <div class="brand"><img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);"><div class="brand-text"><div class="name">GNC-OSA Admin</div><div class="sub"><?= t('ui.administrator_7b7b', 'Administrator') ?></div></div></div>
     <div class="nav-right">
         <?php renderLangSwitcher(); ?><div class="avatar" style="background:#7C3AED;color:#fff;">AD</div><span class="uname"><?= htmlspecialchars($_SESSION['name']) ?></span></div>
 </nav>
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
 <aside class="sidebar">
-    <div class="sidebar-section">Overview</div>
+    <div class="sidebar-section"><?= t('sidebar.overview', 'Overview') ?></div>
     <a class="sitem" href="dashboard.php"><i class="ti ti-layout-dashboard"></i> <?= t('sidebar.dashboard', 'Dashboard') ?></a>
-    <div class="sidebar-section">Complaints</div>
-    <a class="sitem" href="complaints.php"><i class="ti ti-message-report"></i> All Complaints <span class="badge-count"><?= $newComplaints ?></span></a>
+    <div class="sidebar-section"><?= t('sidebar.complaints', 'Complaints') ?></div>
+    <a class="sitem" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.all_complaints', 'All Complaints') ?> <span class="badge-count"><?= $newComplaints ?></span></a><a class="sitem" href="../osa/messages.php"><i class="ti ti-messages"></i> <?= t('sidebar.messages', 'Messages') ?></a>
     <div class="sidebar-section"><?= t('sidebar.election', 'Election') ?></div>
-    <a class="sitem" href="elections.php"><i class="ti ti-trophy"></i> Elections</a>
-    <a class="sitem" href="candidates.php"><i class="ti ti-users"></i> Candidates</a>
-    <a class="sitem" href="party-lists.php"><i class="ti ti-flag"></i> Party Lists</a>
+    <a class="sitem" href="elections.php"><i class="ti ti-trophy"></i> <?= t('sidebar.elections', 'Elections') ?></a>
+    <a class="sitem" href="candidates.php"><i class="ti ti-users"></i> <?= t('sidebar.candidates', 'Candidates') ?></a>
+    <a class="sitem" href="party-lists.php"><i class="ti ti-flag"></i> <?= t('sidebar.party_lists', 'Party Lists') ?></a>
     <a class="sitem" href="vouchers.php"><i class="ti ti-ticket"></i> <?= t('sidebar.vouchers', 'Vouchers') ?></a>
-    <a class="sitem" href="results.php"><i class="ti ti-chart-pie"></i> Live Results</a>
-    <div class="sidebar-section">Events</div>
-    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> Events</a>
-    <div class="sidebar-section">System</div>
-    <a class="sitem" href="students.php"><i class="ti ti-user-plus"></i> Students</a>
-    <a class="sitem" href="staff.php"><i class="ti ti-shield-check"></i> OSA Staff</a>
-    <a class="sitem active" href="reports.php"><i class="ti ti-report-analytics"></i> Reports</a>
-    <div class="sidebar-section">Account</div>
-    <a class="sitem" href="notifications.php"><i class="ti ti-bell"></i> Notifications
+    <a class="sitem" href="results.php"><i class="ti ti-chart-pie"></i> <?= t('sidebar.live_results', 'Live Results') ?></a>
+    <div class="sidebar-section"><?= t('sidebar.events', 'Events') ?></div>
+    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> <?= t('sidebar.events', 'Events') ?></a>
+    <div class="sidebar-section"><?= t('sidebar.system', 'System') ?></div>
+    <a class="sitem" href="students.php"><i class="ti ti-user-plus"></i> <?= t('sidebar.students', 'Students') ?></a>
+    <?php if ($_SESSION['user_type'] === 'admin'): ?><a class="sitem" href="staff.php"><i class="ti ti-shield-check"></i> <?= t('sidebar.osa_staff', 'OSA Staff') ?></a><?php endif; ?><?php if ($_SESSION['user_type'] === 'admin'): ?><a class="sitem" href="audit-log.php"><i class="ti ti-history"></i> <?= t('sidebar.audit_log', 'Audit Log') ?></a><?php endif; ?>
+    <a class="sitem active" href="reports.php"><i class="ti ti-report-analytics"></i> <?= t('sidebar.reports', 'Reports') ?></a>
+    <div class="sidebar-section"><?= t('sidebar.account', 'Account') ?></div>
+    <a class="sitem" href="notifications.php"><i class="ti ti-bell"></i> <?= t('sidebar.notifications', 'Notifications') ?>
         <?php if ($notifCount > 0): ?><span class="badge-count"><?= $notifCount ?></span><?php endif; ?>
     </a>
     <a class="sitem" href="../logout.php"><i class="ti ti-logout"></i> <?= t('nav.logout', 'Log out') ?></a>
@@ -142,11 +145,11 @@ if ($rangeStart && $rangeEnd && preg_match('/^\d{4}-\d{2}-\d{2}$/', $rangeStart)
 
     <div class="card">
         <div class="card-title" style="justify-content:space-between;">
-            <span><i class="ti ti-message-report"></i> <?= t('sidebar.complaints', 'Complaints') ?> by Category</span>
+            <span><i class="ti ti-message-report"></i> <?= t('sidebar.complaints', 'Complaints') ?> <?= t('ui.by_category_2f2a', 'by Category') ?></span>
             <?= exportMenu('export-reports.php?type=complaints_analytics', 'btn btn-primary btn-sm') ?>
         </div>
         <div class="table-wrap"><table>
-            <thead><tr><th>Category</th><th>Today</th><th>This Week</th><th>This Month</th><th>This Year</th><th>All-Time</th></tr></thead>
+            <thead><tr><th><?= t('ui.category_3adb', 'Category') ?></th><th><?= t('ui.today_1dd1', 'Today') ?></th><th><?= t('ui.this_week_9832', 'This Week') ?></th><th><?= t('ui.this_month_93f5', 'This Month') ?></th><th><?= t('ui.this_year_ee7d', 'This Year') ?></th><th><?= t('ui.all_time_f23e', 'All-Time') ?></th></tr></thead>
             <tbody>
             <?php foreach ($categoryBreakdown as $c): ?>
             <tr>
@@ -158,18 +161,18 @@ if ($rangeStart && $rangeEnd && preg_match('/^\d{4}-\d{2}-\d{2}$/', $rangeStart)
                 <td><strong><?= (int)$c['all_time'] ?></strong></td>
             </tr>
             <?php endforeach; ?>
-            <?php if (!$categoryBreakdown): ?><tr><td colspan="6" style="text-align:center;color:#9CA3AF;">No complaints yet.</td></tr><?php endif; ?>
+            <?php if (!$categoryBreakdown): ?><tr><td colspan="6" style="text-align:center;color:#9CA3AF;"><?= t('ui.no_complaints_yet_b48c', 'No complaints yet.') ?></td></tr><?php endif; ?>
             </tbody>
         </table></div>
     </div>
 
     <div class="card">
         <div class="card-title" style="justify-content:space-between;">
-            <span><i class="ti ti-mood-smile"></i> Reviews by Reaction</span>
+            <span><i class="ti ti-mood-smile"></i> <?= t('ui.reviews_by_reaction_6675', 'Reviews by Reaction') ?></span>
             <?= exportMenu('export-reports.php?type=reviews_analytics', 'btn btn-primary btn-sm') ?>
         </div>
         <div class="table-wrap"><table>
-            <thead><tr><th>Reaction</th><th>Today</th><th>This Week</th><th>This Month</th><th>This Year</th><th>All-Time</th></tr></thead>
+            <thead><tr><th><?= t('ui.reaction_a871', 'Reaction') ?></th><th><?= t('ui.today_1dd1', 'Today') ?></th><th><?= t('ui.this_week_9832', 'This Week') ?></th><th><?= t('ui.this_month_93f5', 'This Month') ?></th><th><?= t('ui.this_year_ee7d', 'This Year') ?></th><th><?= t('ui.all_time_f23e', 'All-Time') ?></th></tr></thead>
             <tbody>
             <?php foreach ($reactionLabels as $emoji => $label): $b = $reactionBreakdown[$emoji]; ?>
             <tr>
@@ -187,16 +190,16 @@ if ($rangeStart && $rangeEnd && preg_match('/^\d{4}-\d{2}-\d{2}$/', $rangeStart)
 
     <div class="card">
         <div class="card-title" style="justify-content:space-between;">
-            <span><i class="ti ti-chart-infographic"></i> Combined Overview</span>
+            <span><i class="ti ti-chart-infographic"></i> <?= t('ui.combined_overview_c0bb', 'Combined Overview') ?></span>
             <?= exportMenu('export-reports.php?type=combined_overview', 'btn btn-primary btn-sm') ?>
         </div>
-        <p style="font-size:13px;color:#6B7280;">One-page snapshot combining complaints and review satisfaction — great for a quick summary to present to OSA leadership.</p>
+        <p style="font-size:13px;color:#6B7280;"><?= t('ui.one_page_snapshot_combining_compla_9f19', 'One-page snapshot combining complaints and review satisfaction — great for a quick summary to present to OSA leadership.') ?></p>
     </div>
 
     <div class="card">
-        <div class="card-title"><i class="ti ti-arrows-diff"></i> This Month vs Last Month</div>
+        <div class="card-title"><i class="ti ti-arrows-diff"></i> <?= t('ui.this_month_vs_last_month_7ec1', 'This Month vs Last Month') ?></div>
         <div class="table-wrap"><table>
-            <thead><tr><th>Metric</th><th>This Month</th><th>Last Month</th><th>Change</th></tr></thead>
+            <thead><tr><th><?= t('ui.metric_216a', 'Metric') ?></th><th><?= t('ui.this_month_93f5', 'This Month') ?></th><th><?= t('ui.last_month_8dce', 'Last Month') ?></th><th><?= t('ui.change_f4ec', 'Change') ?></th></tr></thead>
             <tbody>
             <?php foreach ($comparisonRows as $c): ?>
             <tr>
@@ -205,13 +208,13 @@ if ($rangeStart && $rangeEnd && preg_match('/^\d{4}-\d{2}-\d{2}$/', $rangeStart)
                 <td><?= htmlspecialchars((string)$c['last']) ?></td>
                 <td>
                     <?php if ($c['change'] === null): ?>
-                        <span style="color:#6B7280;">— new —</span>
+                        <span style="color:#6B7280;"><?= t('ui.new_c409', '— new —') ?></span>
                     <?php elseif ($c['change'] > 0): ?>
                         <span style="color:#059669;font-weight:600;"><i class="ti ti-arrow-up-right"></i> +<?= $c['change'] ?>%</span>
                     <?php elseif ($c['change'] < 0): ?>
                         <span style="color:#DC2626;font-weight:600;"><i class="ti ti-arrow-down-right"></i> <?= $c['change'] ?>%</span>
                     <?php else: ?>
-                        <span style="color:#6B7280;">No change</span>
+                        <span style="color:#6B7280;"><?= t('ui.no_change_7b44', 'No change') ?></span>
                     <?php endif; ?>
                 </td>
             </tr>
@@ -221,43 +224,43 @@ if ($rangeStart && $rangeEnd && preg_match('/^\d{4}-\d{2}-\d{2}$/', $rangeStart)
     </div>
 
     <div class="card">
-        <div class="card-title"><i class="ti ti-calendar-stats"></i> Custom Date Range</div>
+        <div class="card-title"><i class="ti ti-calendar-stats"></i> <?= t('ui.custom_date_range_720f', 'Custom Date Range') ?></div>
         <form method="GET" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;">
             <div>
-                <label style="display:block;font-size:12px;color:#6B7280;margin-bottom:4px;">Start Date</label>
+                <label style="display:block;font-size:12px;color:#6B7280;margin-bottom:4px;"><?= t('ui.start_date_db37', 'Start Date') ?></label>
                 <input type="date" name="start_date" value="<?= htmlspecialchars($rangeStart) ?>" class="form-control" required>
             </div>
             <div>
-                <label style="display:block;font-size:12px;color:#6B7280;margin-bottom:4px;">End Date</label>
+                <label style="display:block;font-size:12px;color:#6B7280;margin-bottom:4px;"><?= t('ui.end_date_3c14', 'End Date') ?></label>
                 <input type="date" name="end_date" value="<?= htmlspecialchars($rangeEnd) ?>" class="form-control" required>
             </div>
-            <button type="submit" class="btn btn-primary btn-sm"><i class="ti ti-filter"></i> Show</button>
+            <button type="submit" class="btn btn-primary btn-sm"><i class="ti ti-filter"></i> <?= t('ui.show_498f', 'Show') ?></button>
             <?php if ($validRange): ?>
                 <?= exportMenu('export-reports.php?type=custom_range&start_date='.urlencode($rangeStart).'&end_date='.urlencode($rangeEnd), 'btn btn-outline btn-sm', '', 'Export This Range') ?>
             <?php endif; ?>
         </form>
 
         <?php if ($rangeStart && $rangeEnd && !$validRange): ?>
-            <p style="color:#DC2626;font-size:13px;">Invalid date range — make sure the start date is before or equal to the end date.</p>
+            <p style="color:#DC2626;font-size:13px;"><?= t('ui.invalid_date_range_make_sure_the_s_25ee', 'Invalid date range — make sure the start date is before or equal to the end date.') ?></p>
         <?php elseif ($validRange): ?>
-            <p style="font-size:12.5px;color:#6B7280;margin-bottom:10px;">Showing <?= date('M j, Y', strtotime($rangeStart)) ?> – <?= date('M j, Y', strtotime($rangeEnd)) ?></p>
+            <p style="font-size:12.5px;color:#6B7280;margin-bottom:10px;"><?= t('ui.showing_b4e6', 'Showing') ?> <?= date('M j, Y', strtotime($rangeStart)) ?> – <?= date('M j, Y', strtotime($rangeEnd)) ?></p>
             <div class="report-range-grid">
                 <div>
-                    <strong style="font-size:13px;">Complaints by Category</strong>
+                    <strong style="font-size:13px;"><?= t('ui.complaints_by_category_d77c', 'Complaints by Category') ?></strong>
                     <div class="table-wrap"><table>
-                        <thead><tr><th>Category</th><th>Count</th></tr></thead>
+                        <thead><tr><th><?= t('ui.category_3adb', 'Category') ?></th><th><?= t('ui.count_e93f', 'Count') ?></th></tr></thead>
                         <tbody>
                         <?php foreach ($customCategoryBreakdown as $c): ?>
                         <tr><td><?= htmlspecialchars($c['category']) ?></td><td><?= (int)$c['total'] ?></td></tr>
                         <?php endforeach; ?>
-                        <?php if (!$customCategoryBreakdown): ?><tr><td colspan="2" style="text-align:center;color:#9CA3AF;">No complaints in this range.</td></tr><?php endif; ?>
+                        <?php if (!$customCategoryBreakdown): ?><tr><td colspan="2" style="text-align:center;color:#9CA3AF;"><?= t('ui.no_complaints_in_this_range_0e96', 'No complaints in this range.') ?></td></tr><?php endif; ?>
                         </tbody>
                     </table></div>
                 </div>
                 <div>
-                    <strong style="font-size:13px;">Reviews by Reaction</strong>
+                    <strong style="font-size:13px;"><?= t('ui.reviews_by_reaction_6675', 'Reviews by Reaction') ?></strong>
                     <div class="table-wrap"><table>
-                        <thead><tr><th>Reaction</th><th>Count</th></tr></thead>
+                        <thead><tr><th><?= t('ui.reaction_a871', 'Reaction') ?></th><th><?= t('ui.count_e93f', 'Count') ?></th></tr></thead>
                         <tbody>
                         <?php foreach ($customReactionBreakdown as $emoji => $r): ?>
                         <tr><td><?= $emoji ?> <?= htmlspecialchars($r['label']) ?></td><td><?= $r['total'] ?></td></tr>
@@ -273,5 +276,6 @@ if ($rangeStart && $rangeEnd && preg_match('/^\d{4}-\d{2}-\d{2}$/', $rangeStart)
 
 </div></div>
 <script src="../assets/js/sidebar.js?v=5"></script>
-<?php include __DIR__.'/../includes/push-widget.php'; ?>
+<script>window.CSRF_TOKEN = <?= json_encode(csrfToken()) ?>;</script>
+<script src="../assets/js/admin-otp.js?v=2"></script>
 </body></html>

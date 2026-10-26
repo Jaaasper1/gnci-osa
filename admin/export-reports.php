@@ -1,8 +1,12 @@
 <?php
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/audit.php';
 require_once '../includes/functions.php';
-requireAdmin();
+requireStaff();
+require_once '../includes/admin-otp.php';
+adminOtpRequireGate('export_reports');
+auditLog($pdo, 'export', 'report', 0, [], ['type' => $_GET['type'] ?? '']);
 
 require_once '../vendor/autoload.php';
 require_once '../includes/export-helpers.php';

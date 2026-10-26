@@ -3,7 +3,7 @@ require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/functions.php';
 require_once '../includes/facebook.php';
-requireAdmin();
+requireStaff();
 session_write_close();   // read-only endpoint: don't keep other pages waiting on the session lock
 
 // forceRefresh is left false — fbGetPagePosts already only hits the real

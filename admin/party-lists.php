@@ -3,7 +3,10 @@ require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/functions.php';
 require_once '../includes/lang.php';
-requireAdmin();
+requireStaff();
+require_once '../includes/csrf.php';
+require_once '../includes/admin-otp.php';
+adminOtpHandleAjax($pdo);
 require_once __DIR__ . '/election-picker.php';
 require_once __DIR__ . '/list-search.php';
 $notifCount = getUnreadStaffNotifCount($pdo, $_SESSION['user_id']);
@@ -15,9 +18,12 @@ $elections = $pdo->query("SELECT * FROM elections ORDER BY course, created_at DE
 $eid = (int)($_GET['election'] ?? defaultElectionId($elections));
 
 // DELETE
-if (isset($_GET['delete'])) {
+if (isset($_POST['delete'])) {
+    requireCsrf();
     // Candidates linked to this party list simply become independent (party_list_id -> NULL via FK ON DELETE SET NULL)
-    $pdo->prepare("DELETE FROM party_lists WHERE id=?")->execute([(int)$_GET['delete']]);
+    $__before = auditRow($pdo, 'party_lists', (int)$_POST['delete']);
+    $pdo->prepare("DELETE FROM party_lists WHERE id=?")->execute([(int)$_POST['delete']]);
+    auditLog($pdo, 'delete', 'party_list', (int)$_POST['delete'], $__before);
     header('Location: party-lists.php?election=' . $eid); exit;
 }
 
@@ -35,6 +41,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($name === '') {
         $_SESSION['flash_error'] = 'Party list name is required.';
+    } elseif ($party_id && !adminOtpConsumeApproval('edit_party', $party_id)) {
+        $_SESSION['flash_error'] = t('msg.please_confirm_the_change_with_the_email_1213', 'Please confirm the change with the emailed code first.');
     } else {
         $logo = null;
         if (!empty($_FILES['logo']['name'])) {
@@ -44,6 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if (!isset($_SESSION['flash_error'])) {
+            $__before = $party_id ? auditRow($pdo, 'party_lists', $party_id) : [];
             if ($party_id) {
                 if ($logo) {
                     $pdo->prepare("UPDATE party_lists SET name=?, platform=?, color=?, logo=? WHERE id=?")
@@ -52,11 +61,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $pdo->prepare("UPDATE party_lists SET name=?, platform=?, color=? WHERE id=?")
                         ->execute([$name, $platform, $color, $party_id]);
                 }
+                auditLog($pdo, 'update', 'party_list', $party_id, $__before, ['name' => $name, 'platform' => $platform, 'color' => $color]);
                 $_SESSION['flash_success'] = 'Party list updated!';
             } else {
                 $pdo->prepare("INSERT INTO party_lists (election_id, name, platform, color, logo) VALUES (?,?,?,?,?)")
                     ->execute([$election_id, $name, $platform, $color, $logo]);
                 $_SESSION['flash_success'] = 'Party list added!';
+                auditLog($pdo, 'create', 'party_list', (int)$pdo->lastInsertId(), [], ['name' => $name]);
             }
         }
     }
@@ -75,37 +86,37 @@ if ($eid) {
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Party Lists — GNC-OSA Admin</title>
+    <title><?= t('title.party_lists', 'Party Lists') ?> — GNC-OSA Admin</title>
     <link rel="stylesheet" href="../assets/css/style.css?v=27">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
-</head>
+<?php include __DIR__.'/../includes/pwa-head.php'; ?></head>
 <body class="theme-election">
 <nav class="topnav">
-    <button class="hamburger" id="hamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
-    <div class="brand"><img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);"><div class="brand-text"><div class="name">GNC-OSA Admin</div><div class="sub">Administrator</div></div></div>
+    <button class="hamburger" id="hamburger" aria-label="<?= t('ui.toggle_menu_641f', 'Toggle menu') ?>"><span></span><span></span><span></span></button>
+    <div class="brand"><img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);"><div class="brand-text"><div class="name">GNC-OSA Admin</div><div class="sub"><?= t('ui.administrator_7b7b', 'Administrator') ?></div></div></div>
     <div class="nav-right">
         <?php renderLangSwitcher(); ?><div class="avatar" style="background:#7C3AED;color:#fff;">AD</div><span class="uname"><?= e($_SESSION['name']) ?></span></div>
 </nav>
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
 <aside class="sidebar">
-    <div class="sidebar-section">Overview</div>
+    <div class="sidebar-section"><?= t('sidebar.overview', 'Overview') ?></div>
     <a class="sitem" href="dashboard.php"><i class="ti ti-layout-dashboard"></i> <?= t('sidebar.dashboard', 'Dashboard') ?></a>
-    <div class="sidebar-section">Complaints</div>
-    <a class="sitem" href="complaints.php"><i class="ti ti-message-report"></i> All Complaints</a>
+    <div class="sidebar-section"><?= t('sidebar.complaints', 'Complaints') ?></div>
+    <a class="sitem" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.all_complaints', 'All Complaints') ?></a><a class="sitem" href="../osa/messages.php"><i class="ti ti-messages"></i> <?= t('sidebar.messages', 'Messages') ?></a>
     <div class="sidebar-section"><?= t('sidebar.election', 'Election') ?></div>
-    <a class="sitem" href="elections.php"><i class="ti ti-trophy"></i> Elections</a>
-    <a class="sitem" href="candidates.php"><i class="ti ti-users"></i> Candidates</a>
-    <a class="sitem active" href="party-lists.php"><i class="ti ti-flag"></i> Party Lists</a>
+    <a class="sitem" href="elections.php"><i class="ti ti-trophy"></i> <?= t('sidebar.elections', 'Elections') ?></a>
+    <a class="sitem" href="candidates.php"><i class="ti ti-users"></i> <?= t('sidebar.candidates', 'Candidates') ?></a>
+    <a class="sitem active" href="party-lists.php"><i class="ti ti-flag"></i> <?= t('sidebar.party_lists', 'Party Lists') ?></a>
     <a class="sitem" href="vouchers.php"><i class="ti ti-ticket"></i> <?= t('sidebar.vouchers', 'Vouchers') ?></a>
-    <a class="sitem" href="results.php"><i class="ti ti-chart-pie"></i> Live Results</a>
-    <div class="sidebar-section">Events</div>
-    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> Events</a>
-    <div class="sidebar-section">System</div>
-    <a class="sitem" href="students.php"><i class="ti ti-user-plus"></i> Students</a>
-    <a class="sitem" href="staff.php"><i class="ti ti-shield-check"></i> OSA Staff</a>
-    <a class="sitem" href="reports.php"><i class="ti ti-report-analytics"></i> Reports</a>
-    <div class="sidebar-section">Account</div>
-    <a class="sitem" href="notifications.php"><i class="ti ti-bell"></i> Notifications
+    <a class="sitem" href="results.php"><i class="ti ti-chart-pie"></i> <?= t('sidebar.live_results', 'Live Results') ?></a>
+    <div class="sidebar-section"><?= t('sidebar.events', 'Events') ?></div>
+    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> <?= t('sidebar.events', 'Events') ?></a>
+    <div class="sidebar-section"><?= t('sidebar.system', 'System') ?></div>
+    <a class="sitem" href="students.php"><i class="ti ti-user-plus"></i> <?= t('sidebar.students', 'Students') ?></a>
+    <?php if ($_SESSION['user_type'] === 'admin'): ?><a class="sitem" href="staff.php"><i class="ti ti-shield-check"></i> <?= t('sidebar.osa_staff', 'OSA Staff') ?></a><?php endif; ?><?php if ($_SESSION['user_type'] === 'admin'): ?><a class="sitem" href="audit-log.php"><i class="ti ti-history"></i> <?= t('sidebar.audit_log', 'Audit Log') ?></a><?php endif; ?>
+    <a class="sitem" href="reports.php"><i class="ti ti-report-analytics"></i> <?= t('sidebar.reports', 'Reports') ?></a>
+    <div class="sidebar-section"><?= t('sidebar.account', 'Account') ?></div>
+    <a class="sitem" href="notifications.php"><i class="ti ti-bell"></i> <?= t('sidebar.notifications', 'Notifications') ?>
         <?php if ($notifCount > 0): ?><span class="badge-count"><?= $notifCount ?></span><?php endif; ?>
     </a>
     <a class="sitem" href="../logout.php"><i class="ti ti-logout"></i> <?= t('nav.logout', 'Log out') ?></a>
@@ -119,19 +130,28 @@ if ($eid) {
 
     <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
-            <div class="card-title" style="margin-bottom:0;"><i class="ti ti-flag"></i> Party Lists <span style="background:#6B1A2A;color:#fff;border-radius:20px;padding:2px 10px;font-size:11px;margin-left:6px;"><?= count($partyLists) ?></span></div>
+            <div class="card-title" style="margin-bottom:0;"><i class="ti ti-flag"></i> <?= t('ui.party_lists_e975', 'Party Lists') ?> <span style="background:#6B1A2A;color:#fff;border-radius:20px;padding:2px 10px;font-size:11px;margin-left:6px;"><?= count($partyLists) ?></span></div>
             <?php if (!empty($elections)): ?>
             <div class="io-group">
                 <button onclick="openImportModal()" class="btn btn-outline btn-sm" style="display:flex;align-items:center;gap:6px;white-space:nowrap;">
-                    <i class="ti ti-file-spreadsheet"></i> Import Excel
+                    <i class="ti ti-file-spreadsheet"></i> <?= t('ui.import_excel_508e', 'Import Excel') ?>
                 </button>
-                <?= exportMenu('export.php?type=party_lists&election='.$eid, 'btn btn-outline btn-sm', 'white-space:nowrap;color:#059669;border-color:#059669;') ?>
+                <?php
+                $__pOpts = []; foreach ($partyLists as $__pl) $__pOpts[$__pl['id']] = $__pl['name'];
+                if ($eid) {
+                    $__ind = $pdo->prepare("SELECT COUNT(*) FROM candidates WHERE election_id=? AND party_list_id IS NULL"); $__ind->execute([$eid]);
+                    if ((int)$__ind->fetchColumn() > 0) $__pOpts[0] = 'Independent (no party list)';
+                }
+                ?>
+                <?= exportMenu('export.php?type=party_lists&election='.$eid, 'btn btn-outline btn-sm', 'white-space:nowrap;color:#059669;border-color:#059669;', 'Export', null, [
+                    ['key' => 'party', 'label' => 'Party List', 'options' => $__pOpts],
+                ]) ?>
                 <button onclick="openAddPartyModal()" class="btn btn-primary btn-sm io-full" style="display:flex;align-items:center;gap:6px;white-space:nowrap;">
-                    <i class="ti ti-circle-plus"></i> Add Party List
+                    <i class="ti ti-circle-plus"></i> <?= t('ui.add_party_list_8db3', 'Add Party List') ?>
                 </button>
             </div>
             <?php else: ?>
-            <a href="elections.php" class="btn btn-primary btn-sm"><i class="ti ti-plus"></i> Create Election</a>
+            <a href="elections.php" class="btn btn-primary btn-sm"><i class="ti ti-plus"></i> <?= t('ui.create_election_78c4', 'Create Election') ?></a>
             <?php endif; ?>
         </div>
 
@@ -142,9 +162,9 @@ if ($eid) {
         <?php else: ?>
         <?php renderListSearch('party-table', 'Search party list or platform...'); ?>
         <div class="table-wrap"><table id="party-table" data-pager="10" data-pager-sizes="10,25,50">
-            <thead><tr><th></th><th>Party List</th><th>Platform</th><th>Candidates</th><th></th></tr></thead>
+            <thead><tr><th></th><th>Party List</th><th><?= t('ui.platform_419f', 'Platform') ?></th><th><?= t('ui.candidates_211d', 'Candidates') ?></th><th></th></tr></thead>
             <tbody><?php foreach ($partyLists as $pl): ?>
-            <tr data-search="<?= e(strtolower($pl['name'].' '.($pl['platform'] ?? ''))) ?>">
+            <tr data-bulk-id="<?= (int)$pl['id'] ?>" data-search="<?= e(strtolower($pl['name'].' '.($pl['platform'] ?? ''))) ?>">
                 <td>
                     <?php if ($pl['logo']): ?>
                         <img src="../uploads/<?= e($pl['logo']) ?>" style="width:32px;height:32px;border-radius:50%;object-fit:cover;">
@@ -174,7 +194,7 @@ if ($eid) {
             </tr>
             <?php endforeach; ?></tbody>
         </table></div>
-        <p style="font-size:11px;color:#9CA3AF;margin-top:10px;">Deleting a party list does not remove its candidates — they simply become "Independent".</p>
+        <p style="font-size:11px;color:#9CA3AF;margin-top:10px;"><?= t('ui.deleting_a_party_list_does_not_rem_89fd', 'Deleting a party list does not remove its candidates — they simply become "Independent".') ?></p>
         <?php endif; ?>
     </div>
 </div></div>
@@ -183,32 +203,32 @@ if ($eid) {
 <div id="party-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9100;align-items:center;justify-content:center;overflow-y:auto;">
     <div style="background:#fff;border-radius:14px;padding:28px;width:100%;max-width:460px;box-shadow:0 8px 32px rgba(0,0,0,0.18);margin:20px auto;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
-            <div id="party-modal-title" style="font-size:15px;font-weight:600;color:#1F2937;"><i class="ti ti-circle-plus" style="margin-right:6px;color:#6B1A2A;"></i> Add Party List</div>
+            <div id="party-modal-title" style="font-size:15px;font-weight:600;color:#1F2937;"><i class="ti ti-circle-plus" style="margin-right:6px;color:#6B1A2A;"></i> <?= t('ui.add_party_list_8db3', 'Add Party List') ?></div>
             <button onclick="closePartyModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9CA3AF;line-height:1;">&times;</button>
         </div>
         <form method="POST" enctype="multipart/form-data" id="party-form">
             <input type="hidden" name="party_id" id="party-id-input" value="">
             <input type="hidden" name="election_id" value="<?= $eid ?>">
             <div class="form-group">
-                <label>Party List Name *</label>
-                <input type="text" name="name" id="party-name-input" class="form-control" placeholder="ex. Unity Coalition" required>
+                <label><?= t('ui.party_list_name_95ce', 'Party List Name *') ?></label>
+                <input type="text" name="name" id="party-name-input" class="form-control" placeholder="<?= t('ui.ex_unity_coalition_5d69', 'ex. Unity Coalition') ?>" required>
             </div>
             <div class="form-group">
-                <label>Platform / Advocacy (optional)</label>
-                <textarea name="platform" id="party-platform-input" class="form-control" placeholder="Short description of the party's platform..."></textarea>
+                <label><?= t('ui.platform_advocacy_optional_1049', 'Platform / Advocacy (optional)') ?></label>
+                <textarea name="platform" id="party-platform-input" class="form-control" placeholder="<?= htmlspecialchars(t('auto.short_description_of_the_party_s_platfor_3f95', 'Short description of the party\'s platform...'), ENT_QUOTES) ?>"></textarea>
             </div>
             <div class="form-group">
-                <label>Party Color</label>
+                <label><?= t('ui.party_color_a0bc', 'Party Color') ?></label>
                 <input type="color" name="color" id="party-color-input" class="form-control" value="#6B1A2A" style="height:40px;padding:4px;">
             </div>
             <div class="form-group">
-                <label>Logo (optional)</label>
+                <label><?= t('ui.logo_optional_6dfd', 'Logo (optional)') ?></label>
                 <input type="file" name="logo" class="form-control" accept=".jpg,.jpeg,.png">
-                <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">JPG o PNG · max 2MB</div>
+                <div style="font-size:11px;color:#9CA3AF;margin-top:4px;"><?= t('ui.jpg_o_png_max_2mb_532b', 'JPG o PNG · max 2MB') ?></div>
             </div>
             <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px;">
-                <button type="button" onclick="closePartyModal()" class="btn btn-outline btn-sm">Cancel</button>
-                <button type="submit" class="btn btn-primary btn-sm"><i class="ti ti-device-floppy"></i> Save</button>
+                <button type="button" onclick="closePartyModal()" class="btn btn-outline btn-sm"><?= t('ui.cancel_ea47', 'Cancel') ?></button>
+                <button type="submit" class="btn btn-primary btn-sm"><i class="ti ti-device-floppy"></i> <?= t('ui.save_c9cc', 'Save') ?></button>
             </div>
         </form>
     </div>
@@ -248,7 +268,7 @@ document.querySelectorAll('.edit-party-btn').forEach(function(btn) {
         <!-- Header -->
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
             <div style="font-size:15px;font-weight:600;color:#1F2937;">
-                <i class="ti ti-file-spreadsheet" style="margin-right:6px;color:#059669;"></i> Import Party Lists via Excel
+                <i class="ti ti-file-spreadsheet" style="margin-right:6px;color:#059669;"></i> <?= t('ui.import_party_lists_via_excel_8da4', 'Import Party Lists via Excel') ?>
             </div>
             <button onclick="closeImportModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9CA3AF;">&times;</button>
         </div>
@@ -256,23 +276,23 @@ document.querySelectorAll('.edit-party-btn').forEach(function(btn) {
         <!-- Step 1: Download template -->
         <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:14px 16px;margin-bottom:18px;">
             <div style="font-size:13px;font-weight:600;color:#065F46;margin-bottom:6px;">
-                <i class="ti ti-download" style="margin-right:4px;"></i> Step 1 — Download the template
+                <i class="ti ti-download" style="margin-right:4px;"></i> <?= t('ui.step_1_download_the_template_1a58', 'Step 1 — Download the template') ?>
             </div>
             <div style="font-size:12px;color:#047857;margin-bottom:10px;line-height:1.5;">
-                Fill in the Excel template with <strong>name</strong> (required), <strong>platform</strong>, and <strong>color</strong> columns.<br>
-                Logos can't be imported via Excel — add those individually via Edit after importing.
+                <?= t('ui.fill_in_the_excel_template_with_1a76', 'Fill in the Excel template with') ?> <strong>name</strong> <?= t('ui.required_ec80', '(required),') ?> <strong>platform</strong><?= t('ui.and_8a0e', ', and') ?> <strong>color</strong> <?= t('ui.columns_7af3', 'columns.') ?><br>
+                <?= t('ui.logos_can_t_be_imported_via_excel__5fd6', 'Logos can\'t be imported via Excel — add those individually via Edit after importing.') ?>
             </div>
             <a href="import-party-lists.php?template=1" class="btn btn-sm" style="background:#059669;color:#fff;gap:6px;">
-                <i class="ti ti-table-export"></i> Download Template (.xlsx)
+                <i class="ti ti-table-export"></i> <?= t('ui.download_template_xlsx_68a5', 'Download Template (.xlsx)') ?>
             </a>
             <div style="font-size:11.5px;color:#065F46;margin-top:10px;">
-                <i class="ti ti-info-circle" style="margin-right:3px;"></i> Tip: already have a Party Lists file you exported earlier? You can edit that file directly and upload it in Step 2 — no need to start from the template.
+                <i class="ti ti-info-circle" style="margin-right:3px;"></i> <?= t('ui.tip_already_have_a_party_lists_fil_8b08', 'Tip: already have a Party Lists file you exported earlier? You can edit that file directly and upload it in Step 2 — no need to start from the template.') ?>
             </div>
         </div>
 
         <!-- Step 2: Upload -->
         <div style="font-size:13px;font-weight:600;color:#1F2937;margin-bottom:10px;">
-            <i class="ti ti-upload" style="margin-right:4px;color:#6B1A2A;"></i> Step 2 — Upload filled Excel file
+            <i class="ti ti-upload" style="margin-right:4px;color:#6B1A2A;"></i> <?= t('ui.step_2_upload_filled_excel_file_cce2', 'Step 2 — Upload filled Excel file') ?>
         </div>
 
         <!-- Drop zone -->
@@ -282,8 +302,8 @@ document.querySelectorAll('.edit-party-btn').forEach(function(btn) {
              ondragleave="this.style.borderColor='#D1D5DB';this.style.background='';"
              ondrop="handlePartyDrop(event)">
             <i class="ti ti-file-spreadsheet" style="font-size:32px;color:#9CA3AF;display:block;margin-bottom:8px;"></i>
-            <div id="party-drop-label" style="font-size:13px;color:#6B7280;">Click to browse or drag & drop your Excel file here</div>
-            <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">.xlsx or .xls · max 5MB</div>
+            <div id="party-drop-label" style="font-size:13px;color:#6B7280;"><?= t('ui.click_to_browse_or_drag_drop_your__9481', 'Click to browse or drag & drop your Excel file here') ?></div>
+            <div style="font-size:11px;color:#9CA3AF;margin-top:4px;"><?= t('ui.xlsx_or_xls_max_5mb_45c7', '.xlsx or .xls · max 5MB') ?></div>
         </div>
         <input type="file" id="party-excel-file-input" accept=".xlsx,.xls" style="display:none;" onchange="handlePartyFileSelect(this.files[0])">
 
@@ -292,9 +312,9 @@ document.querySelectorAll('.edit-party-btn').forEach(function(btn) {
 
         <!-- Actions -->
         <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px;">
-            <button onclick="closeImportModal()" class="btn btn-outline btn-sm">Cancel</button>
+            <button onclick="closeImportModal()" class="btn btn-outline btn-sm"><?= t('ui.cancel_ea47', 'Cancel') ?></button>
             <button id="party-import-submit-btn" onclick="submitPartyImport()" class="btn btn-primary btn-sm" disabled>
-                <i class="ti ti-eye"></i> Preview Changes
+                <i class="ti ti-eye"></i> <?= t('ui.preview_changes_b2e8', 'Preview Changes') ?>
             </button>
         </div>
     </div>
@@ -317,7 +337,7 @@ document.getElementById('import-modal-overlay').addEventListener('click', functi
 function resetImportModal() {
     _partyImportFile = null;
     document.getElementById('party-excel-file-input').value = '';
-    document.getElementById('party-drop-label').textContent = 'Click to browse or drag & drop your Excel file here';
+    document.getElementById('party-drop-label').textContent = __t('Click to browse or drag & drop your Excel file here');
     document.getElementById('party-drop-zone').style.borderColor = '#D1D5DB';
     document.getElementById('party-drop-zone').style.background  = '';
     document.getElementById('party-import-result').style.display = 'none';
@@ -347,7 +367,7 @@ function handlePartyDrop(event) {
     if (file) handlePartyFileSelect(file);
 }
 
-// One button, two steps: "Preview Changes" first, then "Confirm Import".
+// One button, two steps: __t("Preview Changes") first, then __t("Confirm Import").
 var _partyPreview = false;
 
 function _impEsc(v) {
@@ -376,6 +396,14 @@ function submitPartyImportReset() {
 function submitPartyImport() {
     if (!_partyImportFile) return;
     var isConfirm = _partyPreview;
+    if (isConfirm && !window._partyGateOK) {
+        AdminOtp.gate({
+            op: 'import_party_lists', title: __t('Confirm party list import'), subtitle: __t('Import party lists from Excel'),
+            body: __t('The party lists in this file will be added or updated after you confirm.'), confirmLabel: __t('Import'),
+            proceed: function () { window._partyGateOK = true; try { submitPartyImport(); } finally { window._partyGateOK = false; } }
+        });
+        return;
+    }
 
     var electionId = <?= $eid ?>;
     var btn = document.getElementById('party-import-submit-btn');
@@ -397,7 +425,7 @@ function submitPartyImport() {
 
             if (!data.success) {
                 submitPartyImportReset();
-                result.innerHTML = _impErrorHTML(data.message || 'Something went wrong.');
+                result.innerHTML = _impErrorHTML(data.message || __t('Something went wrong.'));
                 result.style.display = 'block';
                 return;
             }
@@ -409,7 +437,7 @@ function submitPartyImport() {
                     submitPartyImportReset();
                     result.innerHTML =
                         '<div style="background:#F3F4F6;border:1px solid #E5E7EB;border-radius:8px;padding:12px 14px;color:#374151;font-size:13px;">' +
-                        'Nothing to import — no new or changed party list(s) found in this file' + (data.unchanged ? ' (' + data.unchanged + ' unchanged).' : '.') + '</div>' + _impSkippedHTML(data.skipped);
+                        __t('Nothing to import — no new or changed party list(s) found in this file') + (data.unchanged ? ' (' + data.unchanged + ' unchanged).' : '.') + '</div>' + _impSkippedHTML(data.skipped);
                     result.style.display = 'block';
                     return;
                 }
@@ -457,7 +485,7 @@ function submitPartyImport() {
         .catch(function() {
             btn.disabled = false;
             submitPartyImportReset();
-            result.innerHTML = _impErrorHTML('Network error. Please try again.');
+            result.innerHTML = _impErrorHTML(__t('Network error. Please try again.'));
             result.style.display = 'block';
         });
 }
@@ -476,8 +504,8 @@ function submitPartyImport() {
             </div>
         </div>
         <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;">
-            <button onclick="gncCloseModal()" class="btn btn-outline btn-sm">Cancel</button>
-            <button id="gnc-modal-confirm-btn" class="btn btn-danger btn-sm">Delete</button>
+            <button onclick="gncCloseModal()" class="btn btn-outline btn-sm"><?= t('ui.cancel_ea47', 'Cancel') ?></button>
+            <button id="gnc-modal-confirm-btn" class="btn btn-danger btn-sm"><?= t('ui.delete_f2a6', 'Delete') ?></button>
         </div>
     </div>
 </div>
@@ -506,13 +534,46 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') gncCl
 
 function confirmDeleteParty(id, name) {
     gncOpenModal(
-        'Delete Party List',
-        'Delete party list "' + name + '"? Its candidates will become Independent.',
-        function() { window.location.href = 'party-lists.php?delete=' + id + '&election=<?= $eid ?>'; }
+        __t('Delete Party List'),
+        'Delete party list "' + name + __t('"? Its candidates will become Independent.'),
+        function() { postAction({ delete: id }); }
     );
 }
 </script>
 <script src="../assets/js/client-pager.js?v=3"></script>
+<script src="../assets/js/bulk-select.js?v=5"></script>
+<script>
+(function () {
+  var t = document.getElementById('party-table'); if (!t) return;
+  BulkSelect.init({
+    rows: '#party-table tbody tr[data-bulk-id]', before: t.closest('.table-wrap'), noun: 'party list', exportType: 'party_lists',
+    actions: [{ label: __t('Delete'), icon: 'ti-trash', danger: true,
+      confirm: function (n) { return __t('Permanently delete ') + n + __t(' party list(s)? Their candidates become independent.'); },
+      run: function (id) { return fetch('party-lists.php?election=<?= (int)$eid ?>', { method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: 'delete=' + encodeURIComponent(id) + '&csrf_token=' + encodeURIComponent(window.CSRF_TOKEN || '') }).then(function (r) { return r.ok; }); } }]
+  });
+})();
+</script>
 <script src="../assets/js/sidebar.js?v=5"></script>
 <?php include __DIR__.'/../includes/push-widget.php'; ?>
+<script>window.CSRF_TOKEN = <?= json_encode(csrfToken()) ?>;</script>
+<script src="../assets/js/admin-otp.js?v=2"></script>
+<script>
+document.getElementById('party-form').addEventListener('submit', function (e) {
+    var form = this;
+    if (e.defaultPrevented || form.dataset.otpOk === '1') return;
+    var pid = form.querySelector('input[name="party_id"]').value;
+    if (!pid) return;                       // adding a new party list needs no code
+    e.preventDefault();
+    AdminOtp.confirmThen({
+        op: 'edit_party',
+        targetId: pid,
+        title: __t('Save Party List Changes'),
+        subtitle: document.getElementById('party-name-input').value,
+        body: __t('This party list will be changed after you confirm.'),
+        confirmLabel: __t('Save Changes')
+    }, function () { form.dataset.otpOk = '1'; form.submit(); });
+});
+</script>
+<script>window.CSRF_TOKEN = <?= json_encode(csrfToken()) ?>;</script>
+<script src="../assets/js/post-action.js"></script>
 </body></html>

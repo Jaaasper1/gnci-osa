@@ -19,8 +19,15 @@ const EXPORT_FORMATS = [
     'csv'   => ['CSV (.csv)',           'ti-file-type-csv'],
 ];
 
-/** Dropdown button. $url is the export URL WITHOUT the format parameter. */
-function exportMenu(string $url, string $btnClass = 'btn btn-outline btn-sm', string $style = '', string $label = 'Export', ?array $formats = null): string {
+/**
+ * Dropdown button. $url is the export URL WITHOUT the format parameter.
+ *
+ * $filters (optional) adds a "pick what to export" panel above the formats. Each filter:
+ *   ['key' => 'course', 'label' => 'Course', 'options' => [value => label, ...], 'selected' => [values pre-ticked]]
+ * Ticked values are sent as ?f_<key>[]=value ; nothing ticked = no filtering (export all).
+ * Read them server-side with exportFilter('<key>') / exportFilterInts('<key>').
+ */
+function exportMenu(string $url, string $btnClass = 'btn btn-outline btn-sm', string $style = '', string $label = 'Export', ?array $formats = null, array $filters = []): string {
     static $assets = false;
     $formats = $formats ?? array_keys(EXPORT_FORMATS);
     $sep = (strpos($url, '?') === false) ? '?' : '&';
@@ -34,15 +41,90 @@ function exportMenu(string $url, string $btnClass = 'btn btn-outline btn-sm', st
 @media(max-width:600px){.xm-list{left:0;right:auto}}
 .xm-list a{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;color:#374151;font-size:13px;white-space:nowrap}
 .xm-list a:hover{background:#F9EEF0;color:#6B1A2A}
+.xm-list.xm-wide{min-width:260px}
+.xm-filters{padding:4px 4px 8px;border-bottom:1px solid #F3F4F6;margin-bottom:6px}
+.xm-fh{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:#6B1A2A;padding:4px 6px}
+.xm-fh .xm-fcount{margin-left:auto;font-weight:600;color:#6B7280;background:#F3F4F6;border-radius:10px;padding:1px 8px}
+.xm-fh .xm-fclear{border:0;background:none;color:#6B7280;font-size:12px;cursor:pointer;text-decoration:underline;padding:0}
+.xm-fl{font-size:11px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.04em;padding:6px 6px 2px}
+.xm-fopts{max-height:150px;overflow-y:auto;padding:0 2px}
+.xm-fopts label{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;font-size:13px;color:#374151;cursor:pointer;margin:0;white-space:normal}
+.xm-fopts label:hover{background:#F9EEF0}
+.xm-fopts input{width:16px;height:16px;flex-shrink:0;accent-color:#6B1A2A;margin:0}
+.xm-fnote{font-size:11px;color:#9CA3AF;padding:4px 6px 0}
 </style><script>document.addEventListener("toggle",function(e){var d=e.target;if(!d.classList||!d.classList.contains("xm")||!d.open)return;var l=d.querySelector(".xm-list");if(!l)return;l.style.left="";l.style.right="0";l.style.marginLeft="";var r=l.getBoundingClientRect();if(r.left<8){l.style.right="auto";l.style.left="0";r=l.getBoundingClientRect();}if(r.right>window.innerWidth-8){l.style.marginLeft=(window.innerWidth-8-r.right)+"px";}},true);document.addEventListener("click",function(e){document.querySelectorAll("details.xm[open]").forEach(function(d){if(!d.contains(e.target))d.removeAttribute("open")})});</script>';
+    }
+    static $selAssets = false;
+    if (!$selAssets) {
+        // If rows are ticked (BulkSelect) in the table that feeds this export, the
+        // export link gets &ids=... so only those rows are exported. Nothing ticked = all.
+        $selAssets = true;
+        $h .= <<<'SELJS'
+<script>
+(function(){
+  document.addEventListener("click", function(e){
+    var a = e.target.closest ? e.target.closest(".xm-list a") : null;
+    if (!a) return;
+    if (!a.hasAttribute("data-href0")) a.setAttribute("data-href0", a.getAttribute("href"));
+    var u = new URL(a.getAttribute("data-href0"), location.href);
+    // ticked table rows (BulkSelect) -> &ids=...
+    if (window.BulkSelect && BulkSelect.selectedFor) {
+      var ids = BulkSelect.selectedFor(u.searchParams.get("type"));
+      if (ids.length) u.searchParams.set("ids", ids.join(","));
+    }
+    // ticked filter options -> &f_<key>[]=...
+    var box = a.closest(".xm-list");
+    var fl = box ? box.querySelectorAll(".xm-filters input[data-fkey]:checked") : [];
+    for (var i = 0; i < fl.length; i++) u.searchParams.append("f_" + fl[i].getAttribute("data-fkey") + "[]", fl[i].value);
+    a.setAttribute("href", u.pathname + u.search);
+  }, true);
+
+  function refresh(box){
+    var n = box.querySelectorAll("input[data-fkey]:checked").length;
+    var b = box.querySelector(".xm-fcount");
+    if (b) b.textContent = n ? n + " selected" : "All";
+  }
+  document.addEventListener("change", function(e){
+    var box = e.target.closest ? e.target.closest(".xm-filters") : null;
+    if (box) refresh(box);
+  });
+  document.addEventListener("click", function(e){
+    var c = e.target.closest ? e.target.closest(".xm-fclear") : null;
+    if (!c) return;
+    var box = c.closest(".xm-filters");
+    box.querySelectorAll("input[data-fkey]").forEach(function(i){ i.checked = false; });
+    refresh(box);
+  });
+  document.addEventListener("DOMContentLoaded", function(){
+    document.querySelectorAll(".xm-filters").forEach(refresh);
+  });
+})();
+</script>
+SELJS;
     }
     $h .= '<details class="xm"><summary class="' . htmlspecialchars($btnClass) . '" style="' . htmlspecialchars($style) . '">'
         . '<i class="ti ti-table-export"></i> ' . htmlspecialchars($label) . ' <i class="ti ti-chevron-down" style="font-size:12px"></i></summary>'
-        . '<div class="xm-list">';
+        . '<div class="xm-list' . ($filters ? ' xm-wide' : '') . '">';
+    $filters = array_values(array_filter($filters, fn($f) => !empty($f['options']) && !empty($f['key'])));
+    if ($filters) {
+        $h .= '<div class="xm-filters"><div class="xm-fh"><i class="ti ti-filter"></i> Choose what to export'
+            . '<span class="xm-fcount">All</span><button type="button" class="xm-fclear">Clear</button></div>';
+        foreach ($filters as $f) {
+            $pre = array_map('strval', $f['selected'] ?? []);
+            $h .= '<div class="xm-fl">' . htmlspecialchars($f['label'] ?? $f['key']) . '</div><div class="xm-fopts">';
+            foreach ($f['options'] as $val => $lbl) {
+                $h .= '<label><input type="checkbox" data-fkey="' . htmlspecialchars($f['key']) . '" value="' . htmlspecialchars((string)$val) . '"'
+                    . (in_array((string)$val, $pre, true) ? ' checked' : '') . '> ' . htmlspecialchars((string)$lbl) . '</label>';
+            }
+            $h .= '</div>';
+        }
+        $h .= '<div class="xm-fnote">Nothing ticked = export everything.</div></div>';
+    }
     foreach ($formats as $f) {
         if (!isset(EXPORT_FORMATS[$f])) continue;
         [$name, $icon] = EXPORT_FORMATS[$f];
-        $h .= '<a href="' . htmlspecialchars($url . $sep . 'format=' . $f) . '"' . ($f === 'print' ? ' target="_blank"' : '') . '><i class="ti ' . $icon . '"></i> ' . htmlspecialchars($name) . '</a>';
+        $gateOp = strpos($url, 'export-reports.php') === 0 ? 'export_reports' : (strpos($url, 'export-vouchers') === 0 ? 'export_vouchers' : 'export_data');
+        $h .= '<a href="' . htmlspecialchars($url . $sep . 'format=' . $f) . '" data-admin-gate="' . $gateOp . '"' . ($f === 'print' ? ' target="_blank"' : '') . '><i class="ti ' . $icon . '"></i> ' . htmlspecialchars($name) . '</a>';
     }
     return $h . '</div></details>';
 }
@@ -275,4 +357,53 @@ tr.tot td{background:#F9EEF0;font-weight:bold;color:#6B1A2A}
         if ($si < count($sheets) - 1) $h .= '<div style="page-break-after:always"></div>';
     }
     return $h . '</body></html>';
+}
+
+
+/* ── Export filters (server side) ─────────────────────────────────── */
+
+/** Values ticked for filter $key (from ?f_<key>[]=...). Empty array = no filter. */
+function exportFilter(string $key): array {
+    $v = $_GET['f_' . $key] ?? [];
+    if (!is_array($v)) $v = [$v];
+    $out = [];
+    foreach ($v as $x) {
+        if (!is_scalar($x)) continue;
+        $x = trim((string)$x);
+        if ($x !== '') $out[] = $x;
+    }
+    return array_values(array_unique($out));
+}
+
+/** Same, but for numeric ids (keeps 0, e.g. "Independent"). */
+function exportFilterInts(string $key): array {
+    $out = [];
+    foreach (exportFilter($key) as $x) if (ctype_digit($x)) $out[] = (int)$x;
+    return array_values(array_unique($out));
+}
+
+/** Keep rows whose course is one of $courses ('__none__' matches rows with no course). Case-insensitive. */
+function keepCourses(array $rows, array $courses, string $key = 'course'): array {
+    if (!$courses) return $rows;
+    $want = array_map(fn($c) => mb_strtolower(trim((string)$c)), $courses);
+    return array_values(array_filter($rows, function ($r) use ($key, $want) {
+        $c = mb_strtolower(trim((string)($r[$key] ?? '')));
+        return in_array($c === '' ? '__none__' : $c, $want, true);
+    }));
+}
+
+/** Ready-made "Course" filter for exportMenu(): every course found in the students table. */
+function exportCourseFilter(PDO $pdo, bool $activeOnly = false, array $selected = []): array {
+    $where = $activeOnly ? 'WHERE is_active=1' : '';
+    $courses = $pdo->query("SELECT DISTINCT TRIM(course) FROM students $where ORDER BY 1")->fetchAll(PDO::FETCH_COLUMN);
+    $opts = []; $hasNone = false;
+    foreach ($courses as $c) { if ($c === null || $c === '') $hasNone = true; else $opts[$c] = $c; }
+    if ($hasNone) $opts['__none__'] = '(No course)';
+    return ['key' => 'course', 'label' => 'Course', 'options' => $opts, 'selected' => $selected];
+}
+
+/** " · Filtered: BSIT, BSCS" suffix for the sheet's title line (empty when nothing is filtered). */
+function exportFilterNote(array $parts): string {
+    $parts = array_values(array_filter(array_map('strval', $parts), fn($p) => $p !== ''));
+    return $parts ? ' · Filtered: ' . implode(' | ', $parts) : '';
 }

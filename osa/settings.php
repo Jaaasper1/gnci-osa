@@ -1,7 +1,9 @@
 <?php
 require_once '../includes/db.php';
+require_once '../includes/audit.php';
 require_once '../includes/auth.php';
 require_once '../includes/functions.php';
+require_once '../includes/password-login.php';
 require_once '../includes/lang.php';
 requireStaff();
 
@@ -28,7 +30,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $pdo->prepare("UPDATE osa_staff SET email=? WHERE id=?")
                 ->execute([$email ?: null, $staff_id]);
-            $success = t('settings.profile_updated', 'Profile updated successfully!');
+            auditLog($pdo, 'update', 'account', (int)$staff_id, [], ['email' => $email]);
+            $success = t('settings.profile_updated', t('msg.profile_updated_successfully_260c', 'Profile updated successfully!'));
             $staff['email'] = $email;
         }
     }
@@ -39,15 +42,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $new_pass = trim($_POST['new_password'] ?? '');
         $confirm  = trim($_POST['confirm_password'] ?? '');
 
-        if (!password_verify($current, $staff['password'])) {
+        $method = $_SESSION['login_method'] ?? 'password';
+        if ($current !== '' && !password_verify($current, $staff['password'])) {
             $error = t('settings.err_current_wrong', 'Current password is incorrect.');
+        } elseif ($current === '' && $method === 'password') {
+            $error = t('msg.enter_your_current_password_d333', 'Enter your current password.');
         } elseif (strlen($new_pass) < 9) {
-            $error = t('register.err_pw_length', 'New password must be at least 9 characters.');
+            $error = t('register.err_pw_length', t('msg.new_password_must_be_at_least_9_characte_d1ff', 'New password must be at least 9 characters.'));
         } elseif ($new_pass !== $confirm) {
             $error = t('register.err_pw_mismatch', 'Passwords do not match.');
         } else {
             $pdo->prepare("UPDATE osa_staff SET password=? WHERE id=?")
                 ->execute([password_hash($new_pass, PASSWORD_DEFAULT), $staff_id]);
+            adminMarkPasswordSet($pdo, (int)$staff_id);   // admin confirmations now use this password
+            auditLog($pdo, 'password_change', 'account', (int)$staff_id);
             $success = t('settings.password_changed', 'Password changed successfully!');
             $staff['password'] = password_hash($new_pass, PASSWORD_DEFAULT);
         }
@@ -58,15 +66,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Settings — GNC-OSA Portal</title>
+    <title><?= t('title.settings', 'Settings') ?> — GNC-OSA Portal</title>
     <link rel="stylesheet" href="../assets/css/style.css?v=27">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
-</head>
+<?php include __DIR__.'/../includes/pwa-head.php'; ?></head>
 <body>
 
 <!-- TOPNAV -->
 <nav class="topnav">
-    <button class="hamburger" id="hamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
+    <button class="hamburger" id="hamburger" aria-label="<?= t('ui.toggle_menu_641f', 'Toggle menu') ?>"><span></span><span></span><span></span></button>
     <div class="brand">
         <img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);">
         <div class="brand-text">
@@ -92,8 +100,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <aside class="sidebar">
     <div class="sidebar-section"><?= t('sidebar.main', 'Main') ?></div>
     <a class="sitem" href="dashboard.php"><i class="ti ti-layout-dashboard"></i> <?= t('sidebar.dashboard', 'Dashboard') ?></a>
-    <a class="sitem" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.complaints', 'Complaints') ?></a>
-    <div class="sidebar-section">Events</div><a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> Events</a><div class="sidebar-section"><?= t('sidebar.account', 'Account') ?></div>
+    <a class="sitem" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.complaints', 'Complaints') ?></a><a class="sitem" href="messages.php"><i class="ti ti-messages"></i> <?= t('sidebar.messages', 'Messages') ?></a>
+    <div class="sidebar-section"><?= t('sidebar.events', 'Events') ?></div><a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> <?= t('sidebar.events', 'Events') ?></a><div class="sidebar-section"><?= t('sidebar.account', 'Account') ?></div>
     <a class="sitem active" href="settings.php"><i class="ti ti-settings"></i> <?= t('nav.settings', 'Settings') ?></a>
     <a class="sitem" href="notifications.php"><i class="ti ti-bell"></i> <?= t('nav.notifications', 'Notifications') ?>
         <?php if ($notifCount > 0): ?><span class="badge-count"><?= $notifCount ?></span><?php endif; ?>
@@ -156,10 +164,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="card-title"><i class="ti ti-lock"></i> <?= t('settings.change_password', 'Change Password') ?></div>
             <form method="POST">
                 <input type="hidden" name="action" value="change_password">
+                <div style="font-size:11px;color:#6B7280;margin:-6px 0 12px;"><i class="ti ti-info-circle"></i> <?= t('ui.leave_the_current_password_blank_i_14a1', 'Leave the current password blank if you logged in with an email code and have no password yet.') ?></div>
                 <div class="form-group">
-                    <label><?= t('settings.current_password', 'Current Password') ?> <span style="color:#EF4444;">*</span></label>
+                    <label><?= t('settings.current_password', 'Current Password') ?> <span style="color:#9CA3AF;"><?= t('ui.optional_if_you_logged_in_with_a_c_a7e5', '(optional if you logged in with a code)') ?></span></label>
                     <div style="position:relative;">
-                        <input type="password" name="current_password" id="cur-pass" class="form-control" placeholder="<?= t('settings.current_password_ph', 'Enter current password') ?>" style="padding-right:38px;" required>
+                        <input type="password" name="current_password" id="cur-pass" class="form-control" placeholder="<?= t('settings.current_password_ph', 'Enter current password') ?>" style="padding-right:38px;">
                         <button type="button" onclick="toggleVis('cur-pass','cur-eye')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:16px;" tabindex="-1"><i class="ti ti-eye" id="cur-eye"></i></button>
                     </div>
                 </div>

@@ -50,7 +50,7 @@ $notifs = notifFetchPage($pdo, 'notifications', (int)$student_id, $filter, $page
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Notifications — GNC-OSA</title>
+    <title><?= t('title.notifications', 'Notifications') ?> — GNC-OSA</title>
     <link rel="stylesheet" href="../assets/css/style.css?v=27">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
     <style>
@@ -129,24 +129,24 @@ $notifs = notifFetchPage($pdo, 'notifications', (int)$student_id, $filter, $page
         .modal-actions { display: flex; gap: 10px; justify-content: center; }
         .modal-actions .btn { min-width: 100px; justify-content: center; }
     </style>
-</head>
+<?php include __DIR__.'/../includes/pwa-head.php'; ?></head>
 <body>
 
 <!-- ── Custom Confirm Modal ── -->
 <div class="modal-overlay" id="confirmModal">
     <div class="modal-box">
         <div class="modal-icon"><i class="ti ti-trash" id="modalIcon"></i></div>
-        <div class="modal-title" id="modalTitle">Delete Notification</div>
-        <div class="modal-desc"  id="modalDesc">Are you sure you want to delete this notification? This cannot be undone.</div>
+        <div class="modal-title" id="modalTitle"><?= t('ui.delete_notification_9006', 'Delete Notification') ?></div>
+        <div class="modal-desc"  id="modalDesc"><?= t('ui.are_you_sure_you_want_to_delete_th_a039', 'Are you sure you want to delete this notification? This cannot be undone.') ?></div>
         <div class="modal-actions">
-            <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
-            <button class="btn btn-danger"  id="modalConfirmBtn">Delete</button>
+            <button class="btn btn-outline" onclick="closeModal()"><?= t('ui.cancel_ea47', 'Cancel') ?></button>
+            <button class="btn btn-danger"  id="modalConfirmBtn"><?= t('ui.delete_f2a6', 'Delete') ?></button>
         </div>
     </div>
 </div>
 
 <nav class="topnav">
-    <button class="hamburger" id="hamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
+    <button class="hamburger" id="hamburger" aria-label="<?= t('ui.toggle_menu_641f', 'Toggle menu') ?>"><span></span><span></span><span></span></button>
     <div class="brand">
         <img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);">
         <div class="brand-text"><div class="name">GNC-OSA Portal</div><div class="sub"><?= t('nav.student_portal', 'Student Portal') ?></div></div>
@@ -160,8 +160,8 @@ $notifs = notifFetchPage($pdo, 'notifications', (int)$student_id, $filter, $page
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
 <aside class="sidebar">
     <div class="sidebar-section"><?= t('sidebar.main', 'Main') ?></div>
-    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> Events</a>
-    <a class="sitem" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.my_complaints', 'My Complaints') ?></a>
+    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> <?= t('sidebar.events', 'Events') ?></a>
+    <a class="sitem" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.my_complaints', 'My Complaints') ?></a><a class="sitem" href="help.php"><i class="ti ti-book"></i> <?= t('sidebar.osa_guide', 'OSA Guide') ?></a>
     <a class="sitem" href="new-complaint.php"><i class="ti ti-circle-plus"></i> <?= t('sidebar.new_complaint', 'New Complaint') ?></a>
     <?php if ($election): ?>
     <div class="sidebar-section"><?= t('sidebar.election', 'Election') ?></div>
@@ -206,16 +206,16 @@ document.getElementById('confirmModal').addEventListener('click', function(e) {
 // ── Delete actions ───────────────────────────────────────────────────────────
 function askDeleteOne(id) {
     openModal(
-        'Delete Notification',
-        'Are you sure you want to delete this notification? This cannot be undone.',
+        __t('Delete Notification'),
+        __t('Are you sure you want to delete this notification? This cannot be undone.'),
         () => doDeleteOne(id)
     );
 }
 
 function askDeleteAll() {
     openModal(
-        'Delete All Notifications',
-        'This will permanently remove all your notifications. Are you sure?',
+        __t('Delete All Notifications'),
+        __t('This will permanently remove all your notifications. Are you sure?'),
         () => doDeleteAll()
     );
 }
@@ -272,5 +272,6 @@ function markAllRead() {
 }
 </script>
 <script src="../assets/js/sidebar.js?v=5"></script>
+<?php include __DIR__.'/../includes/ask-osa-widget.php'; ?>
 </body>
 </html>

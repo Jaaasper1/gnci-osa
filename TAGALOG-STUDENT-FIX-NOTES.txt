@@ -1,0 +1,9 @@
+TAGALOG (TL) FIX - student side
+Bago: tx('English') sa includes/lang.php + lang/tl-text.php (English => Tagalog, PHP)
+      tlDate() = petsa na may Tagalog na buwan; tlNotifMsg() = isinasalin ang mga abiso sa pagpapakita lang
+      (hindi binabago ang nakasave sa database, kaya gumagana pa rin ang notification filters).
+Naayos: OSA Guide (guides + FAQ), Voting (mga mensahe, Independent, Abstain, JS), Events (Happening now / In 5 days / Ended...),
+        buwan sa lahat ng petsa, complaint categories (value sa DB nananatiling English), Messages (OSA Office, Open/Closed, Voice message),
+        Ask OSA auto replies, Notifications (uri, grupo, bilang, laman ng abiso), Results (Live, Abstain), Settings, FB feed, Install App prompt.
+Upload (overwrite, same paths) -> Ctrl+F5 -> piliin ang TL. Huwag galawin ang includes/config.local.php at uploads/.
+Hindi sinalin: laman na isinulat ng staff sa DB (pamagat/deskripsyon ng event, remarks sa reklamo, pangalan ng posisyon/kandidato).

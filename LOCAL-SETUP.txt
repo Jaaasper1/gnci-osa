@@ -1,0 +1,7 @@
+GNC-OSA PORTAL — LOCAL (XAMPP) BACKUP COPY (with dark mode)
+1. Copy this folder to C:/xampp/htdocs/gnc-osa-portal  (start Apache + MySQL)
+2. phpMyAdmin -> create database  gnc_osa_portal  (utf8mb4_unicode_ci) -> Import gnc_osa_portal.sql
+3. Open http://localhost/gnc-osa-portal/
+   Admin: osa_admin / admin123   (change it right away; for local testing only)
+This copy has NO real student data, uploads, or API keys.
+If .htaccess has HTTPS-only/redirect rules, comment them out for http://localhost.

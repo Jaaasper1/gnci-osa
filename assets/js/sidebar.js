@@ -1,3 +1,4 @@
+window.__t = window.__t || function (s) { return s; };
 /* GNC-OSA Portal — Mobile Sidebar Toggle */
 (function () {
     // Where this script lives -> used to find the logo no matter which page (or folder) we are on.
@@ -192,9 +193,9 @@
         window.appConfirm = function (opts, onConfirm) {
             opts = opts || {};
             pendingCallback = onConfirm;
-            modal.querySelector('.confirm-modal-title').textContent = opts.title || 'Are you sure?';
-            modal.querySelector('.confirm-modal-message').textContent = opts.message || 'This action cannot be undone.';
-            modal.querySelector('.confirm-modal-ok').textContent = opts.btn || 'Confirm';
+            modal.querySelector('.confirm-modal-title').textContent = opts.title || __t('Are you sure?');
+            modal.querySelector('.confirm-modal-message').textContent = opts.message || __t('This action cannot be undone.');
+            modal.querySelector('.confirm-modal-ok').textContent = opts.btn || __t('Confirm');
             modal.classList.toggle('confirm-modal-danger', !!opts.danger);
             modal.classList.add('show');
         };
@@ -214,9 +215,9 @@
                 }
 
                 pendingForm = form;
-                modal.querySelector('.confirm-modal-title').textContent = form.dataset.confirmTitle || 'Are you sure?';
-                modal.querySelector('.confirm-modal-message').textContent = form.dataset.confirmMessage || 'This action cannot be undone.';
-                modal.querySelector('.confirm-modal-ok').textContent = form.dataset.confirmBtn || 'Confirm';
+                modal.querySelector('.confirm-modal-title').textContent = form.dataset.confirmTitle || __t('Are you sure?');
+                modal.querySelector('.confirm-modal-message').textContent = form.dataset.confirmMessage || __t('This action cannot be undone.');
+                modal.querySelector('.confirm-modal-ok').textContent = form.dataset.confirmBtn || __t('Confirm');
                 modal.classList.toggle('confirm-modal-danger', form.dataset.confirmDanger === '1');
                 modal.classList.add('show');
             });
@@ -258,11 +259,11 @@
     // that draws itself in (circle, then check), Gmail/Forms-style.
     // - On initial load: only inside flash-message banners
     //   (.alert-success / .alert.alert-success / .info-banner), so
-    //   pre-existing per-row status badges (e.g. "Voted", "Used")
+    //   pre-existing per-row status badges (e.g. "Voted", __t("Used"))
     //   are left alone.
     // - After that: a MutationObserver animates the same icons the
     //   moment they're inserted dynamically (AJAX import results,
-    //   approve/reject toasts, "Found!" indicators, etc.) with zero
+    //   approve/reject toasts, __t("Found!") indicators, etc.) with zero
     //   changes needed anywhere else.
     // ============================================
     function animateCheckIcon(icon) {
@@ -526,7 +527,7 @@
                 if (act > -1 && tr.cells[act] && tr.cells[act].children.length) {
                     var btn = document.createElement('button');
                     btn.type = 'button'; btn.className = 'mr-more';
-                    btn.setAttribute('aria-label', 'Actions');
+                    btn.setAttribute('aria-label', __t('Actions'));
                     btn.textContent = '\u22EF';
                     tr.appendChild(btn);
                 }

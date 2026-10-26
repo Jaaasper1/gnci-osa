@@ -49,7 +49,7 @@ $notifs = notifFetchPage($pdo, 'staff_notifications', (int)$staff_id, $filter, $
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Notifications — GNC-OSA</title>
+    <title><?= t('title.notifications', 'Notifications') ?> — GNC-OSA</title>
     <link rel="stylesheet" href="../assets/css/style.css?v=27">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
     <style>
@@ -125,23 +125,23 @@ $notifs = notifFetchPage($pdo, 'staff_notifications', (int)$staff_id, $filter, $
         .modal-actions { display: flex; gap: 10px; justify-content: center; }
         .modal-actions .btn { min-width: 100px; justify-content: center; }
     </style>
-</head>
+<?php include __DIR__.'/../includes/pwa-head.php'; ?></head>
 <body>
 
 <div class="modal-overlay" id="confirmModal">
     <div class="modal-box">
         <div class="modal-icon"><i class="ti ti-trash" id="modalIcon"></i></div>
-        <div class="modal-title" id="modalTitle">Delete Notification</div>
-        <div class="modal-desc"  id="modalDesc">Are you sure you want to delete this notification? This cannot be undone.</div>
+        <div class="modal-title" id="modalTitle"><?= t('ui.delete_notification_9006', 'Delete Notification') ?></div>
+        <div class="modal-desc"  id="modalDesc"><?= t('ui.are_you_sure_you_want_to_delete_th_a039', 'Are you sure you want to delete this notification? This cannot be undone.') ?></div>
         <div class="modal-actions">
-            <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
-            <button class="btn btn-danger"  id="modalConfirmBtn">Delete</button>
+            <button class="btn btn-outline" onclick="closeModal()"><?= t('ui.cancel_ea47', 'Cancel') ?></button>
+            <button class="btn btn-danger"  id="modalConfirmBtn"><?= t('ui.delete_f2a6', 'Delete') ?></button>
         </div>
     </div>
 </div>
 
 <nav class="topnav">
-    <button class="hamburger" id="hamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
+    <button class="hamburger" id="hamburger" aria-label="<?= t('ui.toggle_menu_641f', 'Toggle menu') ?>"><span></span><span></span><span></span></button>
     <div class="brand">
         <img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);">
         <div class="brand-text"><div class="name">GNC-OSA Portal</div><div class="sub"><?= t('nav.osa_portal', 'OSA Staff Portal') ?></div></div>
@@ -158,8 +158,8 @@ $notifs = notifFetchPage($pdo, 'staff_notifications', (int)$staff_id, $filter, $
 <aside class="sidebar">
     <div class="sidebar-section"><?= t('sidebar.main', 'Main') ?></div>
     <a class="sitem" href="dashboard.php"><i class="ti ti-layout-dashboard"></i> <?= t('sidebar.dashboard', 'Dashboard') ?></a>
-    <a class="sitem" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.complaints', 'Complaints') ?></a>
-    <div class="sidebar-section">Events</div><a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> Events</a><div class="sidebar-section"><?= t('sidebar.account', 'Account') ?></div>
+    <a class="sitem" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.complaints', 'Complaints') ?></a><a class="sitem" href="messages.php"><i class="ti ti-messages"></i> <?= t('sidebar.messages', 'Messages') ?></a>
+    <div class="sidebar-section"><?= t('sidebar.events', 'Events') ?></div><a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> <?= t('sidebar.events', 'Events') ?></a><div class="sidebar-section"><?= t('sidebar.account', 'Account') ?></div>
     <a class="sitem" href="settings.php"><i class="ti ti-settings"></i> <?= t('nav.settings', 'Settings') ?></a>
     <a class="sitem active" href="notifications.php"><i class="ti ti-bell"></i> <?= t('nav.notifications', 'Notifications') ?>
         <?php if ($notifCount > 0): ?><span class="badge-count"><?= $notifCount ?></span><?php endif; ?>

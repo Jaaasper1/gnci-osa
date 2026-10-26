@@ -3,7 +3,10 @@ require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/functions.php';
 require_once '../includes/lang.php';
-requireAdmin();
+requireStaff();
+require_once '../includes/csrf.php';
+require_once '../includes/admin-otp.php';
+adminOtpHandleAjax($pdo);
 require_once __DIR__ . '/election-picker.php';
 require_once __DIR__ . '/list-search.php';
 $notifCount = getUnreadStaffNotifCount($pdo, $_SESSION['user_id']);
@@ -43,8 +46,11 @@ if (isset($_GET['lookup'])) {
 }
 
 // DELETE
-if (isset($_GET['delete'])) {
-    $pdo->prepare("DELETE FROM candidates WHERE id=?")->execute([(int)$_GET['delete']]);
+if (isset($_POST['delete'])) {
+    requireCsrf();
+    $__before = auditRow($pdo, 'candidates', (int)$_POST['delete']);
+    $pdo->prepare("DELETE FROM candidates WHERE id=?")->execute([(int)$_POST['delete']]);
+    auditLog($pdo, 'delete', 'candidate', (int)$_POST['delete'], $__before);
     header('Location: candidates.php?election='.$eid); exit;
 }
 
@@ -52,10 +58,14 @@ if (isset($_GET['delete'])) {
 if (isset($_POST['edit_candidate_id'])) {
     if (session_status() === PHP_SESSION_NONE) session_start();
     header('Content-Type: application/json; charset=utf-8');
-    if (!isset($_SESSION['user_type']) || $_SESSION['user_type'] !== 'admin') {
-        echo json_encode(['success' => false, 'message' => 'Unauthorized.']); exit;
+    if (!isset($_SESSION['user_type']) || !in_array($_SESSION['user_type'] ?? '', ['staff', 'admin'], true)) {
+        echo json_encode(['success' => false, 'message' => t('msg.unauthorized_fee0', 'Unauthorized.')]); exit;
     }
     $cid  = (int)$_POST['edit_candidate_id'];
+    $__before = auditRow($pdo, 'candidates', $cid);
+    if (!adminOtpConsumeApproval('edit_candidate', $cid)) {
+        echo json_encode(['success' => false, 'message' => t('msg.please_confirm_the_change_with_the_email_1213', 'Please confirm the change with the emailed code first.')]); exit;
+    }
     $bio  = trim($_POST['edit_bio'] ?? '');
     $credentials = trim($_POST['edit_credentials'] ?? '');
     $edit_party_list_id = !empty($_POST['edit_party_list_id']) ? (int)$_POST['edit_party_list_id'] : null;
@@ -73,10 +83,11 @@ if (isset($_POST['edit_candidate_id'])) {
     } else {
         $pdo->prepare("UPDATE candidates SET bio=?, credentials=?, party_list_id=? WHERE id=?")->execute([$bio, $credentials, $edit_party_list_id, $cid]);
     }
+    auditLog($pdo, 'update', 'candidate', $cid, $__before, ['bio' => $bio, 'credentials' => $credentials, 'party_list_id' => $edit_party_list_id]);
     $row = $pdo->prepare("SELECT photo FROM candidates WHERE id=?");
     $row->execute([$cid]);
     $updated = $row->fetch();
-    echo json_encode(['success' => true, 'message' => 'Candidate updated!', 'photo' => $updated['photo'] ?? null]);
+    echo json_encode(['success' => true, 'message' => t('msg.candidate_updated_7a90', 'Candidate updated!'), 'photo' => $updated['photo'] ?? null]);
     exit;
 }
 
@@ -150,37 +161,37 @@ if ($eid) {
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Candidates — GNC-OSA Admin</title>
+    <title><?= t('title.candidates', 'Candidates') ?> — GNC-OSA Admin</title>
     <link rel="stylesheet" href="../assets/css/style.css?v=27">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
-</head>
+<?php include __DIR__.'/../includes/pwa-head.php'; ?></head>
 <body class="theme-election">
 <nav class="topnav">
-    <button class="hamburger" id="hamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
-    <div class="brand"><img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);"><div class="brand-text"><div class="name">GNC-OSA Admin</div><div class="sub">Administrator</div></div></div>
+    <button class="hamburger" id="hamburger" aria-label="<?= t('ui.toggle_menu_641f', 'Toggle menu') ?>"><span></span><span></span><span></span></button>
+    <div class="brand"><img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);"><div class="brand-text"><div class="name">GNC-OSA Admin</div><div class="sub"><?= t('ui.administrator_7b7b', 'Administrator') ?></div></div></div>
     <div class="nav-right">
         <?php renderLangSwitcher(); ?><div class="avatar" style="background:#7C3AED;color:#fff;">AD</div><span class="uname"><?= e($_SESSION['name']) ?></span></div>
 </nav>
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
 <aside class="sidebar">
-    <div class="sidebar-section">Overview</div>
+    <div class="sidebar-section"><?= t('sidebar.overview', 'Overview') ?></div>
     <a class="sitem" href="dashboard.php"><i class="ti ti-layout-dashboard"></i> <?= t('sidebar.dashboard', 'Dashboard') ?></a>
-    <div class="sidebar-section">Complaints</div>
-    <a class="sitem" href="complaints.php"><i class="ti ti-message-report"></i> All Complaints</a>
+    <div class="sidebar-section"><?= t('sidebar.complaints', 'Complaints') ?></div>
+    <a class="sitem" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.all_complaints', 'All Complaints') ?></a><a class="sitem" href="../osa/messages.php"><i class="ti ti-messages"></i> <?= t('sidebar.messages', 'Messages') ?></a>
     <div class="sidebar-section"><?= t('sidebar.election', 'Election') ?></div>
-    <a class="sitem" href="elections.php"><i class="ti ti-trophy"></i> Elections</a>
-    <a class="sitem active" href="candidates.php"><i class="ti ti-users"></i> Candidates</a>
-    <a class="sitem" href="party-lists.php"><i class="ti ti-flag"></i> Party Lists</a>
+    <a class="sitem" href="elections.php"><i class="ti ti-trophy"></i> <?= t('sidebar.elections', 'Elections') ?></a>
+    <a class="sitem active" href="candidates.php"><i class="ti ti-users"></i> <?= t('sidebar.candidates', 'Candidates') ?></a>
+    <a class="sitem" href="party-lists.php"><i class="ti ti-flag"></i> <?= t('sidebar.party_lists', 'Party Lists') ?></a>
     <a class="sitem" href="vouchers.php"><i class="ti ti-ticket"></i> <?= t('sidebar.vouchers', 'Vouchers') ?></a>
-    <a class="sitem" href="results.php"><i class="ti ti-chart-pie"></i> Live Results</a>
-    <div class="sidebar-section">Events</div>
-    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> Events</a>
-    <div class="sidebar-section">System</div>
-    <a class="sitem" href="students.php"><i class="ti ti-user-plus"></i> Students</a>
-    <a class="sitem" href="staff.php"><i class="ti ti-shield-check"></i> OSA Staff</a>
-    <a class="sitem" href="reports.php"><i class="ti ti-report-analytics"></i> Reports</a>
-    <div class="sidebar-section">Account</div>
-    <a class="sitem" href="notifications.php"><i class="ti ti-bell"></i> Notifications
+    <a class="sitem" href="results.php"><i class="ti ti-chart-pie"></i> <?= t('sidebar.live_results', 'Live Results') ?></a>
+    <div class="sidebar-section"><?= t('sidebar.events', 'Events') ?></div>
+    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> <?= t('sidebar.events', 'Events') ?></a>
+    <div class="sidebar-section"><?= t('sidebar.system', 'System') ?></div>
+    <a class="sitem" href="students.php"><i class="ti ti-user-plus"></i> <?= t('sidebar.students', 'Students') ?></a>
+    <?php if ($_SESSION['user_type'] === 'admin'): ?><a class="sitem" href="staff.php"><i class="ti ti-shield-check"></i> <?= t('sidebar.osa_staff', 'OSA Staff') ?></a><?php endif; ?><?php if ($_SESSION['user_type'] === 'admin'): ?><a class="sitem" href="audit-log.php"><i class="ti ti-history"></i> <?= t('sidebar.audit_log', 'Audit Log') ?></a><?php endif; ?>
+    <a class="sitem" href="reports.php"><i class="ti ti-report-analytics"></i> <?= t('sidebar.reports', 'Reports') ?></a>
+    <div class="sidebar-section"><?= t('sidebar.account', 'Account') ?></div>
+    <a class="sitem" href="notifications.php"><i class="ti ti-bell"></i> <?= t('sidebar.notifications', 'Notifications') ?>
         <?php if ($notifCount > 0): ?><span class="badge-count"><?= $notifCount ?></span><?php endif; ?>
     </a>
     <a class="sitem" href="../logout.php"><i class="ti ti-logout"></i> <?= t('nav.logout', 'Log out') ?></a>
@@ -193,23 +204,31 @@ if ($eid) {
     <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                <div class="card-title" style="margin-bottom:0;"><i class="ti ti-users"></i> Candidates <span style="background:#6B1A2A;color:#fff;border-radius:20px;padding:2px 10px;font-size:11px;margin-left:6px;"><?= count($candidates) ?></span></div>
+                <div class="card-title" style="margin-bottom:0;"><i class="ti ti-users"></i> <?= t('ui.candidates_211d', 'Candidates') ?> <span style="background:#6B1A2A;color:#fff;border-radius:20px;padding:2px 10px;font-size:11px;margin-left:6px;"><?= count($candidates) ?></span></div>
                 <?php if (!empty($elections)): ?>
                 <div class="io-group">
                 <button onclick="openAddCandModal()" class="btn btn-primary btn-sm io-full" style="display:flex;align-items:center;gap:6px;white-space:nowrap;">
-                    <i class="ti ti-circle-plus"></i> Add Candidate
+                    <i class="ti ti-circle-plus"></i> <?= t('ui.add_candidate_8d05', 'Add Candidate') ?>
                 </button>
                 <button onclick="openImportModal()" class="btn btn-outline btn-sm" style="display:flex;align-items:center;gap:6px;white-space:nowrap;">
-                    <i class="ti ti-file-spreadsheet"></i> Import Excel
+                    <i class="ti ti-file-spreadsheet"></i> <?= t('ui.import_excel_508e', 'Import Excel') ?>
                 </button>
                 <?php if (!empty($candidates)): ?>
-                <?= exportMenu('export.php?type=candidates&election='.$eid, 'btn btn-outline btn-sm', 'white-space:nowrap;color:#059669;border-color:#059669;') ?>
+                <?php
+                $__pOpts = []; foreach ($partyLists as $__pl) $__pOpts[$__pl['id']] = $__pl['name'];
+                foreach ($candidates as $__c) { if (empty($__c['party_list_id'])) { $__pOpts[0] = 'Independent'; break; } }
+                $__posOpts = []; foreach ($positions as $__p) $__posOpts[$__p['id']] = $__p['title'];
+                ?>
+                <?= exportMenu('export.php?type=candidates&election='.$eid, 'btn btn-outline btn-sm', 'white-space:nowrap;color:#059669;border-color:#059669;', 'Export', null, [
+                    ['key' => 'party',    'label' => 'Party List', 'options' => $__pOpts],
+                    ['key' => 'position', 'label' => 'Position',   'options' => $__posOpts],
+                ]) ?>
                 <?php endif; ?>
                 </div>
                 <?php endif; ?>
             </div>
             <?php if (empty($elections)): ?>
-            <a href="elections.php" class="btn btn-primary btn-sm"><i class="ti ti-plus"></i> Create Election</a>
+            <a href="elections.php" class="btn btn-primary btn-sm"><i class="ti ti-plus"></i> <?= t('ui.create_election_78c4', 'Create Election') ?></a>
             <?php endif; ?>
         </div>
         <?php if (empty($candidates)): ?>
@@ -232,15 +251,15 @@ if ($eid) {
         ?>
         <div class="table-wrap"><table id="cand-table" data-tt data-pager="10" data-pager-sizes="10,25,50">
             <thead><tr>
-                <th data-tt-cfilter="data-position" data-tt-all="All Positions" data-tt-icon="ti-award" data-tt-options="<?= e(json_encode($optPositions)) ?>">Position</th>
-                <th data-sort-key="name" data-type="text" data-tt-group="data-pos-order">Candidate</th>
+                <th data-tt-cfilter="data-position" data-tt-all="All Positions" data-tt-icon="ti-award" data-tt-options="<?= e(json_encode($optPositions)) ?>"><?= t('ui.position_52f5', 'Position') ?></th>
+                <th data-sort-key="name" data-type="text" data-tt-group="data-pos-order"><?= t('ui.candidate_25be', 'Candidate') ?></th>
                 <th data-tt-cfilter="data-party" data-tt-all="All Parties" data-tt-icon="ti-flag" data-tt-options="<?= e(json_encode($optParties)) ?>">Party List</th>
-                <th data-tt-cfilter="data-course" data-tt-all="All Courses" data-tt-icon="ti-school" data-tt-options="<?= e(json_encode($optCourses)) ?>">Course</th>
-                <th data-nosort>Credentials / Honors</th>
+                <th data-tt-cfilter="data-course" data-tt-all="All Courses" data-tt-icon="ti-school" data-tt-options="<?= e(json_encode($optCourses)) ?>"><?= t('ui.course_3730', 'Course') ?></th>
+                <th data-nosort><?= t('ui.credentials_honors_b3f7', 'Credentials / Honors') ?></th>
                 <th></th>
             </tr></thead>
             <tbody><?php foreach ($candidates as $c): ?>
-            <tr data-search="<?= e(strtolower($c['position'].' '.$c['first_name'].' '.$c['last_name'].' '.$c['sid'].' '.($c['party_name'] ?: 'independent').' '.($c['course'] ?? '').' '.($c['credentials'] ?? ''))) ?>"
+            <tr data-bulk-id="<?= (int)$c['id'] ?>" data-search="<?= e(strtolower($c['position'].' '.$c['first_name'].' '.$c['last_name'].' '.$c['sid'].' '.($c['party_name'] ?: 'independent').' '.($c['course'] ?? '').' '.($c['credentials'] ?? ''))) ?>"
                 data-position="<?= e(strtolower($c['position'])) ?>"
                 data-pos-order="<?= (int)$c['pos_order'] * 1000000 + (int)$c['position_id'] ?>"
                 data-course="<?= e(strtolower(trim($c['course'] ?? ''))) ?>"
@@ -293,12 +312,12 @@ if ($eid) {
 <div id="add-cand-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9100;align-items:center;justify-content:center;overflow-y:auto;padding:16px;box-sizing:border-box;">
     <div style="background:#fff;border-radius:14px;padding:28px;width:100%;max-width:480px;box-shadow:0 8px 32px rgba(0,0,0,0.18);margin:20px auto;max-height:90vh;overflow-y:auto;box-sizing:border-box;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
-            <div style="font-size:15px;font-weight:600;color:#1F2937;"><i class="ti ti-circle-plus" style="margin-right:6px;color:#6B1A2A;"></i> Add Candidate</div>
+            <div style="font-size:15px;font-weight:600;color:#1F2937;"><i class="ti ti-circle-plus" style="margin-right:6px;color:#6B1A2A;"></i> <?= t('ui.add_candidate_8d05', 'Add Candidate') ?></div>
             <button onclick="closeAddCandModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9CA3AF;line-height:1;">&times;</button>
         </div>
         <form method="POST" enctype="multipart/form-data" id="cand-form">
             <div class="form-group">
-                <label>Election *</label>
+                <label><?= t('ui.election_7099', 'Election *') ?></label>
                 <select name="election_id" class="form-control" onchange="location.href='?election='+this.value" required>
                     <?php foreach ($elections as $el): ?>
                     <option value="<?= $el['id'] ?>" <?= $el['id']==$eid?'selected':'' ?>>[<?= e($el['course']) ?>] <?= e($el['title']) ?></option>
@@ -306,30 +325,30 @@ if ($eid) {
                 </select>
             </div>
             <div class="form-group">
-                <label>Position *</label>
+                <label><?= t('ui.position_c219', 'Position *') ?></label>
                 <select name="position_id" class="form-control" required>
-                    <option value="">— Select —</option>
+                    <option value=""><?= t('ui.select_1f94', '— Select —') ?></option>
                     <?php foreach ($positions as $p): ?>
                     <option value="<?= $p['id'] ?>"><?= e($p['title']) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
             <div class="form-group">
-                <label>Party List <span style="color:#9CA3AF;font-weight:400;">(optional)</span></label>
+                <label>Party List <span style="color:#9CA3AF;font-weight:400;"><?= t('ui.optional_f53d', '(optional)') ?></span></label>
                 <select name="party_list_id" class="form-control">
-                    <option value="">— Independent (no party) —</option>
+                    <option value=""><?= t('ui.independent_no_party_482b', '— Independent (no party) —') ?></option>
                     <?php foreach ($partyLists as $pl): ?>
                     <option value="<?= $pl['id'] ?>"><?= e($pl['name']) ?></option>
                     <?php endforeach; ?>
                 </select>
                 <?php if (empty($partyLists)): ?>
-                <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">No party lists yet for this election. <a href="party-lists.php?election=<?= $eid ?>" target="_blank">Create one here</a>.</div>
+                <div style="font-size:11px;color:#9CA3AF;margin-top:4px;"><?= t('ui.no_party_lists_yet_for_this_electi_3fbe', 'No party lists yet for this election.') ?> <a href="party-lists.php?election=<?= $eid ?>" target="_blank"><?= t('ui.create_one_here_fc52', 'Create one here') ?></a>.</div>
                 <?php endif; ?>
             </div>
             <div class="form-group">
-                <label>Student ID ng Candidate *</label>
+                <label><?= t('ui.student_id_ng_candidate_7ee2', 'Student ID ng Candidate *') ?></label>
                 <input type="text" name="student_id" id="sid-input" class="form-control"
-                       placeholder="ex. 20193372" autocomplete="off" required>
+                       placeholder="<?= t('ui.ex_20193372_e0f5', 'ex. 20193372') ?>" autocomplete="off" required>
                 <div id="sid-feedback" style="font-size:12px;margin-top:5px;min-height:16px;"></div>
             </div>
             <div id="student-preview" style="display:none;align-items:center;gap:12px;background:#F9EEF0;border-radius:8px;padding:10px 14px;margin-bottom:16px;">
@@ -342,26 +361,26 @@ if ($eid) {
                 </div>
             </div>
             <div class="form-group">
-                <label>Short Bio (optional)</label>
-                <textarea name="bio" class="form-control" placeholder="Short bio..."></textarea>
+                <label><?= t('ui.short_bio_optional_329d', 'Short Bio (optional)') ?></label>
+                <textarea name="bio" class="form-control" placeholder="<?= htmlspecialchars(t('auto.short_bio_109c', 'Short bio...'), ENT_QUOTES) ?>"></textarea>
             </div>
             <div class="form-group">
-                <label>Credentials / Honors (optional)</label>
-                <textarea name="credentials" class="form-control" placeholder="ex. SHS With Honors, President's Lister, Dean's Lister"></textarea>
-                <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">Enter the candidate's honors or achievements here. These will be shown to voters.</div>
+                <label><?= t('ui.credentials_honors_optional_8ead', 'Credentials / Honors (optional)') ?></label>
+                <textarea name="credentials" class="form-control" placeholder="<?= htmlspecialchars(t('auto.ex_shs_with_honors_president_s_lister_de_7d4c', 'ex. SHS With Honors, President\'s Lister, Dean\'s Lister'), ENT_QUOTES) ?>"></textarea>
+                <div style="font-size:11px;color:#9CA3AF;margin-top:4px;"><?= t('ui.enter_the_candidate_s_honors_or_ac_1510', 'Enter the candidate\'s honors or achievements here. These will be shown to voters.') ?></div>
             </div>
             <div class="form-group">
-                <label>Photo (optional)</label>
+                <label><?= t('ui.photo_optional_169e', 'Photo (optional)') ?></label>
                 <input type="file" name="photo" id="photo-input" class="form-control" accept=".jpg,.jpeg,.png">
                 <div id="photo-preview-wrap" style="display:none;margin-top:10px;text-align:center;">
                     <img id="photo-preview-img" src="" alt="" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid #C9943A;">
-                    <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">Preview ng photo</div>
+                    <div style="font-size:11px;color:#9CA3AF;margin-top:4px;"><?= t('ui.preview_ng_photo_6888', 'Preview ng photo') ?></div>
                 </div>
-                <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">JPG o PNG · max 2MB</div>
+                <div style="font-size:11px;color:#9CA3AF;margin-top:4px;"><?= t('ui.jpg_o_png_max_2mb_532b', 'JPG o PNG · max 2MB') ?></div>
             </div>
             <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px;">
-                <button type="button" onclick="closeAddCandModal()" class="btn btn-outline btn-sm">Cancel</button>
-                <button type="submit" class="btn btn-primary btn-sm"><i class="ti ti-circle-plus"></i> Add Candidate</button>
+                <button type="button" onclick="closeAddCandModal()" class="btn btn-outline btn-sm"><?= t('ui.cancel_ea47', 'Cancel') ?></button>
+                <button type="submit" class="btn btn-primary btn-sm"><i class="ti ti-circle-plus"></i> <?= t('ui.add_candidate_8d05', 'Add Candidate') ?></button>
             </div>
         </form>
     </div>
@@ -371,7 +390,7 @@ if ($eid) {
 <div id="edit-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9100;align-items:center;justify-content:center;overflow-y:auto;padding:16px;box-sizing:border-box;">
     <div style="background:#fff;border-radius:14px;padding:28px;width:100%;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,0.18);margin:20px auto;max-height:90vh;overflow-y:auto;box-sizing:border-box;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
-            <div style="font-size:15px;font-weight:600;color:#1F2937;"><i class="ti ti-edit" style="margin-right:6px;color:#6B1A2A;"></i> Edit Candidate</div>
+            <div style="font-size:15px;font-weight:600;color:#1F2937;"><i class="ti ti-edit" style="margin-right:6px;color:#6B1A2A;"></i> <?= t('ui.edit_candidate_3e16', 'Edit Candidate') ?></div>
             <button onclick="closeEditModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9CA3AF;line-height:1;">&times;</button>
         </div>
         <div id="edit-candidate-name" style="font-size:13px;font-weight:600;color:#4A0F1B;margin-bottom:16px;"></div>
@@ -382,22 +401,22 @@ if ($eid) {
         </div>
 
         <div class="form-group">
-            <label style="font-size:13px;font-weight:500;">Change Photo <span style="color:#9CA3AF;font-weight:400;">(optional)</span></label>
+            <label style="font-size:13px;font-weight:500;"><?= t('ui.change_photo_80de', 'Change Photo') ?> <span style="color:#9CA3AF;font-weight:400;"><?= t('ui.optional_f53d', '(optional)') ?></span></label>
             <input type="file" id="edit-photo-input" class="form-control" accept=".jpg,.jpeg,.png">
-            <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">JPG or PNG · max 2MB</div>
+            <div style="font-size:11px;color:#9CA3AF;margin-top:4px;"><?= t('ui.jpg_or_png_max_2mb_d61b', 'JPG or PNG · max 2MB') ?></div>
         </div>
         <div class="form-group">
-            <label style="font-size:13px;font-weight:500;">Bio <span style="color:#9CA3AF;font-weight:400;">(optional)</span></label>
-            <textarea id="edit-bio-input" class="form-control" rows="3" placeholder="Short bio..."></textarea>
+            <label style="font-size:13px;font-weight:500;">Bio <span style="color:#9CA3AF;font-weight:400;"><?= t('ui.optional_f53d', '(optional)') ?></span></label>
+            <textarea id="edit-bio-input" class="form-control" rows="3" placeholder="<?= htmlspecialchars(t('auto.short_bio_109c', 'Short bio...'), ENT_QUOTES) ?>"></textarea>
         </div>
         <div class="form-group">
-            <label style="font-size:13px;font-weight:500;">Credentials / Honors <span style="color:#9CA3AF;font-weight:400;">(optional)</span></label>
-            <textarea id="edit-credentials-input" class="form-control" rows="2" placeholder="ex. SHS With Honors, President's Lister, Dean's Lister"></textarea>
+            <label style="font-size:13px;font-weight:500;"><?= t('ui.credentials_honors_b3f7', 'Credentials / Honors') ?> <span style="color:#9CA3AF;font-weight:400;"><?= t('ui.optional_f53d', '(optional)') ?></span></label>
+            <textarea id="edit-credentials-input" class="form-control" rows="2" placeholder="<?= htmlspecialchars(t('auto.ex_shs_with_honors_president_s_lister_de_7d4c', 'ex. SHS With Honors, President\'s Lister, Dean\'s Lister'), ENT_QUOTES) ?>"></textarea>
         </div>
         <div class="form-group">
-            <label style="font-size:13px;font-weight:500;">Party List <span style="color:#9CA3AF;font-weight:400;">(optional)</span></label>
+            <label style="font-size:13px;font-weight:500;">Party List <span style="color:#9CA3AF;font-weight:400;"><?= t('ui.optional_f53d', '(optional)') ?></span></label>
             <select id="edit-party-input" class="form-control">
-                <option value="">— Independent (no party) —</option>
+                <option value=""><?= t('ui.independent_no_party_482b', '— Independent (no party) —') ?></option>
                 <?php foreach ($partyLists as $pl): ?>
                 <option value="<?= $pl['id'] ?>"><?= e($pl['name']) ?></option>
                 <?php endforeach; ?>
@@ -407,8 +426,8 @@ if ($eid) {
         <div id="edit-msg" style="font-size:13px;min-height:18px;margin-bottom:10px;"></div>
 
         <div style="display:flex;justify-content:flex-end;gap:10px;">
-            <button onclick="closeEditModal()" class="btn btn-outline btn-sm">Cancel</button>
-            <button onclick="submitEdit()" id="edit-save-btn" class="btn btn-primary btn-sm"><i class="ti ti-device-floppy"></i> Save</button>
+            <button onclick="closeEditModal()" class="btn btn-outline btn-sm"><?= t('ui.cancel_ea47', 'Cancel') ?></button>
+            <button onclick="submitEdit()" id="edit-save-btn" class="btn btn-primary btn-sm"><i class="ti ti-device-floppy"></i> <?= t('ui.save_c9cc', 'Save') ?></button>
         </div>
     </div>
 </div>
@@ -599,6 +618,18 @@ function closeEditModal() {
 
 function submitEdit() {
     if (!_editCandId) return;
+    AdminOtp.confirmThen({
+        op: 'edit_candidate',
+        targetId: _editCandId,
+        title: __t('Save Candidate Changes'),
+        subtitle: document.getElementById('edit-candidate-name').textContent,
+        body: __t('The bio, credentials, party list, or photo of this candidate will be changed after you confirm.'),
+        confirmLabel: __t('Save Changes')
+    }, doCandidateSave);
+}
+
+function doCandidateSave() {
+    if (!_editCandId) return;
     var btn = document.getElementById('edit-save-btn');
     var msg = document.getElementById('edit-msg');
     btn.disabled = true;
@@ -665,8 +696,8 @@ document.addEventListener('click', function(e) {
             </div>
         </div>
         <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;">
-            <button onclick="gncCloseModal()" class="btn btn-outline btn-sm">Cancel</button>
-            <button id="gnc-modal-confirm-btn" class="btn btn-danger btn-sm">Delete</button>
+            <button onclick="gncCloseModal()" class="btn btn-outline btn-sm"><?= t('ui.cancel_ea47', 'Cancel') ?></button>
+            <button id="gnc-modal-confirm-btn" class="btn btn-danger btn-sm"><?= t('ui.delete_f2a6', 'Delete') ?></button>
         </div>
     </div>
 </div>
@@ -695,9 +726,9 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') gncCl
 
 function confirmDeleteCandidate(id, name, eid) {
     gncOpenModal(
-        'Remove Candidate',
-        'Remove "' + name + '" from the candidates list?',
-        function() { window.location.href = '?delete=' + id + '&election=' + eid; }
+        __t('Remove Candidate'),
+        'Remove "' + name + __t('" from the candidates list?'),
+        function() { postAction({ delete: id }); }
     );
 }
 </script>
@@ -705,6 +736,18 @@ function confirmDeleteCandidate(id, name, eid) {
 <script src="../assets/js/sidebar.js?v=5"></script>
 <script src="../assets/js/table-tools.js?v=6"></script>
 <script src="../assets/js/client-pager.js?v=3"></script>
+<script src="../assets/js/bulk-select.js?v=5"></script>
+<script>
+(function () {
+  var t = document.getElementById('cand-table'); if (!t) return;
+  BulkSelect.init({
+    rows: '#cand-table tbody tr[data-bulk-id]', before: t.closest('.table-wrap'), noun: 'candidate', exportType: 'candidates',
+    actions: [{ label: __t('Delete'), icon: 'ti-trash', danger: true,
+      confirm: function (n) { return __t('Permanently delete ') + n + __t(' candidate(s)? This cannot be undone.'); },
+      run: function (id) { return fetch('candidates.php?election=<?= (int)$eid ?>', { method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: 'delete=' + encodeURIComponent(id) + '&csrf_token=' + encodeURIComponent(window.CSRF_TOKEN || '') }).then(function (r) { return r.ok; }); } }]
+  });
+})();
+</script>
 
 <!-- ===== IMPORT EXCEL MODAL ===== -->
 <div id="import-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9200;align-items:center;justify-content:center;padding:16px;">
@@ -713,7 +756,7 @@ function confirmDeleteCandidate(id, name, eid) {
         <!-- Header -->
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
             <div style="font-size:15px;font-weight:600;color:#1F2937;">
-                <i class="ti ti-file-spreadsheet" style="margin-right:6px;color:#059669;"></i> Import Candidates via Excel
+                <i class="ti ti-file-spreadsheet" style="margin-right:6px;color:#059669;"></i> <?= t('ui.import_candidates_via_excel_d754', 'Import Candidates via Excel') ?>
             </div>
             <button onclick="closeImportModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9CA3AF;">&times;</button>
         </div>
@@ -721,23 +764,23 @@ function confirmDeleteCandidate(id, name, eid) {
         <!-- Step 1: Download template -->
         <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:14px 16px;margin-bottom:18px;">
             <div style="font-size:13px;font-weight:600;color:#065F46;margin-bottom:6px;">
-                <i class="ti ti-download" style="margin-right:4px;"></i> Step 1 — Download the template
+                <i class="ti ti-download" style="margin-right:4px;"></i> <?= t('ui.step_1_download_the_template_1a58', 'Step 1 — Download the template') ?>
             </div>
             <div style="font-size:12px;color:#047857;margin-bottom:10px;line-height:1.5;">
-                Fill in the Excel template with <strong>student_id</strong> and <strong>position</strong> columns.<br>
-                Position name must match exactly what's in the election (e.g. "President", "Secretary").
+                <?= t('ui.fill_in_the_excel_template_with_1a76', 'Fill in the Excel template with') ?> <strong>student_id</strong> <?= t('ui.and_be5d', 'and') ?> <strong>position</strong> <?= t('ui.columns_7af3', 'columns.') ?><br>
+                <?= t('ui.position_name_must_match_exactly_w_c8ce', 'Position name must match exactly what\'s in the election (e.g. "President", "Secretary").') ?>
             </div>
             <a href="import-candidates.php?template=1" class="btn btn-sm" style="background:#059669;color:#fff;gap:6px;">
-                <i class="ti ti-table-export"></i> Download Template (.xlsx)
+                <i class="ti ti-table-export"></i> <?= t('ui.download_template_xlsx_68a5', 'Download Template (.xlsx)') ?>
             </a>
             <div style="font-size:11.5px;color:#065F46;margin-top:10px;">
-                <i class="ti ti-info-circle" style="margin-right:3px;"></i> Tip: already have a Candidates List you exported earlier? You can edit that file directly and upload it in Step 2 — no need to start from the template.
+                <i class="ti ti-info-circle" style="margin-right:3px;"></i> <?= t('ui.tip_already_have_a_candidates_list_f862', 'Tip: already have a Candidates List you exported earlier? You can edit that file directly and upload it in Step 2 — no need to start from the template.') ?>
             </div>
         </div>
 
         <!-- Step 2: Upload -->
         <div style="font-size:13px;font-weight:600;color:#1F2937;margin-bottom:10px;">
-            <i class="ti ti-upload" style="margin-right:4px;color:#6B1A2A;"></i> Step 2 — Upload filled Excel file
+            <i class="ti ti-upload" style="margin-right:4px;color:#6B1A2A;"></i> <?= t('ui.step_2_upload_filled_excel_file_cce2', 'Step 2 — Upload filled Excel file') ?>
         </div>
 
         <!-- Drop zone -->
@@ -747,8 +790,8 @@ function confirmDeleteCandidate(id, name, eid) {
              ondragleave="this.style.borderColor='#D1D5DB';this.style.background='';"
              ondrop="handleDrop(event)">
             <i class="ti ti-file-spreadsheet" style="font-size:32px;color:#9CA3AF;display:block;margin-bottom:8px;"></i>
-            <div id="drop-label" style="font-size:13px;color:#6B7280;">Click to browse or drag & drop your Excel file here</div>
-            <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">.xlsx or .xls · max 5MB</div>
+            <div id="drop-label" style="font-size:13px;color:#6B7280;"><?= t('ui.click_to_browse_or_drag_drop_your__9481', 'Click to browse or drag & drop your Excel file here') ?></div>
+            <div style="font-size:11px;color:#9CA3AF;margin-top:4px;"><?= t('ui.xlsx_or_xls_max_5mb_45c7', '.xlsx or .xls · max 5MB') ?></div>
         </div>
         <input type="file" id="excel-file-input" accept=".xlsx,.xls" style="display:none;" onchange="handleFileSelect(this.files[0])">
 
@@ -757,9 +800,9 @@ function confirmDeleteCandidate(id, name, eid) {
 
         <!-- Actions -->
         <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px;">
-            <button onclick="closeImportModal()" class="btn btn-outline btn-sm">Cancel</button>
+            <button onclick="closeImportModal()" class="btn btn-outline btn-sm"><?= t('ui.cancel_ea47', 'Cancel') ?></button>
             <button id="import-submit-btn" onclick="submitImport()" class="btn btn-primary btn-sm" disabled>
-                <i class="ti ti-eye"></i> Preview Changes
+                <i class="ti ti-eye"></i> <?= t('ui.preview_changes_b2e8', 'Preview Changes') ?>
             </button>
         </div>
     </div>
@@ -782,7 +825,7 @@ document.getElementById('import-modal-overlay').addEventListener('click', functi
 function resetImportModal() {
     _importFile = null;
     document.getElementById('excel-file-input').value = '';
-    document.getElementById('drop-label').textContent = 'Click to browse or drag & drop your Excel file here';
+    document.getElementById('drop-label').textContent = __t('Click to browse or drag & drop your Excel file here');
     document.getElementById('drop-zone').style.borderColor = '#D1D5DB';
     document.getElementById('drop-zone').style.background  = '';
     document.getElementById('import-result').style.display = 'none';
@@ -812,7 +855,7 @@ function handleDrop(event) {
     if (file) handleFileSelect(file);
 }
 
-// One button, two steps: "Preview Changes" first, then "Confirm Import".
+// One button, two steps: __t("Preview Changes") first, then __t("Confirm Import").
 var _candPreview = false;
 
 function _impEsc(v) {
@@ -841,6 +884,14 @@ function submitImportReset() {
 function submitImport() {
     if (!_importFile) return;
     var isConfirm = _candPreview;
+    if (isConfirm && !window._candGateOK) {
+        AdminOtp.gate({
+            op: 'import_candidates', title: __t('Confirm candidate import'), subtitle: __t('Import candidates from Excel'),
+            body: __t('The candidates in this file will be added or updated after you confirm.'), confirmLabel: __t('Import'),
+            proceed: function () { window._candGateOK = true; try { submitImport(); } finally { window._candGateOK = false; } }
+        });
+        return;
+    }
 
     var electionId = <?= $eid ?>;
     var btn = document.getElementById('import-submit-btn');
@@ -862,7 +913,7 @@ function submitImport() {
 
             if (!data.success) {
                 submitImportReset();
-                result.innerHTML = _impErrorHTML(data.message || 'Something went wrong.');
+                result.innerHTML = _impErrorHTML(data.message || __t('Something went wrong.'));
                 result.style.display = 'block';
                 return;
             }
@@ -911,10 +962,13 @@ function submitImport() {
         .catch(function() {
             btn.disabled = false;
             submitImportReset();
-            result.innerHTML = _impErrorHTML('Network error. Please try again.');
+            result.innerHTML = _impErrorHTML(__t('Network error. Please try again.'));
             result.style.display = 'block';
         });
 }
 </script>
 <?php include __DIR__.'/../includes/push-widget.php'; ?>
+<script>window.CSRF_TOKEN = <?= json_encode(csrfToken()) ?>;</script>
+<script src="../assets/js/admin-otp.js?v=2"></script>
+<script src="../assets/js/post-action.js"></script>
 </body></html>

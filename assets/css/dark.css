@@ -1,0 +1,199 @@
+/* ============================================
+   GNC-OSA PORTAL — DARK MODE  (toggle: assets/js/dark.js)
+   Active when <html data-theme="dark">. Palette follows the Facebook/Messenger dark look.
+   ============================================ */
+
+/* Toggle button (both themes) */
+.theme-toggle { width: 36px; height: 36px; border-radius: 50%; border: 0; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.16); color: #fff; font-size: 18px; margin-right: 6px; flex-shrink: 0; transition: background .15s; }
+.theme-toggle:hover { background: rgba(255,255,255,0.28); }
+.theme-toggle-float { position: fixed; right: 76px; top: 16px; z-index: 9999; width: 36px; height: 36px; margin: 0;
+    background: #6B1A2A; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+@media (max-width: 480px) { .theme-toggle-float { right: 66px; top: 12px; } }
+.theme-toggle-float:hover { background: #8C2438; }
+
+html[data-theme="dark"] {
+    color-scheme: dark;
+    --maroon:        #B84A60;
+    --maroon-dark:   #4A0F1B;
+    --maroon-light:  #D06A7E;
+    --maroon-pale:   #3A2128;
+    --maroon-border: #6B3A45;
+    --gold:          #D9A441;
+    --gold-light:    #3A2F14;
+    --gold-dark:     #E5B567;
+    --white:         #242526;
+    --gray-50:       #2A2B2D;
+    --gray-100:      #18191A;
+    --gray-200:      #3E4042;
+    --gray-400:      #8A8D91;
+    --gray-600:      #B0B3B8;
+    --gray-800:      #E4E6EB;
+    --green:         #10B981;
+    --green-light:   #14352A;
+    --yellow:        #FBBF24;
+    --yellow-light:  #3A2F14;
+    --red:           #F28B82;
+    --red-light:     #3B1F20;
+    --purple:        #C4B5FD;
+    --purple-light:  #2E2347;
+    --teal:          #22A6C3;
+    --teal-dark:     #67D4E8;
+    --teal-pale:     #10303A;
+    --shadow:        0 1px 4px rgba(0,0,0,0.5);
+}
+html[data-theme="dark"] body { background: #18191A; color: #E4E6EB; }
+
+/* Top bar / sidebar */
+html[data-theme="dark"] .topnav { background: #242526; border-bottom: 1px solid #3E4042; }
+html[data-theme="dark"] .theme-election .topnav,
+html[data-theme="dark"] .theme-events .topnav { background: #242526; }
+html[data-theme="dark"] .topnav .avatar { background: var(--maroon); color: #fff; }
+html[data-theme="dark"] .sidebar { background: #242526; border-right-color: #3E4042; }
+html[data-theme="dark"] .sidebar .sitem { color: #B0B3B8; }
+html[data-theme="dark"] .sidebar .sitem:hover,
+html[data-theme="dark"] .sidebar .sitem.active { background: #3A2128; color: #F0A3B2; }
+html[data-theme="dark"] .sidebar-section { color: #8A8D91; }
+
+/* Surfaces */
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .modal,
+html[data-theme="dark"] .modal-box,
+html[data-theme="dark"] .modal-content,
+html[data-theme="dark"] .stat-card,
+html[data-theme="dark"] .event-card,
+html[data-theme="dark"] .table-wrap,
+html[data-theme="dark"] .dropdown-menu,
+html[data-theme="dark"] .xm-list { background: #242526; color: #E4E6EB; border-color: #3E4042; }
+html[data-theme="dark"] .page-header h1,
+html[data-theme="dark"] .card-title,
+html[data-theme="dark"] h1, html[data-theme="dark"] h2, html[data-theme="dark"] h3, html[data-theme="dark"] h4 { color: #E4E6EB; }
+html[data-theme="dark"] .theme-election .page-header h1 { color: #E5B567; }
+
+/* Tables */
+html[data-theme="dark"] table { color: #E4E6EB; }
+html[data-theme="dark"] th { background: #2A2B2D; color: #B0B3B8; border-color: #3E4042; }
+html[data-theme="dark"] td { border-color: #3E4042; }
+html[data-theme="dark"] tbody tr:hover { background: #2F3031; }
+html[data-theme="dark"] tr { border-color: #3E4042; }
+
+/* Forms */
+html[data-theme="dark"] input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] .form-control { background: #3A3B3C; color: #E4E6EB; border-color: #4E4F50; }
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder { color: #8A8D91; }
+html[data-theme="dark"] input:focus, html[data-theme="dark"] select:focus, html[data-theme="dark"] textarea:focus { border-color: var(--maroon-light); outline: none; }
+html[data-theme="dark"] option { background: #242526; color: #E4E6EB; }
+html[data-theme="dark"] label { color: #B0B3B8; }
+html[data-theme="dark"] .btn-outline { background: transparent; color: #E4E6EB; border-color: #4E4F50; }
+html[data-theme="dark"] .btn-outline:hover { background: #3A3B3C; }
+html[data-theme="dark"] hr { border-color: #3E4042; }
+
+/* Links, code, scrollbars */
+html[data-theme="dark"] .btn-primary { background: var(--maroon); color: #fff; }
+html[data-theme="dark"] .btn-primary:hover { background: var(--maroon-light); }
+html[data-theme="dark"] ::-webkit-scrollbar-thumb { background: #4E4F50; border-radius: 6px; }
+html[data-theme="dark"] ::-webkit-scrollbar-track { background: #18191A; }
+
+/* Login / register */
+html[data-theme="dark"] body.auth-split-page { background: #18191A; }
+html[data-theme="dark"] .auth-main, html[data-theme="dark"] .auth-panel { background: #18191A; color: #E4E6EB; }
+
+/* Images that are mostly white boxes (QR, charts, scanned COR) keep their own look */
+html[data-theme="dark"] img { filter: none; }
+
+/* Small fixes */
+html[data-theme="dark"] .badge-review { color: #F0A3B2; }
+html[data-theme="dark"] [style*="background:rgba(255,255,255,0.25)"], html[data-theme="dark"] [style*="background:rgba(255,255,255,.25)"] { background: rgba(255,255,255,0.18) !important; }
+html[data-theme="dark"] [style*="color:var(--maroon-dark)"], html[data-theme="dark"] [style*="color: var(--maroon-dark)"] { color: #F0A3B2 !important; }
+html[data-theme="dark"] .topnav .avatar { color: #fff !important; }
+html[data-theme="dark"] .lang-btn { background: #3A3B3C !important; color: #E4E6EB !important; border-color: #4E4F50 !important; }
+html[data-theme="dark"] .lang-btn span, html[data-theme="dark"] .lang-btn i { color: #E4E6EB !important; }
+html[data-theme="dark"] .theme-toggle-float { background: #3A3B3C; }
+
+/* ============================================
+   DARK MODE FIXES — messages (student + OSA) and notifications
+   These rules were light-only in messages*.css / notif-ui.php.
+   ============================================ */
+
+/* Notifications: unread-row tint uses the page accent, but it was pale-light even in dark mode */
+html[data-theme="dark"] .notif-wrap { --nacc-pale: color-mix(in srgb, var(--nacc) 18%, #242526); }
+html[data-theme="dark"] .notif-read-btn:hover,
+html[data-theme="dark"] .notif-row .notif-unread-btn:hover { background: #242526; }
+html[data-theme="dark"] .notif-sticky-head,
+html[data-theme="dark"] .notif-bulkbar { background: #242526; }
+
+/* Thread list (student + OSA) */
+html[data-theme="dark"] .msgm-item { background: #242526; border-color: #3E4042; }
+html[data-theme="dark"] .msgm-item:hover { background: #2A2B2D; }
+html[data-theme="dark"] .msgm-avatar { background: #242526; border-color: #3E4042; }
+html[data-theme="dark"] .msgm-name,
+html[data-theme="dark"] .msgm-bar-name { color: #E4E6EB; }
+html[data-theme="dark"] .msgm-item.unread .msgm-name,
+html[data-theme="dark"] .msgm-item.unread .msgm-prev { color: #F0F2F5; }
+html[data-theme="dark"] .msgm-prev,
+html[data-theme="dark"] .msgm-sid,
+html[data-theme="dark"] .msgm-note,
+html[data-theme="dark"] .msgm-searchnote,
+html[data-theme="dark"] .msgm-bar-name small { color: #B0B3B8; }
+html[data-theme="dark"] .msgm-time { color: #8A8D91; }
+html[data-theme="dark"] .msgm-bar { border-bottom-color: #3E4042; }
+html[data-theme="dark"] .msgm-back:hover { background: #3A2128; }
+html[data-theme="dark"] .msgm-search input { background: #3A3B3C; color: #E4E6EB; border-color: #4E4F50; }
+html[data-theme="dark"] .msgm-search input:focus { border-color: var(--maroon-light); box-shadow: 0 0 0 3px rgba(184,74,96,0.2); }
+html[data-theme="dark"] .msgm-search button { background: #3A3B3C; color: #B0B3B8; }
+html[data-theme="dark"] .msgm-search button:hover { background: #4E4F50; }
+
+/* Conversation: composer card, reply box, bubbles */
+html[data-theme="dark"] .msg-reply,
+html[data-theme="dark"] .msg-card { background: #242526; border: 1px solid #3E4042; }
+html[data-theme="dark"] .msg-card .msg-title { color: #B0B3B8; }
+html[data-theme="dark"] .msg-card .msg-title i { color: #8A8D91; }
+html[data-theme="dark"] .msg-card textarea.form-control { color: #E4E6EB; background: transparent; }
+html[data-theme="dark"] .msg-card textarea.form-control::placeholder { color: #8A8D91; }
+html[data-theme="dark"] .msg-card .voice-btn { background: #3A3B3C; border-color: #4E4F50; color: #B0B3B8; }
+html[data-theme="dark"] .msg-card .voice-btn:hover { background: #4E4F50; }
+html[data-theme="dark"] .msg-row.mine .msg-bubble { background: #3A3B3C; color: #E4E6EB; }
+html[data-theme="dark"] .msg-row.theirs .msg-bubble { background: #212327; color: #a6bddd; }
+html[data-theme="dark"] .msg-card form > div[style*="font-size:12px"] { color: #8A8D91 !important; }
+
+/* ============================================
+   DARK MODE — student OSA Guide page (assets/css/help.css had no dark rules)
+   ============================================ */
+html[data-theme="dark"] .help-hero { background: #3A1D24; }
+html[data-theme="dark"] .help-logo { background: #242526; border-color: rgba(255,255,255,0.18); }
+html[data-theme="dark"] .help-search { background: #242526; border-color: #3E4042; }
+html[data-theme="dark"] .help-search i { color: #8A8D91; }
+html[data-theme="dark"] .help-search input { color: #E4E6EB; }
+html[data-theme="dark"] .help-search input::placeholder { color: #8A8D91; }
+html[data-theme="dark"] .help-section h2,
+html[data-theme="dark"] .help-card-title,
+html[data-theme="dark"] .help-contact strong,
+html[data-theme="dark"] .help-steps b,
+html[data-theme="dark"] .help-faq-item summary { color: #E4E6EB; }
+html[data-theme="dark"] .help-card,
+html[data-theme="dark"] .help-faq { background: #242526; border-color: #3E4042; }
+html[data-theme="dark"] .help-card[open] { border-color: #6B3A45; }
+html[data-theme="dark"] .help-icon { background: #3A2128; color: #F0A3B2; }
+html[data-theme="dark"] .help-card-intro,
+html[data-theme="dark"] .help-contact p { color: #B0B3B8; }
+html[data-theme="dark"] .help-caret { color: #8A8D91; }
+html[data-theme="dark"] .help-steps,
+html[data-theme="dark"] .help-faq-answer { color: #C9CCD1; }
+html[data-theme="dark"] .help-faq-item { border-top-color: #3E4042; }
+html[data-theme="dark"] .help-empty { color: #8A8D91; }
+html[data-theme="dark"] .help-contact { background: #2A2B2D; border-color: #3E4042; }
+html[data-theme="dark"] .help-contact-btn { background: var(--maroon); color: #fff; }
+html[data-theme="dark"] .help-contact-btn:hover { background: var(--maroon-light); }
+
+/* ============================================
+   DARK MODE — "Update Status" slide-in panel (admin + OSA complaint view)
+   The drawer is styled inline in view-complaint.php with a white background.
+   ============================================ */
+html[data-theme="dark"] .upd-drawer { background: #18191A; box-shadow: -8px 0 32px rgba(0,0,0,.6); }
+html[data-theme="dark"] .upd-head { background: #18191A; color: #E4E6EB; border-bottom-color: #3E4042; }
+html[data-theme="dark"] .upd-head button { color: #B0B3B8; }
+html[data-theme="dark"] .upd-head button:hover { background: #242526; }
+html[data-theme="dark"] .upd-body { background: #18191A; }

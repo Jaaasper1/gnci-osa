@@ -10,3 +10,8 @@ Options -Indexes
         Deny from all
     </IfModule>
 </FilesMatch>
+
+# PWA: correct MIME type for the web app manifest
+<IfModule mod_mime.c>
+    AddType application/manifest+json .webmanifest
+</IfModule>

@@ -1,0 +1,54 @@
+/* GNC-OSA Portal — accessibility (reading, colour-blind, text magnifier). Classes are set on <html> by assets/js/a11y.js */
+@font-face{font-family:'OpenDyslexic';src:url('../fonts/opendyslexic-latin-400-normal.woff2') format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:'OpenDyslexic';src:url('../fonts/opendyslexic-latin-700-normal.woff2') format('woff2');font-weight:700;font-display:swap}
+
+/* Text size (whole page scales, so px-based text grows too) */
+html.a11y-size-1 body{zoom:1.15}
+html.a11y-size-2 body{zoom:1.3}
+html.a11y-size-3 body{zoom:1.5}
+
+/* Dyslexia-friendly font */
+html.a11y-dys body, html.a11y-dys body *:not(i):not(.fa):not(.fas):not(.far):not(.fab):not([class*="icon"]):not(svg):not(svg *){
+  font-family:'OpenDyslexic','Atkinson Hyperlegible','Comic Sans MS','Verdana',sans-serif!important}
+
+/* Spacing */
+html.a11y-sp-1 body, html.a11y-sp-1 body *{letter-spacing:.05em!important;word-spacing:.12em!important;line-height:1.6!important}
+html.a11y-sp-2 body, html.a11y-sp-2 body *{letter-spacing:.12em!important;word-spacing:.25em!important;line-height:1.9!important}
+html.a11y-lines p, html.a11y-lines li{margin-bottom:1em}
+html.a11y-links a{text-decoration:underline!important;text-underline-offset:3px}
+html.a11y-focus *:focus{outline:3px solid #0B5FFF!important;outline-offset:2px}
+
+/* Colour-blind filters (SVG filter defined by a11y.js) */
+html.a11y-cb-protan{filter:url(#a11y-f-protan)}
+html.a11y-cb-deutan{filter:url(#a11y-f-deutan)}
+html.a11y-cb-tritan{filter:url(#a11y-f-tritan)}
+html.a11y-cb-mono{filter:grayscale(1) contrast(1.1)}
+
+/* Floating button + panel */
+#a11y-btn{position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:9998;width:46px;height:46px;border-radius:50%;border:2px solid #fff;background:#6B1A2A;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.3);padding:0;zoom:1!important}
+#a11y-btn:hover{background:#8C2438}
+#a11y-panel{position:fixed;right:16px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:9999;width:min(340px,calc(100vw - 32px));max-height:calc(100vh - 100px);overflow:auto;background:#fff;color:#222;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.35);padding:16px;font:14px/1.4 system-ui,'Segoe UI',sans-serif!important;letter-spacing:normal!important;word-spacing:normal!important;display:none}
+#a11y-panel.open{display:block}
+#a11y-panel *{font-family:inherit!important;letter-spacing:normal!important;word-spacing:normal!important;line-height:1.4!important}
+#a11y-panel h2{font-size:16px;margin:0 0 10px;color:#6B1A2A;display:flex;justify-content:space-between;align-items:center}
+#a11y-panel h3{font-size:12px;text-transform:uppercase;letter-spacing:.05em!important;color:#666;margin:14px 0 6px}
+#a11y-panel .row{display:flex;gap:6px;flex-wrap:wrap}
+#a11y-panel button.opt{flex:1 1 auto;border:1.5px solid #cfcfcf;background:#f7f7f7;color:#222;border-radius:8px;padding:8px 10px;cursor:pointer;font-size:13px}
+#a11y-panel button.opt[aria-pressed="true"]{border-color:#6B1A2A;background:#6B1A2A;color:#fff}
+#a11y-panel label.sw{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;font-size:14px;cursor:pointer}
+#a11y-panel .reset{margin-top:14px;width:100%;border:0;background:#eee;border-radius:8px;padding:9px;cursor:pointer;font-size:13px}
+#a11y-panel .x{border:0;background:none;font-size:20px;cursor:pointer;color:#444}
+html[data-theme="dark"] #a11y-panel{background:#242526;color:#E4E6EB}
+html[data-theme="dark"] #a11y-panel button.opt{background:#3A3B3C;color:#E4E6EB;border-color:#555}
+html[data-theme="dark"] #a11y-panel button.opt[aria-pressed="true"]{background:#B84A60;border-color:#B84A60;color:#fff}
+html[data-theme="dark"] #a11y-panel .reset{background:#3A3B3C;color:#E4E6EB}
+html[data-theme="dark"] #a11y-panel .x, html[data-theme="dark"] #a11y-panel h3{color:#B0B3B8}
+
+/* Text magnifier bubble */
+#a11y-mag{position:fixed;z-index:10000;pointer-events:none;max-width:min(520px,92vw);background:#FFF9C4;color:#000;border:3px solid #6B1A2A;border-radius:10px;padding:10px 14px;font:600 26px/1.35 system-ui,'Segoe UI',sans-serif;box-shadow:0 8px 28px rgba(0,0,0,.35);display:none;word-wrap:break-word;zoom:1!important}
+html.a11y-dys #a11y-mag{font-family:'OpenDyslexic','Comic Sans MS',sans-serif;font-size:22px}
+@media print{#a11y-btn,#a11y-panel,#a11y-mag{display:none!important}}
+
+/* Pages that already have a bottom-right floating button (Ask OSA bubble on student pages, Live Results on login): sit above it */
+html.a11y-raised #a11y-btn{right:24px;bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+html.a11y-raised #a11y-panel{bottom:calc(152px + env(safe-area-inset-bottom,0px));max-height:calc(100vh - 170px)}

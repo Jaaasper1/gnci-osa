@@ -1,4 +1,4 @@
-// "Show all / Show less" toggle for card sections (events, Facebook feed).
+// __t("Show all / Show less") toggle for card sections (events, Facebook feed).
 // Items after the 3rd carry .more-item and stay hidden until the section is expanded.
 (function () {
     var state = {};

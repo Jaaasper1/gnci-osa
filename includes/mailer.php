@@ -133,6 +133,33 @@ HTML;
 }
 
 /**
+ * Security notice emailed to a staff/admin after a successful login, so the
+ * owner can spot a login that wasn't them.
+ */
+function sendStaffLoginNotice(string $toEmail, string $toName): bool {
+    $time = date('F j, Y \\a\\t g:i A');
+    $ip   = htmlspecialchars($_SERVER['REMOTE_ADDR'] ?? 'Unknown');
+    $name = htmlspecialchars($toName);
+    $html = '<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;border:1px solid #E5E7EB;border-radius:10px;">'
+          . '<h2 style="color:#6B1A2A;margin:0 0 12px;font-size:18px;">GNC-OSA Portal: new login</h2>'
+          . '<p style="color:#374151;font-size:14px;">Hi ' . $name . ', your staff/admin account was just used to log in on <strong>' . $time . '</strong> from IP <strong>' . $ip . '</strong>.</p>'
+          . '<p style="color:#991B1B;font-size:13px;">If this was not you, tell the OSA office / system admin right away.</p></div>';
+    try {
+        $mail = createMailer();
+        $mail->addAddress($toEmail, $toName);
+        $mail->isHTML(true);
+        $mail->Subject = 'GNC-OSA Portal: new staff login on your account';
+        $mail->Body    = $html;
+        $mail->AltBody = "Hi {$toName}, your GNC-OSA staff/admin account was used to log in on {$time} from IP " . ($_SERVER['REMOTE_ADDR'] ?? 'Unknown') . ". If this was not you, tell the OSA office / system admin right away.";
+        $mail->send();
+        return true;
+    } catch (Exception $e) {
+        error_log("GNC-OSA login notice error for {$toEmail}: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
  * Builds a full portal URL for use inside emails.
  * Set PORTAL_URL in includes/config.local.php (e.g. 'https://osa.yourschool.edu.ph')
  * when hosting online. If not set, it is auto-detected from the current request
@@ -498,4 +525,35 @@ HTML;
     }
 
     return $atLeastOne;
+}
+
+/**
+ * Tells a student their account was deleted by the OSA office.
+ * Sent right after a successful delete (the account row is gone, so an
+ * in-app notification would have nowhere to show up; email is the only channel).
+ */
+function sendAccountDeletedEmail(string $toEmail, string $toName): bool {
+    $name    = htmlspecialchars($toName, ENT_QUOTES, 'UTF-8');
+    $subject = 'GNC-OSA Portal: Your account has been deleted';
+    $html = '<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;border:1px solid #E5E7EB;border-radius:10px;">'
+          . '<h2 style="color:#991B1B;margin:0 0 12px;font-size:18px;">GNC-OSA Portal: Account deleted</h2>'
+          . '<p style="color:#374151;font-size:14px;line-height:1.6;">Hi ' . $name . ', your GNC-OSA Portal student account has been <strong>deleted</strong> by the OSA office. You will no longer be able to log in with it.</p>'
+          . '<p style="color:#374151;font-size:14px;line-height:1.6;">If you believe this was a mistake, please visit the OSA office.</p>'
+          . '<p style="color:#6B7280;font-size:12px;margin-top:16px;">This is an automated message from the GNC-OSA Portal. Please do not reply to this email.</p>'
+          . '</div>';
+    try {
+        $mail = createMailer();
+        $mail->Timeout = 6;
+        $mail->addAddress($toEmail, $toName);
+        $mail->isHTML(true);
+        $mail->Subject = $subject;
+        $mail->Body    = $html;
+        $mail->AltBody = "Hi {$toName}, your GNC-OSA Portal student account has been deleted by the OSA office. If you believe this was a mistake, please visit the OSA office.";
+        $mail->send();
+        return true;
+    } catch (\Throwable $e) {
+        $GLOBALS['gnc_last_mail_error'] = $e->getMessage();
+        error_log("GNC-OSA account-deleted mailer error for {$toEmail}: " . $e->getMessage());
+        return false;
+    }
 }

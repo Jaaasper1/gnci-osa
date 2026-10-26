@@ -1,0 +1,47 @@
+MERGE NOTES — GNC-OSA Portal (your system + classmate's features)
+
+WHAT WAS ADDED FROM THE CLASSMATE'S VERSION
+1. Voice messages (student <-> OSA): voice.php, assets/js/voice-record.js, assets/js/Message-tts.js,
+   uploads/voice/.htaccess, includes/messages.php, student/messages.php, osa/messages.php
+2. AI FAQ assistant (Gemini): includes/osa-assistant.php, includes/osa-faq.php
+3. Export filters + export only ticked rows: includes/export-helpers.php, admin/export.php,
+   admin/export-vouchers-excel.php, admin/results.php, candidates.php, party-lists.php, vouchers.php
+   (vouchers: sortable columns + Course column), assets/js/bulk-select.js, table-tools.js, client-pager.js
+4. Audit log: server-side pagination + date-range filter (admin/audit-log.php)
+5. Students page: search / course filter / date filter / paging for Pending and Disabled tables
+6. performance-indexes.sql (DB indexes)
+
+KEPT FROM YOUR VERSION (classmate's copy did NOT have these)
+- admin/students.php: server-side "Only the admin can do this" guard, masked emails in Pending table,
+  .admin-only hiding for staff  (re-applied on top of the classmate's new students.php)
+- admin/import-students.php: masked emails in the import preview (kept yours as-is)
+- admin/candidates.php + party-lists.php: bulk delete via POST + CSRF (classmate's used GET, which the
+  server ignores, so bulk delete would have silently failed)
+
+NOT COPIED ON PURPOSE
+- includes/config.local.php (secrets), uploads/* (student COR files), setup.php (one-time installer,
+  security risk on a live site), admin/mail-test.php + osa-ai-test.php (temporary test pages),
+  gnc_osa_portal.sql (you already have a live DB)
+
+HOW TO DEPLOY
+1. BACK UP the live site files and the database first.
+2. Upload this folder's files over the live site (do NOT overwrite includes/config.local.php or uploads/).
+3. In phpMyAdmin run performance-indexes.sql once (safe to re-run).
+4. The messages table upgrades itself on first open (adds audio_file + 'assistant' role) — needs ALTER permission.
+5. Make sure uploads/voice/ exists and is writable by PHP.
+6. To enable the AI: add to includes/config.local.php
+       define('GEMINI_API_KEY', 'your key');
+   and replace every "TODO" answer in includes/osa-faq.php with the official OSA answers
+   (entries still marked TODO are ignored). PHP cURL must be enabled.
+   NOTE: students' message text is sent to Google's Gemini API — mention this in your privacy notice.
+7. Test: voice message send/play (student + OSA), a student message that hits the FAQ, export with filters,
+   audit-log paging, students page as STAFF (delete/disable buttons must be hidden and blocked).
+
+NOT TESTED: I could only syntax-check (php -l passes on all files). I could not run it against your database.
+
+DARK MODE (added after the merge)
+- New: assets/css/dark.css, assets/css/dark-auto.css (auto-generated from all the portal's CSS), assets/js/dark.js
+- Changed: includes/pwa-head.php (loads the dark files on every page), sw.js (cache version bump so installed PWAs refresh)
+- A sun/moon button appears in the top bar (login page: top-right next to EN). The choice is saved per browser;
+  until someone picks, it follows the device's dark/light setting.
+- If you later change colours in the CSS/PHP pages, regenerate dark-auto.css:  python3 tools/gen_dark.py <project folder>

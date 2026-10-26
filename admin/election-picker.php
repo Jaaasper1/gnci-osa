@@ -1,4 +1,5 @@
 <?php
+if (!function_exists('t')) { require_once __DIR__ . '/../includes/lang.php'; }
 /**
  * Shared searchable election dropdown (used by candidates.php, party-lists.php, results.php and live-results.php; $param = the URL query name).
  * Groups elections into Active / Closed / Completed and lets the admin search by
@@ -26,9 +27,9 @@ function renderElectionPicker(array $elections, int $eid, string $param = 'elect
     if (count($elections) < 1) return;
 
     $groups = [
-        'active'    => ['Active',    'ti-player-play',  '#059669', []],
-        'closed'    => ['Closed',    'ti-lock',         '#6B7280', []],
-        'completed' => ['Completed', 'ti-circle-check', '#1D4ED8', []],
+        'active'    => [t('ui.active_4d3d', 'Active'),    'ti-player-play',  '#059669', []],
+        'closed'    => [t('ui.closed_03f4', 'Closed'),    'ti-lock',         '#6B7280', []],
+        'completed' => [t('ui.completed_07ca', 'Completed'), 'ti-circle-check', '#1D4ED8', []],
     ];
     $current = null;
     foreach ($elections as $el) {
@@ -39,7 +40,7 @@ function renderElectionPicker(array $elections, int $eid, string $param = 'elect
     $curKey = electionStatusKey($current);
     ?>
     <div class="elpick" id="elpick">
-        <div class="elpick-label">Election</div>
+        <div class="elpick-label"><?= t('auto.election_28c1', 'Election') ?></div>
         <button type="button" class="elpick-btn" id="elpick-btn" aria-haspopup="listbox" aria-expanded="false">
             <span class="elpick-course"><?= $current['course'] !== '' ? e($current['course']) : 'All' ?></span>
             <span class="elpick-title"><?= e($current['title']) ?></span>
@@ -49,7 +50,7 @@ function renderElectionPicker(array $elections, int $eid, string $param = 'elect
         <div class="elpick-panel" id="elpick-panel" style="display:none;">
             <div class="elpick-search">
                 <i class="ti ti-search"></i>
-                <input type="text" id="elpick-q" placeholder="Search election or course..." autocomplete="off">
+                <input type="text" id="elpick-q" placeholder="<?= htmlspecialchars(t('auto.search_election_or_course_e2bb', 'Search election or course...'), ENT_QUOTES) ?>" autocomplete="off">
             </div>
             <div class="elpick-list" id="elpick-list" role="listbox">
                 <?php foreach ($groups as $gk => [$gLabel, $gIcon, $gColor, $gList]): if (empty($gList)) continue; ?>
@@ -68,7 +69,7 @@ function renderElectionPicker(array $elections, int $eid, string $param = 'elect
                     <?php endforeach; ?>
                 </div>
                 <?php endforeach; ?>
-                <div class="elpick-none" id="elpick-none" style="display:none;">No matching elections.</div>
+                <div class="elpick-none" id="elpick-none" style="display:none;"><?= t('auto.no_matching_elections_fe5c', 'No matching elections.') ?></div>
             </div>
         </div>
     </div>
@@ -163,9 +164,9 @@ function renderElectionPicker(array $elections, int $eid, string $param = 'elect
 function renderElectionTabs(array $elections, int $eid, string $param = 'id'): void {
     if (count($elections) < 1) return;
     $statusTabs = [
-        'active'    => ['Active',    'ti-player-play',  []],
-        'closed'    => ['Closed',    'ti-lock',         []],
-        'completed' => ['Completed', 'ti-circle-check', []],
+        'active'    => [t('ui.active_4d3d', 'Active'),    'ti-player-play',  []],
+        'closed'    => [t('ui.closed_03f4', 'Closed'),    'ti-lock',         []],
+        'completed' => [t('ui.completed_07ca', 'Completed'), 'ti-circle-check', []],
     ];
     $current = null;
     foreach ($elections as $el) {
@@ -204,7 +205,7 @@ function renderElectionTabs(array $elections, int $eid, string $param = 'id'): v
                 <div class="lp-panel" style="display:none;">
                     <div class="lp-search">
                         <i class="ti ti-search"></i>
-                        <input type="text" class="lp-q" placeholder="Search election or course..." autocomplete="off">
+                        <input type="text" class="lp-q" placeholder="<?= htmlspecialchars(t('auto.search_election_or_course_e2bb', 'Search election or course...'), ENT_QUOTES) ?>" autocomplete="off">
                     </div>
                     <div class="lp-list" role="listbox">
                         <?php foreach ($tList as $el): $isSel = ((int)$el['id'] === (int)$eid); ?>
@@ -216,7 +217,7 @@ function renderElectionTabs(array $elections, int $eid, string $param = 'id'): v
                             <?php if ($isSel): ?><i class="ti ti-check" style="color:#6B1A2A;"></i><?php endif; ?>
                         </a>
                         <?php endforeach; ?>
-                        <div class="lp-none" style="display:none;">No matching elections.</div>
+                        <div class="lp-none" style="display:none;"><?= t('auto.no_matching_elections_fe5c', 'No matching elections.') ?></div>
                     </div>
                 </div>
             </div>

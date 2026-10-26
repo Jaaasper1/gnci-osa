@@ -4,7 +4,7 @@ require_once '../includes/auth.php';
 require_once '../includes/functions.php';
 require_once '../includes/lang.php';
 require_once '../includes/notif-ui.php';
-requireAdmin();
+requireStaff();
 $staff_id = $_SESSION['user_id'];
 $notifCount = getUnreadStaffNotifCount($pdo, $staff_id);
 
@@ -49,7 +49,7 @@ $notifs = notifFetchPage($pdo, 'staff_notifications', (int)$staff_id, $filter, $
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Notifications — GNC-OSA Admin</title>
+    <title><?= t('title.notifications', 'Notifications') ?> — GNC-OSA Admin</title>
     <link rel="stylesheet" href="../assets/css/style.css?v=27">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
     <style>
@@ -125,47 +125,47 @@ $notifs = notifFetchPage($pdo, 'staff_notifications', (int)$staff_id, $filter, $
         .modal-actions { display: flex; gap: 10px; justify-content: center; }
         .modal-actions .btn { min-width: 100px; justify-content: center; }
     </style>
-</head>
+<?php include __DIR__.'/../includes/pwa-head.php'; ?></head>
 <body>
 
 <div class="modal-overlay" id="confirmModal">
     <div class="modal-box">
         <div class="modal-icon"><i class="ti ti-trash" id="modalIcon"></i></div>
-        <div class="modal-title" id="modalTitle">Delete Notification</div>
-        <div class="modal-desc"  id="modalDesc">Are you sure you want to delete this notification? This cannot be undone.</div>
+        <div class="modal-title" id="modalTitle"><?= t('ui.delete_notification_9006', 'Delete Notification') ?></div>
+        <div class="modal-desc"  id="modalDesc"><?= t('ui.are_you_sure_you_want_to_delete_th_a039', 'Are you sure you want to delete this notification? This cannot be undone.') ?></div>
         <div class="modal-actions">
-            <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
-            <button class="btn btn-danger"  id="modalConfirmBtn">Delete</button>
+            <button class="btn btn-outline" onclick="closeModal()"><?= t('ui.cancel_ea47', 'Cancel') ?></button>
+            <button class="btn btn-danger"  id="modalConfirmBtn"><?= t('ui.delete_f2a6', 'Delete') ?></button>
         </div>
     </div>
 </div>
 
 <nav class="topnav">
-    <button class="hamburger" id="hamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
-    <div class="brand"><img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);"><div class="brand-text"><div class="name">GNC-OSA Admin</div><div class="sub">Administrator</div></div></div>
+    <button class="hamburger" id="hamburger" aria-label="<?= t('ui.toggle_menu_641f', 'Toggle menu') ?>"><span></span><span></span><span></span></button>
+    <div class="brand"><img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);"><div class="brand-text"><div class="name">GNC-OSA Admin</div><div class="sub"><?= t('ui.administrator_7b7b', 'Administrator') ?></div></div></div>
     <div class="nav-right">
         <?php renderLangSwitcher(); ?><div class="avatar" style="background:#7C3AED;color:#fff;">AD</div><span class="uname"><?= e($_SESSION['name']) ?></span></div>
 </nav>
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
 <aside class="sidebar">
-    <div class="sidebar-section">Overview</div>
+    <div class="sidebar-section"><?= t('sidebar.overview', 'Overview') ?></div>
     <a class="sitem" href="dashboard.php"><i class="ti ti-layout-dashboard"></i> <?= t('sidebar.dashboard', 'Dashboard') ?></a>
-    <div class="sidebar-section">Complaints</div>
-    <a class="sitem" href="complaints.php"><i class="ti ti-message-report"></i> All Complaints</a>
+    <div class="sidebar-section"><?= t('sidebar.complaints', 'Complaints') ?></div>
+    <a class="sitem" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.all_complaints', 'All Complaints') ?></a><a class="sitem" href="../osa/messages.php"><i class="ti ti-messages"></i> <?= t('sidebar.messages', 'Messages') ?></a>
     <div class="sidebar-section"><?= t('sidebar.election', 'Election') ?></div>
-    <a class="sitem" href="elections.php"><i class="ti ti-trophy"></i> Elections</a>
-    <a class="sitem" href="candidates.php"><i class="ti ti-users"></i> Candidates</a>
-    <a class="sitem" href="party-lists.php"><i class="ti ti-flag"></i> Party Lists</a>
+    <a class="sitem" href="elections.php"><i class="ti ti-trophy"></i> <?= t('sidebar.elections', 'Elections') ?></a>
+    <a class="sitem" href="candidates.php"><i class="ti ti-users"></i> <?= t('sidebar.candidates', 'Candidates') ?></a>
+    <a class="sitem" href="party-lists.php"><i class="ti ti-flag"></i> <?= t('sidebar.party_lists', 'Party Lists') ?></a>
     <a class="sitem" href="vouchers.php"><i class="ti ti-ticket"></i> <?= t('sidebar.vouchers', 'Vouchers') ?></a>
-    <a class="sitem" href="results.php"><i class="ti ti-chart-pie"></i> Live Results</a>
-    <div class="sidebar-section">Events</div>
-    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> Events</a>
-    <div class="sidebar-section">System</div>
-    <a class="sitem" href="students.php"><i class="ti ti-user-plus"></i> Students</a>
-    <a class="sitem" href="staff.php"><i class="ti ti-shield-check"></i> OSA Staff</a>
-    <a class="sitem" href="reports.php"><i class="ti ti-report-analytics"></i> Reports</a>
-    <div class="sidebar-section">Account</div>
-    <a class="sitem active" href="notifications.php"><i class="ti ti-bell"></i> Notifications
+    <a class="sitem" href="results.php"><i class="ti ti-chart-pie"></i> <?= t('sidebar.live_results', 'Live Results') ?></a>
+    <div class="sidebar-section"><?= t('sidebar.events', 'Events') ?></div>
+    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> <?= t('sidebar.events', 'Events') ?></a>
+    <div class="sidebar-section"><?= t('sidebar.system', 'System') ?></div>
+    <a class="sitem" href="students.php"><i class="ti ti-user-plus"></i> <?= t('sidebar.students', 'Students') ?></a>
+    <?php if ($_SESSION['user_type'] === 'admin'): ?><a class="sitem" href="staff.php"><i class="ti ti-shield-check"></i> <?= t('sidebar.osa_staff', 'OSA Staff') ?></a><?php endif; ?><?php if ($_SESSION['user_type'] === 'admin'): ?><a class="sitem" href="audit-log.php"><i class="ti ti-history"></i> <?= t('sidebar.audit_log', 'Audit Log') ?></a><?php endif; ?>
+    <a class="sitem" href="reports.php"><i class="ti ti-report-analytics"></i> <?= t('sidebar.reports', 'Reports') ?></a>
+    <div class="sidebar-section"><?= t('sidebar.account', 'Account') ?></div>
+    <a class="sitem active" href="notifications.php"><i class="ti ti-bell"></i> <?= t('sidebar.notifications', 'Notifications') ?>
         <?php if ($notifCount > 0): ?><span class="badge-count"><?= $notifCount ?></span><?php endif; ?>
     </a>
     <a class="sitem" href="../logout.php"><i class="ti ti-logout"></i> <?= t('nav.logout', 'Log out') ?></a>

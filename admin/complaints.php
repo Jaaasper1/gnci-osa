@@ -1,10 +1,12 @@
 <?php
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/csrf.php';
+require_once '../includes/audit.php';
 require_once '../includes/functions.php';
 require_once '../includes/lang.php';
 require_once '../includes/pager.php';
-requireAdmin();
+requireStaff();
 $notifCount = getUnreadStaffNotifCount($pdo, $_SESSION['user_id']);
 
 // Auto-archive/cleanup is heavy on big tables, so it runs at most once every 5 minutes (not on every request)
@@ -25,8 +27,10 @@ if (isset($_GET['_arc_check'])) {
 session_write_close();
 
 // Unarchive handler
-if (isset($_GET['unarchive'])) {
-    $pdo->prepare("UPDATE complaints SET is_archived=0 WHERE id=?")->execute([(int)$_GET['unarchive']]);
+if (isset($_POST['unarchive'])) {
+    requireCsrf();
+    $pdo->prepare("UPDATE complaints SET is_archived=0 WHERE id=?")->execute([(int)$_POST['unarchive']]);
+    auditLog($pdo, 'unarchive', 'complaint', (int)$_POST['unarchive'], [], ['is_archived' => 0]);
     header('Location: complaints.php?tab=archived'); exit;
 }
 
@@ -144,7 +148,7 @@ function buildUrl($overrides = []) {
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Complaints — GNC-OSA Admin</title>
+    <title><?= t('title.complaints', 'Complaints') ?> — GNC-OSA Admin</title>
     <link rel="stylesheet" href="../assets/css/style.css?v=27">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
     <style>
@@ -194,34 +198,34 @@ function buildUrl($overrides = []) {
             .complaint-card { padding: 12px; }
         }
     </style>
-</head>
+<?php include __DIR__.'/../includes/pwa-head.php'; ?></head>
 <body>
 <nav class="topnav">
-    <button class="hamburger" id="hamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
-    <div class="brand"><img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);"><div class="brand-text"><div class="name">GNC-OSA Admin</div><div class="sub">Administrator</div></div></div>
+    <button class="hamburger" id="hamburger" aria-label="<?= t('ui.toggle_menu_641f', 'Toggle menu') ?>"><span></span><span></span><span></span></button>
+    <div class="brand"><img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);"><div class="brand-text"><div class="name">GNC-OSA Admin</div><div class="sub"><?= t('ui.administrator_7b7b', 'Administrator') ?></div></div></div>
     <div class="nav-right">
         <?php renderLangSwitcher(); ?><div class="avatar" style="background:#7C3AED;color:#fff;">AD</div><span class="uname"><?= e($_SESSION['name']) ?></span></div>
 </nav>
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
 <aside class="sidebar">
-    <div class="sidebar-section">Overview</div>
+    <div class="sidebar-section"><?= t('sidebar.overview', 'Overview') ?></div>
     <a class="sitem" href="dashboard.php"><i class="ti ti-layout-dashboard"></i> <?= t('sidebar.dashboard', 'Dashboard') ?></a>
-    <div class="sidebar-section">Complaints</div>
-    <a class="sitem active" href="complaints.php"><i class="ti ti-message-report"></i> All Complaints</a>
+    <div class="sidebar-section"><?= t('sidebar.complaints', 'Complaints') ?></div>
+    <a class="sitem active" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.all_complaints', 'All Complaints') ?></a><a class="sitem" href="../osa/messages.php"><i class="ti ti-messages"></i> <?= t('sidebar.messages', 'Messages') ?></a>
     <div class="sidebar-section"><?= t('sidebar.election', 'Election') ?></div>
-    <a class="sitem" href="elections.php"><i class="ti ti-trophy"></i> Elections</a>
-    <a class="sitem" href="candidates.php"><i class="ti ti-users"></i> Candidates</a>
-    <a class="sitem" href="party-lists.php"><i class="ti ti-flag"></i> Party Lists</a>
+    <a class="sitem" href="elections.php"><i class="ti ti-trophy"></i> <?= t('sidebar.elections', 'Elections') ?></a>
+    <a class="sitem" href="candidates.php"><i class="ti ti-users"></i> <?= t('sidebar.candidates', 'Candidates') ?></a>
+    <a class="sitem" href="party-lists.php"><i class="ti ti-flag"></i> <?= t('sidebar.party_lists', 'Party Lists') ?></a>
     <a class="sitem" href="vouchers.php"><i class="ti ti-ticket"></i> <?= t('sidebar.vouchers', 'Vouchers') ?></a>
-    <a class="sitem" href="results.php"><i class="ti ti-chart-pie"></i> Live Results</a>
-    <div class="sidebar-section">Events</div>
-    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> Events</a>
-    <div class="sidebar-section">System</div>
-    <a class="sitem" href="students.php"><i class="ti ti-user-plus"></i> Students</a>
-    <a class="sitem" href="staff.php"><i class="ti ti-shield-check"></i> OSA Staff</a>
-    <a class="sitem" href="reports.php"><i class="ti ti-report-analytics"></i> Reports</a>
-    <div class="sidebar-section">Account</div>
-    <a class="sitem" href="notifications.php"><i class="ti ti-bell"></i> Notifications
+    <a class="sitem" href="results.php"><i class="ti ti-chart-pie"></i> <?= t('sidebar.live_results', 'Live Results') ?></a>
+    <div class="sidebar-section"><?= t('sidebar.events', 'Events') ?></div>
+    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> <?= t('sidebar.events', 'Events') ?></a>
+    <div class="sidebar-section"><?= t('sidebar.system', 'System') ?></div>
+    <a class="sitem" href="students.php"><i class="ti ti-user-plus"></i> <?= t('sidebar.students', 'Students') ?></a>
+    <?php if ($_SESSION['user_type'] === 'admin'): ?><a class="sitem" href="staff.php"><i class="ti ti-shield-check"></i> <?= t('sidebar.osa_staff', 'OSA Staff') ?></a><?php endif; ?><?php if ($_SESSION['user_type'] === 'admin'): ?><a class="sitem" href="audit-log.php"><i class="ti ti-history"></i> <?= t('sidebar.audit_log', 'Audit Log') ?></a><?php endif; ?>
+    <a class="sitem" href="reports.php"><i class="ti ti-report-analytics"></i> <?= t('sidebar.reports', 'Reports') ?></a>
+    <div class="sidebar-section"><?= t('sidebar.account', 'Account') ?></div>
+    <a class="sitem" href="notifications.php"><i class="ti ti-bell"></i> <?= t('sidebar.notifications', 'Notifications') ?>
         <?php if ($notifCount > 0): ?><span class="badge-count"><?= $notifCount ?></span><?php endif; ?>
     </a>
     <a class="sitem" href="../logout.php"><i class="ti ti-logout"></i> <?= t('nav.logout', 'Log out') ?></a>
@@ -235,14 +239,14 @@ function buildUrl($overrides = []) {
            style="padding:8px 18px;font-size:13px;font-weight:600;border-radius:8px 8px 0 0;text-decoration:none;
                   background:<?= $tab==='active'?'#6B1A2E':'transparent' ?>;
                   color:<?= $tab==='active'?'#fff':'#6B7280' ?>;">
-            <i class="ti ti-message-report" style="margin-right:4px;"></i> Active
+            <i class="ti ti-message-report" style="margin-right:4px;"></i> <?= t('ui.active_4d3d', 'Active') ?>
             <span style="background:<?= $tab==='active'?'rgba(255,255,255,0.25)':'#E5E7EB' ?>;color:<?= $tab==='active'?'#fff':'#374151' ?>;border-radius:20px;padding:1px 8px;font-size:11px;margin-left:4px;"><?= $activeCount ?></span>
         </a>
         <a href="<?= buildUrl(['tab'=>'archived','status'=>'','category'=>'','search'=>'','page'=>1]) ?>"
            style="padding:8px 18px;font-size:13px;font-weight:600;border-radius:8px 8px 0 0;text-decoration:none;
                   background:<?= $tab==='archived'?'#6B7280':'transparent' ?>;
                   color:<?= $tab==='archived'?'#fff':'#6B7280' ?>;">
-            <i class="ti ti-archive" style="margin-right:4px;"></i> Archived
+            <i class="ti ti-archive" style="margin-right:4px;"></i> <?= t('ui.archived_7d69', 'Archived') ?>
             <span data-archived-count="<?= $archivedCount ?>" style="background:<?= $tab==='archived'?'rgba(255,255,255,0.25)':'#E5E7EB' ?>;color:<?= $tab==='archived'?'#fff':'#374151' ?>;border-radius:20px;padding:1px 8px;font-size:11px;margin-left:4px;"><?= $archivedCount ?></span>
         </a>
     </div>
@@ -270,14 +274,14 @@ function buildUrl($overrides = []) {
             <!-- Search -->
             <div class="search-wrap" style="flex:1;min-width:180px;max-width:280px;">
                 <i class="ti ti-search"></i>
-                <input type="text" name="search" id="complaint-search" autocomplete="off" class="form-control" placeholder="Search..." value="<?= e($search) ?>" style="margin-bottom:0;height:36px;font-size:13px;">
+                <input type="text" name="search" id="complaint-search" autocomplete="off" class="form-control" placeholder="<?= t('ui.search_2a37', 'Search...') ?>" value="<?= e($search) ?>" style="margin-bottom:0;height:36px;font-size:13px;">
                 <?php if ($search): ?><a href="<?= buildUrl(['search'=>'','page'=>1]) ?>" class="clear-search"><i class="ti ti-x"></i></a><?php endif; ?>
             </div>
 
-            <button type="submit" class="btn btn-sm btn-primary" style="height:36px;white-space:nowrap;"><i class="ti ti-search"></i> Search</button>
+            <button type="submit" class="btn btn-sm btn-primary" style="height:36px;white-space:nowrap;"><i class="ti ti-search"></i> <?= t('ui.search_1334', 'Search') ?></button>
 
             <a href="complaints.php?tab=<?= e($tab) ?>" id="complaint-clear-link" class="btn btn-sm btn-outline" style="height:36px;<?= $hasFilter ? '' : 'display:none;' ?>">
-                <i class="ti ti-x"></i> Clear
+                <i class="ti ti-x"></i> <?= t('ui.clear_dc30', 'Clear') ?>
             </a>
 
             <?= exportMenu('export.php?type=complaints', 'btn btn-sm btn-outline', 'height:36px;color:#059669;border-color:#059669;white-space:nowrap;') ?>
@@ -287,9 +291,9 @@ function buildUrl($overrides = []) {
     <div id="complaints-live" data-filtered="<?= $hasFilter ? '1' : '0' ?>">
     <!-- Result info -->
     <div class="result-info">
-        Showing <?= $totalRows === 0 ? 0 : $offset + 1 ?>–<?= min($offset + $perPage, $totalRows) ?> of <?= number_format($totalRows) ?> complaint<?= $totalRows !== 1 ? 's' : '' ?>
+        <?= t('ui.showing_b4e6', 'Showing') ?> <?= $totalRows === 0 ? 0 : $offset + 1 ?>–<?= min($offset + $perPage, $totalRows) ?> <?= t('ui.of_8bf8', 'of') ?> <?= number_format($totalRows) ?> <?= t('count.complaint', 'complaint' . ($totalRows !== 1 ? 's' : '')) ?>
         <?php if ($hasFilter): ?>
-        <span style="color:#7C3AED;">(filtered)</span>
+        <span style="color:#7C3AED;"><?= t('ui.filtered_e1b0', '(filtered)') ?></span>
         <?php endif; ?>
     </div>
 
@@ -299,13 +303,13 @@ function buildUrl($overrides = []) {
         <!-- ── DESKTOP TABLE ── -->
         <div class="complaint-table-wrap table-wrap"><table data-tt data-tt-server data-tt-form="complaint-filter-form" data-tt-live="complaints-live" data-sort-current="<?= e($sort) ?>" data-sort-dir="<?= e($dir) ?>">
             <thead><tr>
-                <th data-sort-key="student" data-type="text">Student</th>
-                <th data-tt-filter="category" data-tt-all="All Categories" data-tt-icon="ti-tag" data-tt-value="<?= e($category) ?>" data-tt-options="<?= e(json_encode(array_values($categories))) ?>">Category</th>
-                <th data-sort-key="title" data-type="text">Title</th>
-                <th data-sort-key="date" data-type="date" data-tt-date data-tt-year="<?= $dYear ?: '' ?>" data-tt-month="<?= $dMonth ?: '' ?>" data-tt-month-to="<?= $dMonthTo ?: '' ?>" data-tt-months="<?= e(json_encode((object)$dateMonths)) ?>">Date</th>
-                <?php if ($tab === 'active'): ?><th data-sort-key="assigned" data-type="text">Assigned to</th><?php endif; ?>
-                <th data-tt-filter="status" data-tt-all="All Statuses" data-tt-icon="ti-circle-dot" data-tt-value="<?= e($filter) ?>" data-tt-options="<?= e(json_encode($statusOptions)) ?>">Status</th>
-                <?php if ($tab === 'archived'): ?><th data-sort-key="archived" data-type="date">Archived</th><?php endif; ?>
+                <th data-sort-key="student" data-type="text"><?= t('ui.student_f5c0', 'Student') ?></th>
+                <th data-tt-filter="category" data-tt-all="All Categories" data-tt-icon="ti-tag" data-tt-value="<?= e($category) ?>" data-tt-options="<?= e(json_encode(array_values($categories))) ?>"><?= t('ui.category_3adb', 'Category') ?></th>
+                <th data-sort-key="title" data-type="text"><?= t('ui.title_b78a', 'Title') ?></th>
+                <th data-sort-key="date" data-type="date" data-tt-date data-tt-year="<?= $dYear ?: '' ?>" data-tt-month="<?= $dMonth ?: '' ?>" data-tt-month-to="<?= $dMonthTo ?: '' ?>" data-tt-months="<?= e(json_encode((object)$dateMonths)) ?>"><?= t('ui.date_4474', 'Date') ?></th>
+                <?php if ($tab === 'active'): ?><th data-sort-key="assigned" data-type="text"><?= t('ui.assigned_to_1668', 'Assigned to') ?></th><?php endif; ?>
+                <th data-tt-filter="status" data-tt-all="All Statuses" data-tt-icon="ti-circle-dot" data-tt-value="<?= e($filter) ?>" data-tt-options="<?= e(json_encode($statusOptions)) ?>"><?= t('ui.status_ec53', 'Status') ?></th>
+                <?php if ($tab === 'archived'): ?><th data-sort-key="archived" data-type="date"><?= t('ui.archived_7d69', 'Archived') ?></th><?php endif; ?>
                 <th></th>
             </tr></thead>
             <tbody>
@@ -339,10 +343,10 @@ function buildUrl($overrides = []) {
                     <?php if ($tab === 'archived'): ?>
                     <button class="btn btn-outline btn-sm" style="font-size:12px;"
                         onclick="openUnarchiveModal(<?= $c['id'] ?>)">
-                        <i class="ti ti-archive-off"></i> Unarchive
+                        <i class="ti ti-archive-off"></i> <?= t('ui.unarchive_9fd0', 'Unarchive') ?>
                     </button>
                     <?php endif; ?>
-                    <a href="view-complaint.php?id=<?= $c['id'] ?>" class="btn btn-outline btn-sm">View</a>
+                    <a href="view-complaint.php?id=<?= $c['id'] ?>" class="btn btn-outline btn-sm"><?= t('ui.view_4351', 'View') ?></a>
                 </td>
             </tr>
             <?php endforeach; ?></tbody>
@@ -383,7 +387,7 @@ function buildUrl($overrides = []) {
             <div class="cc-bottom">
                 <div style="font-size:11px;color:#9CA3AF;">
                     <?php if ($tab === 'archived'): ?>
-                        Archived <?= date('M j, Y', strtotime($c['updated_at'])) ?>
+                        <?= t('ui.archived_7d69', 'Archived') ?> <?= date('M j, Y', strtotime($c['updated_at'])) ?>
                     <?php else: ?>
                         ID: <?= $c['is_anonymous'] ? '—' : e($c['sid']) ?>
                     <?php endif; ?>
@@ -391,11 +395,11 @@ function buildUrl($overrides = []) {
                 <div style="display:flex;gap:6px;">
                     <?php if ($tab === 'archived'): ?>
                     <button class="btn btn-outline btn-sm" onclick="openUnarchiveModal(<?= $c['id'] ?>)">
-                        <i class="ti ti-archive-off"></i> Unarchive
+                        <i class="ti ti-archive-off"></i> <?= t('ui.unarchive_9fd0', 'Unarchive') ?>
                     </button>
                     <?php endif; ?>
                     <a href="view-complaint.php?id=<?= $c['id'] ?>" class="btn btn-primary btn-sm">
-                        <i class="ti ti-eye"></i> View
+                        <i class="ti ti-eye"></i> <?= t('ui.view_4351', 'View') ?>
                     </a>
                 </div>
             </div>
@@ -418,14 +422,14 @@ function buildUrl($overrides = []) {
                 <i class="ti ti-archive-off" style="color:#1D4ED8;font-size:22px;"></i>
             </div>
             <div>
-                <div style="font-size:15px;font-weight:700;color:#1F2937;margin-bottom:5px;">Move back to Active?</div>
-                <div style="font-size:13px;color:#6B7280;line-height:1.6;">This complaint will be restored to the Active list and can be managed again.</div>
+                <div style="font-size:15px;font-weight:700;color:#1F2937;margin-bottom:5px;"><?= t('ui.move_back_to_active_3524', 'Move back to Active?') ?></div>
+                <div style="font-size:13px;color:#6B7280;line-height:1.6;"><?= t('ui.this_complaint_will_be_restored_to_c715', 'This complaint will be restored to the Active list and can be managed again.') ?></div>
             </div>
         </div>
         <div style="display:flex;justify-content:flex-end;gap:10px;">
-            <button onclick="closeUnarchiveModal()" class="btn btn-outline btn-sm">Cancel</button>
-            <a id="unarchive-confirm-btn" href="#" class="btn btn-sm" style="background:#1D4ED8;color:#fff;border-color:#1D4ED8;">
-                <i class="ti ti-archive-off"></i> Yes, Unarchive
+            <button onclick="closeUnarchiveModal()" class="btn btn-outline btn-sm"><?= t('ui.cancel_ea47', 'Cancel') ?></button>
+            <a id="unarchive-confirm-btn" href="#" onclick="postAction({ unarchive: this.dataset.id }); return false;" class="btn btn-sm" style="background:#1D4ED8;color:#fff;border-color:#1D4ED8;">
+                <i class="ti ti-archive-off"></i> <?= t('ui.yes_unarchive_553a', 'Yes, Unarchive') ?>
             </a>
         </div>
     </div>
@@ -434,7 +438,7 @@ function buildUrl($overrides = []) {
 <script src="../assets/js/table-tools.js?v=6"></script>
 <script>
 function openUnarchiveModal(id) {
-    document.getElementById('unarchive-confirm-btn').href = 'complaints.php?unarchive=' + id;
+    document.getElementById('unarchive-confirm-btn').dataset.id = id;
     document.getElementById('unarchive-modal').style.display = 'flex';
 }
 function closeUnarchiveModal() {
@@ -531,4 +535,7 @@ document.addEventListener('tt:updated', syncClear);
 </script>
 <script src="../assets/js/sidebar.js?v=5"></script>
 <?php include __DIR__.'/../includes/push-widget.php'; ?>
+<script>window.CSRF_TOKEN = <?= json_encode(csrfToken()) ?>;</script>
+<script src="../assets/js/post-action.js"></script>
+<script src="../assets/js/admin-otp.js?v=2"></script>
 </body></html>

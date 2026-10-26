@@ -80,13 +80,13 @@ $unread = getUnreadNotifCount($pdo, $student_id);
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Election Results — GNC-OSA</title>
+    <title><?= t('title.election_results', 'Election Results') ?> — GNC-OSA</title>
     <link rel="stylesheet" href="../assets/css/style.css?v=27">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
-</head>
+<?php include __DIR__.'/../includes/pwa-head.php'; ?></head>
 <body class="theme-election">
 <nav class="topnav">
-    <button class="hamburger" id="hamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
+    <button class="hamburger" id="hamburger" aria-label="<?= t('ui.toggle_menu_641f', 'Toggle menu') ?>"><span></span><span></span><span></span></button>
     <div class="brand"><img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);"><div class="brand-text"><div class="name">GNC-OSA Portal</div><div class="sub"><?= t('nav.student_portal', 'Student Portal') ?></div></div></div>
     <div class="nav-right">
         <?php renderLangSwitcher(); ?>
@@ -97,8 +97,8 @@ $unread = getUnreadNotifCount($pdo, $student_id);
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
 <aside class="sidebar">
     <div class="sidebar-section"><?= t('sidebar.main', 'Main') ?></div>
-    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> Events</a>
-    <a class="sitem" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.my_complaints', 'My Complaints') ?></a>
+    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> <?= t('sidebar.events', 'Events') ?></a>
+    <a class="sitem" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.my_complaints', 'My Complaints') ?></a><a class="sitem" href="help.php"><i class="ti ti-book"></i> <?= t('sidebar.osa_guide', 'OSA Guide') ?></a>
     <a class="sitem" href="new-complaint.php"><i class="ti ti-circle-plus"></i> <?= t('sidebar.new_complaint', 'New Complaint') ?></a>
     <?php if ($election): ?>
     <div class="sidebar-section"><?= t('sidebar.election', 'Election') ?></div>
@@ -117,29 +117,50 @@ $unread = getUnreadNotifCount($pdo, $student_id);
             <p><?= e($election['title']) ?></p>
         </div>
         <span id="live-indicator" style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#059669;background:#D1FAE5;padding:4px 10px;border-radius:20px;">
-            <span style="width:7px;height:7px;border-radius:50%;background:#059669;display:inline-block;"></span> Live
+            <span style="width:7px;height:7px;border-radius:50%;background:#059669;display:inline-block;"></span> <?= tx('Live') ?>
         </span>
     </div>
 
     <div class="stat-grid" id="live-stats" data-election-id="<?= $eid ?>" style="margin-bottom:20px;">
-        <div class="stat-card"><div class="stat-num" id="stat-voted"><?= $totalVoters ?></div><div class="stat-label">Voted</div></div>
-        <div class="stat-card"><div class="stat-num" id="stat-not-voted"><?= $totalStudents - $totalVoters ?></div><div class="stat-label">Not yet voted</div></div>
-        <div class="stat-card"><div class="stat-num" id="stat-turnout"><?= $turnout ?>%</div><div class="stat-label">Voter Turnout</div></div>
-        <div class="stat-card abstain-stat"><div class="stat-num" id="stat-abstain"><?= $overallAbstainPct ?>%</div><div class="stat-label">Overall Abstain Rate</div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-voted"><?= $totalVoters ?></div><div class="stat-label"><?= t('ui.voted_ca78', 'Voted') ?></div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-not-voted"><?= $totalStudents - $totalVoters ?></div><div class="stat-label"><?= t('ui.not_yet_voted_c6aa', 'Not yet voted') ?></div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-turnout"><?= $turnout ?>%</div><div class="stat-label"><?= t('ui.voter_turnout_1376', 'Voter Turnout') ?></div></div>
+        <div class="stat-card abstain-stat"><div class="stat-num" id="stat-abstain"><?= $overallAbstainPct ?>%</div><div class="stat-label"><?= t('ui.overall_abstain_rate_fd17', 'Overall Abstain Rate') ?></div></div>
     </div>
 
-    <div class="res-acc-tools"><button type="button" class="btn btn-sm btn-outline" onclick="document.querySelectorAll('.res-acc').forEach(function(d){d.open=true})"><i class="ti ti-chevrons-down"></i> Expand all</button> <button type="button" class="btn btn-sm btn-outline" onclick="document.querySelectorAll('.res-acc').forEach(function(d){d.open=false})"><i class="ti ti-chevrons-up"></i> Collapse all</button></div>
+    <div class="res-acc-tools"><button type="button" class="btn btn-sm btn-outline" id="res-acc-toggle" data-state="expand"><i class="ti ti-chevrons-down"></i> <span><?= t('ui.expand_all_d0aa', 'Expand all') ?></span></button></div>
+<script>
+(function(){
+    var btn = document.getElementById('res-acc-toggle');
+    if (!btn) return;
+    function items(){ return document.querySelectorAll('.res-acc'); }
+    function allOpen(){ var l = items(); if (!l.length) return false; for (var i=0;i<l.length;i++) if (!l[i].open) return false; return true; }
+    function sync(){
+        var open = allOpen();
+        btn.dataset.state = open ? 'collapse' : 'expand';
+        btn.querySelector('span').textContent = open ? 'Collapse all' : __t('Expand all');
+        btn.querySelector('i').className = 'ti ' + (open ? 'ti-chevrons-up' : 'ti-chevrons-down');
+    }
+    btn.addEventListener('click', function(){
+        var open = allOpen();
+        items().forEach(function(d){ d.open = !open; });
+        sync();
+    });
+    document.addEventListener('toggle', function(e){ if (e.target.classList && e.target.classList.contains('res-acc')) sync(); }, true);
+    sync();
+})();
+</script>
     <div class="live-positions-grid">
     <?php foreach ($positions as $pos): ?>
     <details class="card res-acc" style="margin-bottom:0;">
         <summary class="res-acc-head">
             <span class="res-acc-title"><i class="ti ti-crown"></i> <?= e($pos['title']) ?></span>
-            <span class="res-acc-meta"><?= count($pos['candidates']) ?> candidate<?= count($pos['candidates']) != 1 ? 's' : '' ?></span>
+            <span class="res-acc-meta"><?= count($pos['candidates']) ?> <?= t('count.candidate', 'candidate' . (count($pos['candidates']) != 1 ? 's' : '')) ?></span>
             <i class="ti ti-chevron-down res-acc-chev"></i>
         </summary>
         <div class="res-acc-body">
         <?php if (empty($pos['candidates'])): ?>
-            <div class="alert alert-info" style="margin:0;"><i class="ti ti-info-circle"></i> No candidates for this position.</div>
+            <div class="alert alert-info" style="margin:0;"><i class="ti ti-info-circle"></i> <?= t('ui.no_candidates_for_this_position_641e', 'No candidates for this position.') ?></div>
         <?php else: ?>
         <?php foreach ($pos['candidates'] as $i => $cand): ?>
         <?php $pct = $pos['total'] > 0 ? round($cand['votes'] / $pos['total'] * 100) : 0; ?>
@@ -164,7 +185,7 @@ $unread = getUnreadNotifCount($pdo, $student_id);
                         <span style="font-size:11px;font-weight:600;color:<?= e($cand['party_color'] ?: '#6B1A2A') ?>;">· <?= e($cand['party_name']) ?></span>
                         <?php endif; ?>
                     </span>
-                    <span class="live-cand-count" style="color:var(--maroon);white-space:nowrap;"><?= $cand['votes'] ?> vote<?= $cand['votes'] != 1 ? 's' : '' ?> (<?= $pct ?>%)</span>
+                    <span class="live-cand-count" style="color:var(--maroon);white-space:nowrap;"><?= $cand['votes'] ?> <?= t('count.vote', 'vote' . ($cand['votes'] != 1 ? 's' : '')) ?> (<?= $pct ?>%)</span>
                 </div>
                 <div class="progress"><div class="progress-fill live-cand-bar" style="width:<?= $pct ?>%;"></div></div>
             </div>
@@ -176,7 +197,7 @@ $unread = getUnreadNotifCount($pdo, $student_id);
         <div class="abstain-results-row" data-position-id="<?= $pos['id'] ?>">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
                 <span style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#92400E;">
-                    <i class="ti ti-ban"></i> Abstain
+                    <i class="ti ti-ban"></i> <?= tx('Abstain') ?>
                 </span>
                 <span class="live-abstain-count" style="font-size:13px;font-weight:600;color:#92400E;"><?= $pos['abstains'] ?> (<?= $abstainPct ?>%)</span>
             </div>
@@ -185,7 +206,7 @@ $unread = getUnreadNotifCount($pdo, $student_id);
         <?php endif; ?>
 
         <div style="font-size:11px;color:#9CA3AF;margin-top:8px;">
-            Total votes cast for this position: <?= $pos['candidate_votes'] ?> &nbsp;·&nbsp; Abstained: <?= $pos['abstains'] ?>
+            <?= t('ui.total_votes_cast_for_this_position_b9f5', 'Total votes cast for this position:') ?> <?= $pos['candidate_votes'] ?> &nbsp;·&nbsp; <?= tx('Abstained:') ?> <?= $pos['abstains'] ?>
         </div>
         <?php endif; ?>
         </div>
@@ -194,7 +215,7 @@ $unread = getUnreadNotifCount($pdo, $student_id);
     </div>
 
     <div style="margin-top:8px;">
-        <a href="events.php" class="btn btn-outline"><i class="ti ti-home"></i> Back to Events</a>
+        <a href="events.php" class="btn btn-outline"><i class="ti ti-home"></i> <?= t('ui.back_to_events_f1d4', 'Back to Events') ?></a>
     </div>
 </div></div>
 
@@ -252,5 +273,6 @@ $unread = getUnreadNotifCount($pdo, $student_id);
 </script>
 
 <script src="../assets/js/sidebar.js?v=5"></script>
+<?php include __DIR__.'/../includes/ask-osa-widget.php'; ?>
 </body>
 </html>

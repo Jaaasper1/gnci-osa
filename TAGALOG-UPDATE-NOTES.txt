@@ -1,0 +1,11 @@
+TAGALOG (TL) UPDATE - round 3
+- Naisalin na: login, staff login, register, live results, OTP screens, export/print vouchers, Ask OSA widget,
+  pager (Prev/Next/Rows), notifications bar, FB feed, placeholders, page titles, error/success messages,
+  confirm modals, toasts, table sort/filter menu, accessibility panel, dark-mode toggle, admin OTP dialog.
+- BAGO: i18n-js.php + lang/js-tl.php (Tagalog para sa JavaScript; gamit ang __t('English')).
+  Para magdagdag ng salin sa JS: gawing __t('English text') sa code at idagdag sa lang/js-tl.php.
+- lang/tl.php: dagdag na keys sa dulo ("Auto-added").
+- sw.js VERSION -> v18 para ma-refresh ang cached JS.
+- Hindi isinalin: email templates (includes/mailer.php), laman ng database (kategorya ng reklamo, status values),
+  at ilang HTML na binubuo sa loob ng JS (hal. headers ng import preview table).
+Upload (overwrite, same paths) -> Ctrl+F5 -> piliin ang TL. Huwag galawin ang config.local.php at uploads/.

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/facebook-config.php';
+if (!function_exists('t')) { require_once __DIR__ . '/lang.php'; }
 
 /**
  * True once the placeholders in facebook-config.php have actually been
@@ -182,7 +183,7 @@ function fbGetPagePosts($pdo, $limit = 6, $forceRefresh = false, $allowNetwork =
         $rows = $pdo->prepare("SELECT * FROM fb_posts ORDER BY created_time DESC LIMIT ?");
         $rows->bindValue(1, $limit, PDO::PARAM_INT);
         $rows->execute();
-        return ['posts' => $rows->fetchAll(), 'error' => 'Facebook Page is not configured yet.', 'from_cache' => true];
+        return ['posts' => $rows->fetchAll(), 'error' => t('msg.facebook_page_is_not_configured_yet_c869', 'Facebook Page is not configured yet.'), 'from_cache' => true];
     }
 
     $result = fbGraphRequest('GET', FB_PAGE_ID . '/posts', [

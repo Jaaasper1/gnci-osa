@@ -1,14 +1,19 @@
 <?php
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/audit.php';
 require_once '../includes/functions.php';
-requireAdmin();
+requireStaff();
+require_once '../includes/admin-otp.php';
+adminOtpRequireGate('export_vouchers');
+auditLog($pdo, 'export', 'voucher', (int)($_GET['election_id'] ?? 0), [], ['file' => basename(__FILE__, '.php')]);
 
 $vendorPath = __DIR__ . '/../vendor/autoload.php';
 if (file_exists($vendorPath)) {
     require_once $vendorPath;
 }
 require_once __DIR__ . '/../includes/export-helpers.php';
+if (!function_exists('t')) { require_once __DIR__ . '/../includes/lang.php'; }
 
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -17,12 +22,21 @@ use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 
 $election_id = (int)($_GET['election_id'] ?? 0);
-if (!$election_id) { die('No election selected.'); }
+if (!$election_id) { die(t('msg.no_election_selected_c8ec', 'No election selected.')); }
 
 $se = $pdo->prepare("SELECT * FROM elections WHERE id=?");
 $se->execute([$election_id]);
 $election = $se->fetch();
-if (!$election) { die('Election not found.'); }
+if (!$election) { die(t('msg.election_not_found_fee4', 'Election not found.')); }
+
+
+$vSortCols = [
+    'name' => 's.last_name', 'course' => 's.course', 'sid' => 's.student_id',
+    'status' => 'vv.is_used', 'generated' => 'vv.generated_at',
+];
+$vsort = isset($vSortCols[$_GET['sort'] ?? '']) ? $_GET['sort'] : 'name';
+$vdir  = (($_GET['dir'] ?? '') === 'desc') ? 'DESC' : 'ASC';
+$vOrder = $vSortCols[$vsort] . ' ' . $vdir . ', s.last_name, s.first_name, s.id';
 
 $vs = $pdo->prepare("
     SELECT s.last_name, s.first_name, s.student_id as sid, s.course,
@@ -30,10 +44,18 @@ $vs = $pdo->prepare("
     FROM voting_vouchers vv
     JOIN students s ON vv.student_id = s.id
     WHERE vv.election_id = ?
-    ORDER BY s.last_name, s.first_name
+    ORDER BY $vOrder
 ");
 $vs->execute([$election_id]);
 $vouchers = $vs->fetchAll();
+
+// Filter: course(s) ticked in the Export menu (?f_course[]=BSIT&...). Nothing ticked = all.
+$fCourse = exportFilter('course');
+$vNote = '';
+if ($fCourse) {
+    $vouchers = keepCourses($vouchers, $fCourse);
+    $vNote = ' | Course: ' . implode(', ', array_map(fn($c) => $c === '__none__' ? '(No course)' : $c, $fCourse));
+}
 
 if (file_exists($vendorPath)) {
     // ── PhpSpreadsheet .xlsx ─────────────────────────────────────────────────
@@ -53,7 +75,7 @@ if (file_exists($vendorPath)) {
 
     // Sub-title
     $sheet->mergeCells('A2:H2');
-    $sheet->setCellValue('A2', 'Generated: ' . date('F j, Y \a\t g:i A') . '   |   Total Vouchers: ' . count($vouchers));
+    $sheet->setCellValue('A2', 'Generated: ' . date('F j, Y \a\t g:i A') . '   |   Total Vouchers: ' . count($vouchers) . $vNote);
     $sheet->getStyle('A2')->applyFromArray([
         'font'      => ['italic' => true, 'size' => 10, 'color' => ['rgb' => '6B7280']],
         'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],

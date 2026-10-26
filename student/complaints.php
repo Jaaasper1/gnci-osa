@@ -1,6 +1,7 @@
 <?php
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/csrf.php';
 require_once '../includes/functions.php';
 require_once '../includes/lang.php';
 requireStudent();
@@ -17,8 +18,9 @@ foreach ($statStmt->fetchAll() as $row) $stats[$row['status']] = $row['cnt'];
 $totalComplaintsCount = array_sum($stats);
 
 // Delete handler — only allow deleting "New" complaints owned by this student
-if (isset($_GET['delete'])) {
-    $del_id = (int)$_GET['delete'];
+if (isset($_POST['delete'])) {
+    requireCsrf();
+    $del_id = (int)$_POST['delete'];
     $check = $pdo->prepare("SELECT id FROM complaints WHERE id = ? AND student_id = ? AND status = 'New'");
     $check->execute([$del_id, $student_id]);
     if ($check->fetch()) {
@@ -35,13 +37,13 @@ $complaints = $stmt->fetchAll();
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Complaints — GNC-OSA Portal</title>
+    <title><?= t('title.my_complaints', 'My Complaints') ?> — GNC-OSA Portal</title>
     <link rel="stylesheet" href="../assets/css/style.css?v=27">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
-</head>
+<?php include __DIR__.'/../includes/pwa-head.php'; ?></head>
 <body>
 <nav class="topnav">
-    <button class="hamburger" id="hamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
+    <button class="hamburger" id="hamburger" aria-label="<?= t('ui.toggle_menu_641f', 'Toggle menu') ?>"><span></span><span></span><span></span></button>
     <div class="brand"><img src="../assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);"><div class="brand-text"><div class="name">GNC-OSA Portal</div><div class="sub"><?= t('nav.student_portal', 'Student Portal') ?></div></div></div>
     <div class="nav-right">
         <?php renderLangSwitcher(); ?><div class="avatar"><?= strtoupper(substr($_SESSION['name'],0,2)) ?></div><span class="uname"><?= htmlspecialchars($_SESSION['name']) ?></span></div>
@@ -49,8 +51,8 @@ $complaints = $stmt->fetchAll();
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
 <aside class="sidebar">
     <div class="sidebar-section"><?= t('sidebar.main', 'Main') ?></div>
-    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> Events</a>
-    <a class="sitem active" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.my_complaints', 'My Complaints') ?></a>
+    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> <?= t('sidebar.events', 'Events') ?></a>
+    <a class="sitem active" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.my_complaints', 'My Complaints') ?></a><a class="sitem" href="help.php"><i class="ti ti-book"></i> <?= t('sidebar.osa_guide', 'OSA Guide') ?></a>
     <a class="sitem" href="new-complaint.php"><i class="ti ti-circle-plus"></i> <?= t('sidebar.new_complaint', 'New Complaint') ?></a>
     <?php if ($election): ?>
     <div class="sidebar-section"><?= t('sidebar.election', 'Election') ?></div>
@@ -65,7 +67,7 @@ $complaints = $stmt->fetchAll();
 <div class="main"><div class="content">
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;">
         <div><h1><?= t('sidebar.my_complaints', 'My Complaints') ?></h1><p><?= t('complaints.all_submitted', 'All complaints you have submitted') ?></p></div>
-        <a href="new-complaint.php" class="btn btn-primary"><i class="ti ti-plus"></i> New Complaint</a>
+        <a href="new-complaint.php" class="btn btn-primary"><i class="ti ti-plus"></i> <?= t('ui.new_complaint_15f3', 'New Complaint') ?></a>
     </div>
     <div class="stat-grid">
         <div class="stat-card"><div class="stat-num"><?= $totalComplaintsCount ?></div><div class="stat-label"><?= t('common.total', 'Total') ?></div></div>
@@ -75,25 +77,25 @@ $complaints = $stmt->fetchAll();
     </div>
     <div class="card">
         <?php if (empty($complaints)): ?>
-            <div class="alert alert-info"><i class="ti ti-info-circle"></i> You have not submitted any complaints yet.</div>
+            <div class="alert alert-info"><i class="ti ti-info-circle"></i> <?= t('ui.you_have_not_submitted_any_complai_9866', 'You have not submitted any complaints yet.') ?></div>
         <?php else: ?>
         <div class="table-wrap">
             <table>
-                <thead><tr><th>Category</th><th>Title</th><th>Date Submitted</th><th>Status</th><th>Anonymous?</th><th></th></tr></thead>
+                <thead><tr><th><?= t('ui.category_3adb', 'Category') ?></th><th><?= t('ui.title_b78a', 'Title') ?></th><th><?= t('ui.date_submitted_99e6', 'Date Submitted') ?></th><th><?= t('ui.status_ec53', 'Status') ?></th><th><?= t('auto.anonymous_7e79', 'Anonymous?') ?></th><th></th></tr></thead>
                 <tbody>
                 <?php foreach ($complaints as $c): ?>
                 <tr>
                                         <td><?= htmlspecialchars($c['category']) ?></td>
                     <td><?= htmlspecialchars($c['title']) ?></td>
-                    <td><?= date('M j, Y', strtotime($c['created_at'])) ?></td>
+                    <td><?= tlDate('M j, Y', strtotime($c['created_at'])) ?></td>
                     <td><?= statusBadge($c['status']) ?></td>
-                    <td><?= $c['is_anonymous'] ? '<span style="color:#059669;font-size:12px;">✓ Anonymous</span>' : '—' ?></td>
+                    <td><?= $c['is_anonymous'] ? '<span style="color:#059669;font-size:12px;">✓ ' . tx('Anonymous') . '</span>' : '—' ?></td>
                     <td style="display:flex;gap:6px;">
-                        <a href="view-complaint.php?id=<?= $c['id'] ?>" class="btn btn-outline btn-sm">View</a>
+                        <a href="view-complaint.php?id=<?= $c['id'] ?>" class="btn btn-outline btn-sm"><?= t('ui.view_4351', 'View') ?></a>
                         <?php if ($c['status'] === 'New'): ?>
                         <button class="btn btn-sm" style="background:#FEE2E2;color:#991B1B;border-color:#FECACA;"
                             onclick="openDeleteModal(<?= $c['id'] ?>, '<?= htmlspecialchars(addslashes($c['title'])) ?>')">
-                            <i class="ti ti-trash"></i> Delete
+                            <i class="ti ti-trash"></i> <?= t('ui.delete_f2a6', 'Delete') ?>
                         </button>
                         <?php endif; ?>
                     </td>
@@ -114,16 +116,16 @@ $complaints = $stmt->fetchAll();
                 <i class="ti ti-trash" style="color:#DC2626;font-size:22px;"></i>
             </div>
             <div>
-                <div style="font-size:15px;font-weight:700;color:#1F2937;margin-bottom:5px;">Delete this complaint?</div>
+                <div style="font-size:15px;font-weight:700;color:#1F2937;margin-bottom:5px;"><?= t('ui.delete_this_complaint_47f9', 'Delete this complaint?') ?></div>
                 <div style="font-size:13px;color:#6B7280;line-height:1.6;">
-                    "<span id="delete-title" style="font-weight:600;color:#374151;"></span>" will be permanently deleted and cannot be recovered.
+                    "<span id="delete-title" style="font-weight:600;color:#374151;"></span><?= t('ui.will_be_permanently_deleted_and_ca_6c8f', '" will be permanently deleted and cannot be recovered.') ?>
                 </div>
             </div>
         </div>
         <div style="display:flex;justify-content:flex-end;gap:10px;">
-            <button onclick="closeDeleteModal()" class="btn btn-outline btn-sm">Cancel</button>
-            <a id="delete-confirm-btn" href="#" class="btn btn-sm" style="background:#DC2626;color:#fff;border-color:#DC2626;">
-                <i class="ti ti-trash"></i> Yes, Delete
+            <button onclick="closeDeleteModal()" class="btn btn-outline btn-sm"><?= t('ui.cancel_ea47', 'Cancel') ?></button>
+            <a id="delete-confirm-btn" href="#" onclick="postAction({ delete: this.dataset.id }); return false;" class="btn btn-sm" style="background:#DC2626;color:#fff;border-color:#DC2626;">
+                <i class="ti ti-trash"></i> <?= t('ui.yes_delete_727e', 'Yes, Delete') ?>
             </a>
         </div>
     </div>
@@ -132,7 +134,7 @@ $complaints = $stmt->fetchAll();
 <script>
 function openDeleteModal(id, title) {
     document.getElementById('delete-title').textContent = title;
-    document.getElementById('delete-confirm-btn').href = 'complaints.php?delete=' + id;
+    document.getElementById('delete-confirm-btn').dataset.id = id;
     document.getElementById('delete-modal').style.display = 'flex';
 }
 function closeDeleteModal() {
@@ -146,5 +148,8 @@ document.addEventListener('keydown', function(e) {
 });
 </script>
 <script src="../assets/js/sidebar.js?v=5"></script>
+<script>window.CSRF_TOKEN = <?= json_encode(csrfToken()) ?>;</script>
+<script src="../assets/js/post-action.js"></script>
+<?php include __DIR__.'/../includes/ask-osa-widget.php'; ?>
 </body>
 </html>

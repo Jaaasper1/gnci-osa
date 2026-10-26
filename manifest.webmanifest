@@ -1,0 +1,32 @@
+{
+  "name": "GNC Office of Student Affairs Portal",
+  "short_name": "OSA Portal",
+  "description": "Guagua National College - Office of Student Affairs portal: elections, complaints and events.",
+  "start_url": "./index.php",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#6B1A2A",
+  "theme_color": "#6B1A2A",
+  "icons": [
+    {
+      "src": "assets/icons/icon-192-v5.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-512-v5.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-maskable-512-v5.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "id": "./index.php"
+}
