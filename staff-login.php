@@ -25,12 +25,12 @@ function staffThrottleKey($staffId) { return 'S' . (int)$staffId; }
 // ── Cancel / start over ─────────────────────────────────────────────────────
 if (isset($_GET['cancel'])) {
     unset($_SESSION['staff_login_pending']);
-    header('Location: staff-login.php');
+    header('Location: staff-login.php?mode=otp');
     exit;
 }
 
 // ── Login mode: 'otp' (default) or 'password' ──────────────────────────────
-$mode = (($_GET['mode'] ?? '') === 'password') ? 'password' : 'otp';
+$mode = (($_GET['mode'] ?? '') === 'otp') ? 'otp' : 'password';   // password is the default; email code via ?mode=otp
 
 // ── Password login (OSA staff and admin) ───────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['step'] ?? '') === 'password_login') {
@@ -40,9 +40,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['step'] ?? '') === 'passwor
     $pw    = (string)($_POST['password'] ?? '');
     $key   = 'SU' . strtolower($uname);
     if ($uname === '' || $pw === '') {
-        $error = 'Enter your username and password.';
+        $error = t('msg.enter_your_username_and_password_795f', 'Enter your username and password.');
     } elseif (($wait = pwThrottleWait($pdo, $key)) > 0) {
-        $error = 'Too many wrong attempts. Try again in ' . max(1, (int)ceil($wait / 60)) . ' minute(s), or use the email code instead.';
+        $error = sprintf(t('msg.too_many_wrong_attempts', 'Too many wrong attempts. Try again in %d minute(s), or use the email code instead.'), max(1, (int)ceil($wait / 60)));
     } elseif (loginStaff($pdo, $uname, $pw)) {
         pwThrottleClear($pdo, $key);
         $_SESSION['login_method'] = 'password';
@@ -50,13 +50,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['step'] ?? '') === 'passwor
         header('Location: admin/dashboard.php'); exit;
     } else {
         pwThrottleFail($pdo, $key);
-        $error = 'Wrong username or password.';
+        $error = t('msg.wrong_username_or_password_d9c0', 'Wrong username or password.');
     }
 }
 
 // ── STEP 1: username → send OTP to the email on file ───────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['step'] ?? 'username') === 'username') {
     requireCsrf();
+    $mode = 'otp';
     $username = trim($_POST['username'] ?? '');
     // One generic message for unknown / disabled / no-email accounts, so the
     // form doesn't reveal which usernames exist.
@@ -108,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['step'] ?? '') === 'verify_
         if (time() > $pending['expires_at']) {
             $error = t('register.err_otp_expired', 'This code has expired. Please request a new one.');
         } elseif ($pending['attempts'] >= 5) {
-            $error = t('register.err_otp_attempts', 'Too many incorrect attempts. Please request a new code.');
+            $error = t('register.err_otp_attempts', t('msg.too_many_incorrect_attempts_please_reque_2f99', 'Too many incorrect attempts. Please request a new code.'));
         } elseif (!$enteredOtp || !hash_equals($pending['otp_hash'], hash('sha256', $enteredOtp))) {
             $_SESSION['staff_login_pending']['attempts'] = $pending['attempts'] + 1;
             $error = t('register.err_otp_wrong', 'Incorrect code. Please try again.');
@@ -194,9 +195,9 @@ $pendingEmail = $_SESSION['staff_login_pending']['email'] ?? '';
                 ?>
                 <!-- OTP VERIFICATION STEP -->
                 <a href="staff-login.php?cancel=1" class="auth-back"><i class="ti ti-arrow-left"></i> <?= t('common.go_back', 'Go back') ?></a>
-                <h1 class="auth-title">OTP Verification</h1>
+                <h1 class="auth-title"><?= t('auto.otp_verification_eb4b', 'OTP Verification') ?></h1>
                 <p class="auth-sub">
-                    A one-time verification code has been sent via email to
+                    <?= t('auto.a_one_time_verification_code_has_been_se_edbb', 'A one-time verification code has been sent via email to') ?>
                     <strong><?= htmlspecialchars(maskEmail($pendingEmail)) ?></strong>.
                     Enter the code below to verify it.
                 </p>
@@ -205,7 +206,7 @@ $pendingEmail = $_SESSION['staff_login_pending']['email'] ?? '';
                     <div class="alert alert-error"><i class="ti ti-alert-circle"></i> <?= htmlspecialchars($error) ?></div>
                 <?php endif; ?>
 
-                <form method="POST" action="staff-login.php" id="otpVerifyForm" class="auth-form" data-loading-text="Verifying...">
+                <form method="POST" action="staff-login.php" id="otpVerifyForm" class="auth-form" data-loading-text="<?= htmlspecialchars(t('msg.verifying_1384', 'Verifying...'), ENT_QUOTES) ?>">
                     <?= csrfField() ?>
                     <input type="hidden" name="step" value="verify_otp">
                     <div class="form-group">
@@ -227,17 +228,17 @@ $pendingEmail = $_SESSION['staff_login_pending']['email'] ?? '';
                 </form>
 
                 <div class="otp-resend-row" data-resend-timer="<?= (int)$resendWait ?>" style="text-align:left;">
-                    <span class="otp-waiting-text" style="<?= $resendWait > 0 ? '' : 'display:none;' ?>">Resend OTP in <span class="otp-timer">00:30</span></span>
-                    <button type="submit" form="otpResendForm" style="<?= $resendWait > 0 ? 'display:none;' : '' ?>">Resend code</button>
+                    <span class="otp-waiting-text" style="<?= $resendWait > 0 ? '' : 'display:none;' ?>"><?= t('auto.resend_otp_in_fae8', 'Resend OTP in') ?> <span class="otp-timer">00:30</span></span>
+                    <button type="submit" form="otpResendForm" style="<?= $resendWait > 0 ? 'display:none;' : '' ?>"><?= t('auto.resend_code_c378', 'Resend code') ?></button>
                 </div>
 
-                <button type="submit" form="otpVerifyForm" class="auth-btn">Verify OTP</button>
+                <button type="submit" form="otpVerifyForm" class="auth-btn"><?= t('auto.verify_otp_60bf', 'Verify OTP') ?></button>
 
             <?php else: ?>
                 <?php if ($mode === 'password'): ?>
-                <a href="index.php" class="auth-back"><i class="ti ti-arrow-left"></i> Go back</a>
-                <h1 class="auth-title">Log in with password</h1>
-                <p class="auth-sub">Enter your OSA staff or admin username and password.</p>
+                <a href="index.php" class="auth-back"><i class="ti ti-arrow-left"></i> <?= t('auto.go_back_22b6', 'Go back') ?></a>
+                <h1 class="auth-title"><?= t('auto.log_in_with_password_f159', 'Log in with password') ?></h1>
+                <p class="auth-sub"><?= t('auto.enter_your_osa_staff_or_admin_username_a_29db', 'Enter your OSA staff or admin username and password.') ?></p>
 
                 <?php if ($error): ?>
                     <div class="alert alert-error"><i class="ti ti-alert-circle"></i> <?= htmlspecialchars($error) ?></div>
@@ -256,19 +257,23 @@ $pendingEmail = $_SESSION['staff_login_pending']['email'] ?? '';
                         <label>Password <span style="color:#991B1B;">*</span></label>
                         <input type="password" name="password" class="form-control" autocomplete="current-password" required>
                     </div>
-                    <button type="submit" class="auth-btn">Log in</button>
+                    <button type="submit" class="auth-btn"><?= t('auto.log_in_bffe', 'Log in') ?></button>
                 </form>
+
+                <div class="auth-aside-box" style="margin-top:12px;">
+                    <a href="staff-login.php?mode=otp"><?= t('auto.use_email_code_instead_4280', 'Use email code instead') ?></a>
+                </div>
                 <?php else: ?>
                 <!-- USERNAME FORM (no password) -->
                 <a href="index.php" class="auth-back"><i class="ti ti-arrow-left"></i> <?= t('common.go_back', 'Go back') ?></a>
                 <h1 class="auth-title"><?= t('login.welcome', 'Welcome!') ?></h1>
-                <p class="auth-sub">Enter your staff or admin username and we'll email you a login code.</p>
+                <p class="auth-sub"><?= t('auto.enter_your_staff_or_admin_username_and_w_b7dc', 'Enter your staff or admin username and we\'ll email you a login code.') ?></p>
 
                 <?php if ($error): ?>
                     <div class="alert alert-error"><i class="ti ti-alert-circle"></i> <?= htmlspecialchars($error) ?></div>
                 <?php endif; ?>
 
-                <form method="POST" action="staff-login.php" class="auth-form" data-loading-text="Sending code...">
+                <form method="POST" action="staff-login.php?mode=otp" class="auth-form" data-loading-text="<?= htmlspecialchars(t('msg.sending_code_5079', 'Sending code...'), ENT_QUOTES) ?>">
                     <?= csrfField() ?>
                     <input type="hidden" name="step" value="username">
                     <div class="form-group<?= $error ? ' has-error' : '' ?>">
@@ -279,21 +284,21 @@ $pendingEmail = $_SESSION['staff_login_pending']['email'] ?? '';
                                autocomplete="off" required autofocus>
                     </div>
 
-                    <button type="submit" class="auth-btn">Send Login Code</button>
+                    <button type="submit" class="auth-btn"><?= t('auto.send_login_code_a68e', 'Send Login Code') ?></button>
                 </form>
 
 
                 <div class="auth-aside-box" style="margin-top:12px;">
-                    <a href="staff-login.php?mode=password">Log in with password instead</a>
+                    <a href="staff-login.php"><?= t('auto.log_in_with_password_instead_665e', 'Log in with password instead') ?></a>
                 </div>
                 <?php endif; ?>
                 <p class="auth-hint">
-                    This login is for <strong>OSA Staff and Admin accounts only</strong>. Students should use the student login instead.
+                    <?= t('auto.this_login_is_for_cf79', 'This login is for') ?> <strong><?= t('auto.osa_staff_and_admin_accounts_only_97bf', 'OSA Staff and Admin accounts only') ?></strong><?= t('auto.students_should_use_the_student_login_in_5e50', '. Students should use the student login instead.') ?>
                 </p>
 
                 <div class="auth-aside-box">
-                    Are you a student?
-                    <a href="index.php">Go to Student Login</a>
+                    <?= t('auto.are_you_a_student_ef24', 'Are you a student?') ?>
+                    <a href="index.php"><?= t('auto.go_to_student_login_745c', 'Go to Student Login') ?></a>
                 </div>
             <?php endif; ?>
         </div>

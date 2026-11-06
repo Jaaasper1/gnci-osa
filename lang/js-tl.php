@@ -218,4 +218,6 @@ return [
     'Tap the <b>Share</b> button (the square with an arrow pointing up) in the browser toolbar.' => 'I-tap ang <b>Share</b> button (ang parisukat na may arrow na nakaturo pataas) sa toolbar ng browser.',
     'Scroll down and tap <b>Add to Home Screen</b>.' => 'Mag-scroll pababa at i-tap ang <b>Add to Home Screen</b>.',
     'Tap <b>Add</b>. The OSA Portal icon will appear on your Home Screen.' => 'I-tap ang <b>Add</b>. Lalabas ang OSA Portal icon sa iyong Home Screen.',
+    'Show password' => 'Ipakita ang password',
+    'Hide password' => 'Itago ang password',
 ];

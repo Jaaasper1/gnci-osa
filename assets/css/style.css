@@ -1035,3 +1035,20 @@ input[type="date"].form-control, input[type="time"].form-control, input[type="da
 @media (max-width: 600px) {
     .ev-row { flex-direction: column; gap: 0 !important; }
 }
+
+/* Live Results button: slides shut into a circle after a few seconds (same behaviour as the Ask OSA bubble).
+   Hover / focus / tap opens it again. */
+.liveresults-fab { transition: padding .35s ease, gap .35s ease, background .2s, transform .2s; }
+.liveresults-fab span { display: inline-block; max-width: 200px; overflow: hidden; white-space: nowrap; opacity: 1;
+    transition: max-width .35s ease, opacity .25s ease; }
+.liveresults-fab:active { transform: scale(.94); }
+.liveresults-fab.collapsed { padding: 12px; gap: 0; }
+.liveresults-fab.collapsed span { max-width: 0; opacity: 0; }
+.liveresults-fab.collapsed:hover, .liveresults-fab.collapsed:focus-visible { padding: 10px 16px; gap: 8px; }
+.liveresults-fab.collapsed:hover span, .liveresults-fab.collapsed:focus-visible span { max-width: 200px; opacity: 1; }
+@media (max-width: 480px) {
+    .liveresults-fab { width: auto; height: 46px; padding: 0 16px; gap: 8px; }
+    .liveresults-fab span { display: inline-block; color: var(--maroon-dark); }
+    .liveresults-fab.collapsed { width: 46px; padding: 0; gap: 0; }
+    .liveresults-fab.collapsed:hover, .liveresults-fab.collapsed:focus-visible { width: auto; padding: 0 16px; gap: 8px; }
+}

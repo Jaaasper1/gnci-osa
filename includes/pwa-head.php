@@ -25,6 +25,7 @@ $__v = function ($rel) { $f = dirname(__DIR__) . '/' . $rel; return is_file($f) 
 <link rel="stylesheet" href="<?= $pwaBase ?>assets/css/dark.css?v=<?= $__v('assets/css/dark.css') ?>">
 <script src="<?= $pwaBase ?>i18n-js.php?l=<?= (isset($_COOKIE['gnc_lang']) && $_COOKIE['gnc_lang'] === 'tl') ? 'tl' : 'en' ?>"></script>
 <script src="<?= $pwaBase ?>assets/js/dark.js?v=<?= $__v('assets/js/dark.js') ?>"></script>
+<script src="<?= $pwaBase ?>assets/js/show-password.js?v=<?= $__v('assets/js/show-password.js') ?>" defer></script>
 <link rel="stylesheet" href="<?= $pwaBase ?>assets/css/a11y.css?v=<?= $__v('assets/css/a11y.css') ?>">
 <script src="<?= $pwaBase ?>assets/js/a11y.js?v=<?= $__v('assets/js/a11y.js') ?>"></script>
 <script>

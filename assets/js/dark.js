@@ -57,7 +57,13 @@ window.__t = window.__t || function (s) { return s; };
     b.addEventListener('click', toggle);
     var nav = document.querySelector('.topnav .nav-right');
     if (nav) { paint(b); nav.insertBefore(b, nav.firstChild); }
-    else if (document.querySelector('.auth-split, body.auth-split-page')) { return; }   /* no button on login / register — they still follow the saved or device theme */
+    else if (document.querySelector('.auth-split, body.auth-split-page')) {
+      /* login / register / staff login: put the button next to the language switcher */
+      var al = document.querySelector('.auth-lang');
+      b.className += ' theme-toggle-auth';
+      paint(b);
+      if (al) al.insertBefore(b, al.firstChild); else { b.className += ' theme-toggle-float'; document.body.appendChild(b); }
+    }
     else { b.className += ' theme-toggle-float'; paint(b); document.body.appendChild(b); }
   }
 

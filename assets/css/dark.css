@@ -197,3 +197,22 @@ html[data-theme="dark"] .upd-head { background: #18191A; color: #E4E6EB; border-
 html[data-theme="dark"] .upd-head button { color: #B0B3B8; }
 html[data-theme="dark"] .upd-head button:hover { background: #242526; }
 html[data-theme="dark"] .upd-body { background: #18191A; }
+
+/* Theme button on login / register pages (sits beside the language switcher) */
+.auth-lang { display: flex; align-items: center; gap: 8px; }
+.theme-toggle.theme-toggle-auth { margin-right: 0; background: #fff; color: #333; border: 1px solid #e0e0e0; }
+.theme-toggle.theme-toggle-auth:hover { background: #f1f1f1; }
+html[data-theme="dark"] .theme-toggle.theme-toggle-auth { background: #3A3B3C; color: #E4E6EB; border-color: #4e4f50; }
+html[data-theme="dark"] .theme-toggle.theme-toggle-auth:hover { background: #4a4b4d; }
+
+/* Live Results floating button: its icon colour is forced with !important on mobile, so it vanished on the dark background */
+html[data-theme="dark"] .liveresults-fab i,
+html[data-theme="dark"] .auth-split-page .liveresults-fab i { color: #F0A3B2 !important; }
+html[data-theme="dark"] .auth-split-page .liveresults-fab { background: #242526; border-color: #F0A3B2; }
+html[data-theme="dark"] .liveresults-fab span { color: #F0A3B2; }
+
+/* "Choose File" button inside file inputs: match the portal colours (was the browser's plain grey/white button) */
+input[type=file].form-control::file-selector-button { margin-right: 12px; padding: 7px 14px; border: 0; border-radius: 8px; background: #6B1A2A; color: #fff; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s; }
+input[type=file].form-control::file-selector-button:hover { background: #561421; }
+html[data-theme="dark"] input[type=file].form-control::file-selector-button { background: #3A3B3C; color: #F0A3B2; border: 1px solid #4e4f50; }
+html[data-theme="dark"] input[type=file].form-control::file-selector-button:hover { background: #4a4b4d; }
