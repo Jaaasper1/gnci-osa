@@ -163,7 +163,7 @@ $pendingEmail = $_SESSION['login_pending']['email'] ?? '';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GNC-OSA Portal — Login</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=30">
+    <link rel="stylesheet" href="assets/css/style.css?v=31">
     <link rel="stylesheet" href="assets/css/float-label.css?v=1">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <?php include __DIR__.'/includes/pwa-head.php'; ?></head>
@@ -242,7 +242,7 @@ $pendingEmail = $_SESSION['login_pending']['email'] ?? '';
                     <input type="hidden" name="step" value="password_login">
                     <div class="form-group">
                         <label>Student ID <span style="color:#991B1B;">*</span></label>
-                        <input type="text" name="username" class="form-control" placeholder="ex. 2019****"
+                        <input type="text" name="username" class="form-control" placeholder="ex. 20193372"
                                value="<?= htmlspecialchars($_POST['username'] ?? '') ?>"
                                inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/[^0-9]/g,'')"
                                autocomplete="off" required autofocus>
@@ -271,7 +271,7 @@ $pendingEmail = $_SESSION['login_pending']['email'] ?? '';
                     <div class="form-group<?= $error ? ' has-error' : '' ?>">
                         <label><?= t('login.label_student_id', 'Student ID') ?> <span style="color:#991B1B;">*</span></label>
                         <input type="text" name="username" class="form-control"
-                               placeholder="ex. 2019****"
+                               placeholder="ex. 20193372"
                                value="<?= htmlspecialchars($_POST['username'] ?? '') ?>"
                                inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/[^0-9]/g,'')"
                                autocomplete="off" required autofocus>

@@ -52,21 +52,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['step'] ?? '') === 'details
     $pw2    = (string)($_POST['password_confirm'] ?? '');
 
     if (!$sid || !$fname || !$lname || !$email || !$course) {
-        $error = t('register.err_required', 'Please fill in all required fields.');
+        $error = t('register.err_required', t('msg.please_fill_in_all_required_fields_d5a0', 'Please fill in all required fields.'));
     } elseif (!preg_match('/^\d{6,12}$/', $sid)) {
         $error = t('register.err_sid_format', 'Invalid Student ID format. Numbers only, no dashes (e.g. 20193372).');
     } elseif (!in_array($course, $courses, true)) {
-        $error = 'Please select a valid course from the list.';
+        $error = t('msg.please_select_a_valid_course_from_the_li_ea27', 'Please select a valid course from the list.');
     } elseif (mb_strlen($pw) < 8) {
-        $error = 'Password must be at least 8 characters.';
+        $error = t('msg.password_must_be_at_least_8_characters_7667', 'Password must be at least 8 characters.');
     } elseif ($pw !== $pw2) {
-        $error = 'The passwords do not match.';
+        $error = t('msg.the_passwords_do_not_match_f6d1', 'The passwords do not match.');
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = t('register.err_email', 'Invalid email address.');
     } elseif (!preg_match('/@gmail\.com$/i', $email)) {
         $error = t('register.err_email_gmail', 'Please use a Gmail address (must end in @gmail.com).');
     } elseif (empty($_FILES['cor_file']['name'])) {
-        $error = t('register.err_cor_required', 'Please attach a copy of your Certificate of Registration (COR).');
+        $error = t('register.err_cor_required', t('msg.please_attach_a_copy_of_your_certificate_1c59', 'Please attach a copy of your Certificate of Registration (COR).'));
     } else {
         $check = $pdo->prepare("SELECT id FROM students WHERE student_id = ? OR email = ?");
         $check->execute([$sid, $email]);
@@ -120,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['step'] ?? '') === 'verify'
         if (time() > $pending['expires_at']) {
             $error = t('register.err_otp_expired', 'This code has expired. Please request a new one.');
         } elseif ($pending['attempts'] >= 5) {
-            $error = t('register.err_otp_attempts', 'Too many incorrect attempts. Please request a new code.');
+            $error = t('register.err_otp_attempts', t('msg.too_many_incorrect_attempts_please_reque_2f99', 'Too many incorrect attempts. Please request a new code.'));
         } elseif (!$enteredOtp || !hash_equals($pending['otp'], $enteredOtp)) {
             $_SESSION['reg_pending']['attempts'] = $pending['attempts'] + 1;
             $error = t('register.err_otp_wrong', 'Incorrect code. Please try again.');
@@ -183,8 +183,8 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Register — GNC-OSA Portal</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=29">
+    <title><?= t('title.register', 'Register') ?> — GNC-OSA Portal</title>
+    <link rel="stylesheet" href="assets/css/style.css?v=31">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <?php include __DIR__.'/includes/pwa-head.php'; ?></head>
 <body class="auth-split-page">
@@ -209,7 +209,7 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
                     <i class="ti ti-info-circle" style="color:#92400E;"></i>
                     <span style="color:#92400E;"><?= t('register.approval_note', 'Once approved, log in anytime with just your Student ID — we\'ll email you a code.') ?></span>
                 </div>
-                <a href="index.php" class="auth-btn" data-loading-text="Back to login...">
+                <a href="index.php" class="auth-btn" data-loading-text="<?= htmlspecialchars(t('msg.back_to_login_6c85', 'Back to login...'), ENT_QUOTES) ?>">
                     <?= t('register.back_to_login', 'Back to Login') ?>
                 </a>
 
@@ -222,9 +222,9 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
                 ?>
                 <!-- OTP VERIFICATION STEP -->
                 <a href="register.php?cancel=1" class="auth-back"><i class="ti ti-arrow-left"></i> <?= t('register.start_over', 'Start over') ?></a>
-                <h1 class="auth-title">OTP Verification</h1>
+                <h1 class="auth-title"><?= t('auto.otp_verification_eb4b', 'OTP Verification') ?></h1>
                 <p class="auth-sub">
-                    A one-time verification code has been sent via email to
+                    <?= t('auto.a_one_time_verification_code_has_been_se_edbb', 'A one-time verification code has been sent via email to') ?>
                     <strong><?= htmlspecialchars(maskEmail($pendingEmail)) ?></strong>.
                     Enter the code below to verify it.
                 </p>
@@ -233,7 +233,7 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
                     <div class="alert alert-error"><i class="ti ti-alert-circle"></i> <?= htmlspecialchars($error) ?></div>
                 <?php endif; ?>
 
-                <form method="POST" action="register.php" id="otpVerifyFormReg" class="auth-form" data-loading-text="Verifying...">
+                <form method="POST" action="register.php" id="otpVerifyFormReg" class="auth-form" data-loading-text="<?= htmlspecialchars(t('msg.verifying_1384', 'Verifying...'), ENT_QUOTES) ?>">
                     <?= csrfField() ?>
                     <input type="hidden" name="step" value="verify">
                     <div class="form-group">
@@ -255,15 +255,15 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
                 </form>
 
                 <div class="otp-resend-row" data-resend-timer="<?= (int)$resendWait ?>" style="text-align:left;">
-                    <span class="otp-waiting-text" style="<?= $resendWait > 0 ? '' : 'display:none;' ?>">Resend OTP in <span class="otp-timer">00:30</span></span>
-                    <button type="submit" form="otpResendFormReg" style="<?= $resendWait > 0 ? 'display:none;' : '' ?>">Resend code</button>
+                    <span class="otp-waiting-text" style="<?= $resendWait > 0 ? '' : 'display:none;' ?>"><?= t('auto.resend_otp_in_fae8', 'Resend OTP in') ?> <span class="otp-timer">00:30</span></span>
+                    <button type="submit" form="otpResendFormReg" style="<?= $resendWait > 0 ? 'display:none;' : '' ?>"><?= t('auto.resend_code_c378', 'Resend code') ?></button>
                 </div>
 
-                <button type="submit" form="otpVerifyFormReg" class="auth-btn">Verify OTP</button>
+                <button type="submit" form="otpVerifyFormReg" class="auth-btn"><?= t('auto.verify_otp_60bf', 'Verify OTP') ?></button>
 
             <?php else: ?>
                 <!-- REGISTER FORM (STEP 1) -->
-                <a href="index.php" class="auth-back" data-loading-text="Back to login..."><i class="ti ti-arrow-left"></i> <?= t('common.go_back', 'Go back') ?></a>
+                <a href="index.php" class="auth-back" data-loading-text="<?= htmlspecialchars(t('msg.back_to_login_6c85', 'Back to login...'), ENT_QUOTES) ?>"><i class="ti ti-arrow-left"></i> <?= t('common.go_back', 'Go back') ?></a>
                 <h1 class="auth-title"><?= t('login.register', 'Register') ?></h1>
                 <p class="auth-sub"><?= t('register.subtitle_otp', "Create an account. Set a password, or log in with an email code each time.") ?></p>
 
@@ -271,7 +271,7 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
                     <div class="alert alert-error"><i class="ti ti-alert-circle"></i> <?= htmlspecialchars($error) ?></div>
                 <?php endif; ?>
 
-                <form method="POST" action="register.php" class="auth-form" enctype="multipart/form-data" data-loading-text="Sending verification code...">
+                <form method="POST" action="register.php" class="auth-form" enctype="multipart/form-data" data-loading-text="<?= htmlspecialchars(t('msg.sending_verification_code_738a', 'Sending verification code...'), ENT_QUOTES) ?>">
                     <?= csrfField() ?>
                     <input type="hidden" name="step" value="details">
 
@@ -295,12 +295,12 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
                             <input type="email" name="email" class="form-control"
                                    placeholder="juandelacruz@gmail.com"
                                    pattern="^[^\s@]+@gmail\.com$"
-                                   title="Must be a Gmail address (e.g. juan@gmail.com)"
+                                   title="<?= htmlspecialchars(t('auto.must_be_a_gmail_address_e_g_juan_gmail_c_f63c', 'Must be a Gmail address (e.g. juan@gmail.com)'), ENT_QUOTES) ?>"
                                    value="<?= htmlspecialchars($_POST['email'] ?? '') ?>" autocomplete="off" required>
                         </div>
                     </div>
                     <div style="font-size:12px;color:#6B7280;margin-top:4px;">
-                        <i class="ti ti-info-circle"></i> Must be a Gmail address — this is also how you'll log in, we'll send a code here every time.
+                        <i class="ti ti-info-circle"></i> <?= t('auto.must_be_a_gmail_address_this_is_also_how_24ae', 'Must be a Gmail address — this is also how you\'ll log in, we\'ll send a code here every time.') ?>
                     </div>
 
                     <div style="height:12px;"></div>
@@ -342,16 +342,16 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
                         <div class="form-group" style="margin-bottom:0;">
                             <label>Password <span style="color:#991B1B;">*</span></label>
                             <input type="password" name="password" class="form-control" minlength="8"
-                                   placeholder="At least 8 characters" autocomplete="new-password" required>
+                                   placeholder="<?= htmlspecialchars(t('auto.at_least_8_characters_f641', 'At least 8 characters'), ENT_QUOTES) ?>" autocomplete="new-password" required>
                         </div>
                         <div class="form-group" style="margin-bottom:0;">
-                            <label>Confirm password <span style="color:#991B1B;">*</span></label>
+                            <label><?= t('auto.confirm_password_4c23', 'Confirm password') ?> <span style="color:#991B1B;">*</span></label>
                             <input type="password" name="password_confirm" class="form-control" minlength="8"
-                                   placeholder="Retype password" autocomplete="new-password" required>
+                                   placeholder="<?= htmlspecialchars(t('auto.retype_password_1778', 'Retype password'), ENT_QUOTES) ?>" autocomplete="new-password" required>
                         </div>
                     </div>
                     <div style="font-size:12px;color:#6B7280;margin-top:4px;">
-                        <i class="ti ti-info-circle"></i> You can log in with your password, or use the email code.
+                        <i class="ti ti-info-circle"></i> <?= t('auto.you_can_log_in_with_your_password_or_use_b627', 'You can log in with your password, or use the email code.') ?>
                     </div>
 
                     <div style="height:12px;"></div>
@@ -367,12 +367,12 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
 
                     <div style="height:20px;"></div>
 
-                    <button type="submit" class="auth-btn">Send Verification Code</button>
+                    <button type="submit" class="auth-btn"><?= t('auto.send_verification_code_fe80', 'Send Verification Code') ?></button>
                 </form>
 
                 <div class="auth-aside-box">
                     <?= t('register.have_account', 'Already have an account?') ?>
-                    <a href="index.php" data-loading-text="Back to login..."><?= t('register.login_link', 'Log in') ?></a>
+                    <a href="index.php" data-loading-text="<?= htmlspecialchars(t('msg.back_to_login_6c85', 'Back to login...'), ENT_QUOTES) ?>"><?= t('register.login_link', 'Log in') ?></a>
                 </div>
             <?php endif; ?>
         </div>

@@ -140,7 +140,7 @@ $pendingEmail = $_SESSION['staff_login_pending']['email'] ?? '';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GNC-OSA Portal — Staff / Admin Login</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=29">
+    <link rel="stylesheet" href="assets/css/style.css?v=31">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <?php include __DIR__.'/../includes/pwa-head.php'; ?></head>
 <body class="auth-split-page">
