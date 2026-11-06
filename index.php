@@ -242,7 +242,7 @@ $pendingEmail = $_SESSION['login_pending']['email'] ?? '';
                     <input type="hidden" name="step" value="password_login">
                     <div class="form-group">
                         <label>Student ID <span style="color:#991B1B;">*</span></label>
-                        <input type="text" name="username" class="form-control" placeholder="ex. 20193372"
+                        <input type="text" name="username" class="form-control" placeholder="ex. 2019****"
                                value="<?= htmlspecialchars($_POST['username'] ?? '') ?>"
                                inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/[^0-9]/g,'')"
                                autocomplete="off" required autofocus>
@@ -271,7 +271,7 @@ $pendingEmail = $_SESSION['login_pending']['email'] ?? '';
                     <div class="form-group<?= $error ? ' has-error' : '' ?>">
                         <label><?= t('login.label_student_id', 'Student ID') ?> <span style="color:#991B1B;">*</span></label>
                         <input type="text" name="username" class="form-control"
-                               placeholder="ex. 20193372"
+                               placeholder="ex. 2019****"
                                value="<?= htmlspecialchars($_POST['username'] ?? '') ?>"
                                inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/[^0-9]/g,'')"
                                autocomplete="off" required autofocus>
