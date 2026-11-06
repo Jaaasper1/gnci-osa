@@ -170,7 +170,8 @@ $pendingEmail = $_SESSION['staff_login_pending']['email'] ?? '';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GNC-OSA Portal — Staff / Admin Login</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=29">
+    <link rel="stylesheet" href="assets/css/style.css?v=30">
+    <link rel="stylesheet" href="assets/css/float-label.css?v=1">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <?php include __DIR__.'/includes/pwa-head.php'; ?></head>
 <body class="auth-split-page">
@@ -244,18 +245,18 @@ $pendingEmail = $_SESSION['staff_login_pending']['email'] ?? '';
                     <div class="alert alert-error"><i class="ti ti-alert-circle"></i> <?= htmlspecialchars($error) ?></div>
                 <?php endif; ?>
 
-                <form method="POST" action="staff-login.php?mode=password" class="auth-form">
+                <form method="POST" action="staff-login.php?mode=password" class="auth-form fl-form" autocomplete="off">
                     <?= csrfField() ?>
                     <input type="hidden" name="step" value="password_login">
                     <div class="form-group">
                         <label>Username <span style="color:#991B1B;">*</span></label>
                         <input type="text" name="username" class="form-control" placeholder="OSA username"
                                value="<?= htmlspecialchars($_POST['username'] ?? '') ?>"
-                               autocomplete="username" required autofocus>
+                               autocomplete="off" required autofocus>
                     </div>
                     <div class="form-group">
                         <label>Password <span style="color:#991B1B;">*</span></label>
-                        <input type="password" name="password" class="form-control" autocomplete="current-password" required>
+                        <input type="password" name="password" class="form-control" autocomplete="new-password" required>
                     </div>
                     <button type="submit" class="auth-btn"><?= t('auto.log_in_bffe', 'Log in') ?></button>
                 </form>
@@ -273,7 +274,7 @@ $pendingEmail = $_SESSION['staff_login_pending']['email'] ?? '';
                     <div class="alert alert-error"><i class="ti ti-alert-circle"></i> <?= htmlspecialchars($error) ?></div>
                 <?php endif; ?>
 
-                <form method="POST" action="staff-login.php?mode=otp" class="auth-form" data-loading-text="<?= htmlspecialchars(t('msg.sending_code_5079', 'Sending code...'), ENT_QUOTES) ?>">
+                <form method="POST" action="staff-login.php?mode=otp" class="auth-form fl-form" data-loading-text="<?= htmlspecialchars(t('msg.sending_code_5079', 'Sending code...'), ENT_QUOTES) ?>">
                     <?= csrfField() ?>
                     <input type="hidden" name="step" value="username">
                     <div class="form-group<?= $error ? ' has-error' : '' ?>">
@@ -306,6 +307,7 @@ $pendingEmail = $_SESSION['staff_login_pending']['email'] ?? '';
 </div>
 
 <script src="assets/js/sidebar.js?v=5"></script>
+<script src="assets/js/float-label.js?v=1"></script>
 <script src="assets/js/otp-input.js"></script>
 <script>
 (function () {

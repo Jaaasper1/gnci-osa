@@ -1,0 +1,19 @@
+/* Floating labels for the login forms (opt-in: add class "fl-form" to the <form>).
+   The label sits inside the box and floats up when the field is focused or has text. */
+.auth-panel .fl-form .form-group { position: relative; }
+.auth-panel .fl-form .form-group > label {
+  position: absolute; left: 15px; top: 28px; transform: translateY(-50%); margin: 0; z-index: 2;
+  max-width: calc(100% - 64px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: 16px; font-weight: 400; color: #6b7280; pointer-events: none;
+  transition: top .15s ease, font-size .15s ease, transform .15s ease, color .15s ease;
+}
+.auth-panel .fl-form .form-control,
+.auth-panel .fl-form .form-control:focus { height: 56px; padding: 22px 14px 6px; box-sizing: border-box; }
+.auth-panel .fl-form .form-control::placeholder { color: transparent; }
+.auth-panel .fl-form .form-group.fl-on > label { top: 9px; transform: none; font-size: 12px; }
+.auth-panel .fl-form .form-group.fl-on .form-control::placeholder { color: #9ca3af; }
+.auth-panel .fl-form .form-group:focus-within > label { color: var(--maroon); }
+.auth-panel .fl-form .form-group.has-error > label { color: #b91c1c; }
+html[data-theme="dark"] .auth-panel .fl-form .form-group > label { color: #B0B3B8; }
+html[data-theme="dark"] .auth-panel .fl-form .form-group:focus-within > label { color: #F0A3B2; }
+html[data-theme="dark"] .auth-panel .fl-form .form-group.fl-on .form-control::placeholder { color: #8A8D91; }
