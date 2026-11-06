@@ -25,6 +25,7 @@ function adminOtpLabel(string $op): string {
         'edit_candidate'  => 'Edit a candidate',
         'edit_party'      => 'Edit a party list',
         'edit_election'   => 'Edit an election',
+        'delete_election' => 'Delete an election',
         'edit_event'      => 'Edit an event',
         'edit_student'    => 'Edit a student account',
         'bulk_delete_staff'      => 'Delete several staff accounts',
@@ -253,6 +254,8 @@ function adminOtpHandleAjax(PDO $pdo): bool {
 // The page confirms first (admin password or emailed code) and that approves ONE
 // request for this op. The export or import then consumes the approval.
 function adminOtpRequireGate(string $op): void {
+    // Exports no longer ask for a password/code. (Imports still use adminOtpRequireGateJson.)
+    return;
     if (adminOtpConsumeApproval($op, 0)) return;
     http_response_code(403);
     header('Content-Type: text/html; charset=utf-8');

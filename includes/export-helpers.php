@@ -124,7 +124,7 @@ SELJS;
         if (!isset(EXPORT_FORMATS[$f])) continue;
         [$name, $icon] = EXPORT_FORMATS[$f];
         $gateOp = strpos($url, 'export-reports.php') === 0 ? 'export_reports' : (strpos($url, 'export-vouchers') === 0 ? 'export_vouchers' : 'export_data');
-        $h .= '<a href="' . htmlspecialchars($url . $sep . 'format=' . $f) . '" data-admin-gate="' . $gateOp . '"' . ($f === 'print' ? ' target="_blank"' : '') . '><i class="ti ' . $icon . '"></i> ' . htmlspecialchars($name) . '</a>';
+        $h .= '<a href="' . htmlspecialchars($url . $sep . 'format=' . $f) . '"' . ($f === 'print' ? ' target="_blank"' : '') . '><i class="ti ' . $icon . '"></i> ' . htmlspecialchars($name) . '</a>';
     }
     return $h . '</div></details>';
 }

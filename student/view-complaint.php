@@ -156,7 +156,7 @@ $canReview = in_array($complaint['status'], ['Resolved','Closed']);
 </aside>
 
 <div class="main"><div class="content">
-    <div class="page-header"><h1><?= t('viewcomplaint.title', 'Complaint') ?> #<?= $id ?></h1><p><a href="complaints.php">← <?= t('viewcomplaint.back', 'Back to My Complaints') ?></a></p></div>
+    <div class="page-header"><h1><?= t('viewcomplaint.title', 'Complaint') ?> #<?= $id ?></h1><p><a href="complaints.php" class="btn btn-outline btn-sm"><i class="ti ti-arrow-left"></i> <?= t('viewcomplaint.back', 'Back to My Complaints') ?></a></p></div>
 
     <!-- COMPLAINT DETAILS -->
     <div class="card">

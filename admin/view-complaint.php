@@ -201,9 +201,9 @@ $isImage = $attachFile && preg_match('/\.(jpg|jpeg|png|gif|webp)$/i', $attachFil
                 </span>
                 <button type="button" class="btn btn-primary btn-sm upd-open"><i class="ti ti-edit"></i> <?= t('ui.update_status_a90e', 'Update Status') ?></button>
             </div>
-            <div style="margin-top:5px;">
-                <a href="complaints.php" style="font-size:13px;color:#7C3AED;text-decoration:none;display:inline-flex;align-items:center;gap:4px;">
-                    <i class="ti ti-arrow-left" style="font-size:14px;"></i> <?= t('ui.back_to_all_complaints_69df', 'Back to All Complaints') ?>
+            <div style="margin-top:10px;">
+                <a href="complaints.php" class="btn btn-outline btn-sm">
+                    <i class="ti ti-arrow-left"></i> <?= t('ui.back_to_all_complaints_69df', 'Back to All Complaints') ?>
                 </a>
             </div>
         </div>

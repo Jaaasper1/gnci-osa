@@ -100,7 +100,9 @@ if (isset($_POST['del_election'])) {
     $eid = (int)$_POST['del_election'];
     $hasVotes = $pdo->prepare("SELECT COUNT(*) FROM votes WHERE election_id=?");
     $hasVotes->execute([$eid]);
-    if ($hasVotes->fetchColumn() > 0) {
+    if (!adminOtpConsumeApproval('delete_election', $eid)) {
+        $error = t('msg.please_confirm_the_deletion_with_your_admin_password', 'Please confirm the deletion with your admin password or emailed code first.');
+    } elseif ($hasVotes->fetchColumn() > 0) {
         $error = t('msg.cannot_delete_votes_have_already_been_ca_e259', 'Cannot delete — votes have already been cast in this election.');
     } else {
         // CASCADE will handle positions and candidates
@@ -798,7 +800,16 @@ function confirmDeleteElection(eid, etitle) {
     gncOpenModal(
         __t('Delete Election'),
         __t('Delete "') + etitle + __t('"? All positions and candidates will also be removed.'),
-        function() { postAction({ del_election: eid }); }
+        function() {
+            AdminOtp.confirmThen({
+                op: 'delete_election',
+                targetId: eid,
+                title: __t('Delete Election'),
+                subtitle: etitle,
+                body: __t('Confirm with your admin password or emailed code. All positions and candidates will also be removed.'),
+                confirmLabel: __t('Delete')
+            }, function () { postAction({ del_election: eid }); });
+        }
     );
 }
 </script>
