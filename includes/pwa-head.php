@@ -95,6 +95,35 @@ $__v = function ($rel) { $f = dirname(__DIR__) . '/' . $rel; return is_file($f) 
   var deferred = null;
   if (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone) return;
 
+  /* Install App button. Pages with a sidebar get a normal menu item just above "Log out" (nothing floats over the menu).
+     Pages without a sidebar (login / register) keep the floating pill button. */
+  function osaInstallEl(onclick){
+    var bar = document.querySelector('.sidebar');
+    var logout = bar && bar.querySelector('a[href$="logout.php"]');
+    var b;
+    if (bar && logout) {
+      b = document.createElement('a');
+      b.href = '#';
+      b.className = 'sitem osa-install-item';
+      b.innerHTML = '<i class="ti ti-download"></i> ' + __t('Install App') + ' <span class="osa-install-new">' + __t('NEW') + '</span>';
+      b.setAttribute('style','background:#F9EEF0;color:#6B1A2A;font-weight:600;border-radius:10px;margin-top:6px;margin-bottom:6px');
+      var tag = b.querySelector('.osa-install-new');
+      tag.setAttribute('style','margin-left:auto;font-size:10px;background:#6B1A2A;color:#fff;border-radius:999px;padding:2px 8px;font-weight:600');
+      b.addEventListener('click', function(ev){ ev.preventDefault(); onclick(); });
+      logout.parentNode.insertBefore(b, logout);
+    } else {
+      b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = __t('Install App');
+      b.setAttribute('style','position:fixed;left:16px;bottom:calc(16px + env(safe-area-inset-bottom, 0px));z-index:9000;background:#6B1A2A;color:#fff;border:2px solid #fff;border-radius:999px;padding:10px 18px;font:600 14px system-ui,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.3);cursor:pointer');
+      b.onclick = onclick;
+      if (document.querySelector('.auth-split') && window.matchMedia('(min-width: 901px)').matches) { b.style.left = 'calc(58vw + 24px)'; }
+      document.body.appendChild(b);
+    }
+    b.dataset.osaInstall = '1';
+    return b;
+  }
+
   /* iOS (iPhone/iPad) has NO install prompt (beforeinstallprompt does not exist there). Show the same Install App
      button, but it opens a short how-to: Share > Add to Home Screen. Facebook/Messenger/Instagram in-app browsers
      cannot add to the Home Screen at all, so those users are told to open the page in Safari first. */
@@ -125,30 +154,19 @@ $__v = function ($rel) { $f = dirname(__DIR__) . '/' . $rel; return is_file($f) 
       o.onclick = function(ev){ if (ev.target === o || ev.target.tagName === 'BUTTON') o.remove(); };
       document.body.appendChild(o);
     };
-    var addBtn = function(){
-      var b = document.createElement('button');
-      b.dataset.osaInstall = '1';
-      b.type = 'button';
-      b.textContent = __t('Install App');
-      b.setAttribute('style','position:fixed;left:16px;bottom:calc(16px + env(safe-area-inset-bottom, 0px));z-index:9000;background:#6B1A2A;color:#fff;border:2px solid #fff;border-radius:999px;padding:10px 18px;font:600 14px system-ui,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.3);cursor:pointer');
-      b.onclick = showHelp;
-      document.body.appendChild(b);
-    };
+    var addBtn = function(){ osaInstallEl(showHelp); };
     if (document.body) addBtn(); else document.addEventListener('DOMContentLoaded', addBtn);
     return;
   }
 
   window.addEventListener('beforeinstallprompt', function(e){
     e.preventDefault(); deferred = e;
-    var b = document.createElement('button');
-    b.dataset.osaInstall = '1';
-    b.textContent = __t('Install App');
-    b.setAttribute('style','position:fixed;left:16px;bottom:calc(16px + env(safe-area-inset-bottom, 0px));z-index:9000;background:#6B1A2A;color:#fff;border:2px solid #fff;border-radius:999px;padding:10px 18px;font:600 14px system-ui,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.3);cursor:pointer');
-    b.onclick = function(){ deferred.prompt(); deferred.userChoice.then(function(){ b.remove(); deferred = null; }); };
-    // Desktop split-screen login: sit at the bottom-left of the form panel (right of the photo).
-    if (document.querySelector('.auth-split') && window.matchMedia('(min-width: 901px)').matches) { b.style.left = 'calc(58vw + 24px)'; }
-    document.body.appendChild(b);
+    var mount = function(){
+      var b;
+      b = osaInstallEl(function(){ deferred.prompt(); deferred.userChoice.then(function(){ b.remove(); deferred = null; }); });
+    };
+    if (document.body) mount(); else document.addEventListener('DOMContentLoaded', mount);
   });
-  window.addEventListener('appinstalled', function(){ document.querySelectorAll('button').forEach(function(x){ if (x.dataset.osaInstall === '1') x.remove(); }); });
+  window.addEventListener('appinstalled', function(){ document.querySelectorAll('[data-osa-install]').forEach(function(x){ x.remove(); }); });
 })();
 </script>
