@@ -50,5 +50,5 @@ html.a11y-dys #a11y-mag{font-family:'OpenDyslexic','Comic Sans MS',sans-serif;fo
 @media print{#a11y-btn,#a11y-panel,#a11y-mag{display:none!important}}
 
 /* Pages that already have a bottom-right floating button (Ask OSA bubble on student pages, Live Results on login): sit above it */
-html.a11y-raised #a11y-btn{right:24px;bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+html.a11y-raised #a11y-btn{right:20px;bottom:calc(96px + env(safe-area-inset-bottom,0px))}
 html.a11y-raised #a11y-panel{bottom:calc(152px + env(safe-area-inset-bottom,0px));max-height:calc(100vh - 170px)}

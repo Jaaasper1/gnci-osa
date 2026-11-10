@@ -1058,3 +1058,8 @@ input[type="date"].form-control, input[type="time"].form-control, input[type="da
     .auth-main .auth-lang { position: static; display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin: 0 0 14px; }
     .auth-main { padding-top: 16px; }
 }
+
+/* Live Results button: same 46px size and right edge as the accessibility button so the two circles line up */
+.liveresults-fab { box-sizing: border-box; height: 46px; padding: 0 16px; justify-content: center; }
+.liveresults-fab.collapsed { width: 46px; padding: 0; gap: 0; }
+.liveresults-fab.collapsed:hover, .liveresults-fab.collapsed:focus-visible { width: auto; padding: 0 16px; gap: 8px; }
