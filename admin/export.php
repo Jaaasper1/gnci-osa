@@ -300,6 +300,9 @@ elseif ($type === 'results') {
         $cStmt = $pdo->prepare("SELECT s.first_name, s.last_name, s.student_id as sid, s.course, COUNT(v.id) as votes FROM candidates c JOIN students s ON c.student_id=s.id LEFT JOIN votes v ON v.candidate_id=c.id AND v.election_id=? WHERE c.position_id=? GROUP BY c.id ORDER BY votes DESC");
         $cStmt->execute([$eid,$p['id']]); $p['candidates']=$cStmt->fetchAll();
         $p['total_votes']=array_sum(array_column($p['candidates'],'votes'));
+        $aStmt = $pdo->prepare("SELECT COUNT(*) FROM votes WHERE election_id=? AND position_id=? AND is_abstain=1");
+        $aStmt->execute([$eid,$p['id']]); $p['abstain']=(int)$aStmt->fetchColumn();
+        $p['grand']=$p['total_votes']+$p['abstain'];   // % base = candidate votes + abstain (same as the Results page)
     } unset($p);
 
     $sheet->setTitle('Election Results');
@@ -322,7 +325,7 @@ elseif ($type === 'results') {
         $sheet->getStyle("A{$row}:G{$row}")->applyFromArray(hStyle('4A0F1B')); $sheet->getRowDimension($row)->setRowHeight(20); $row++;
 
         foreach ($pos['candidates'] as $rank=>$c) {
-            $pct = $pos['total_votes']>0 ? round($c['votes']/$pos['total_votes']*100,1) : 0;
+            $pct = $pos['grand']>0 ? round($c['votes']/$pos['grand']*100,1) : 0;
             $sheet->setCellValue("A$row",$rank+1); $sheet->setCellValue("B$row",$c['sid']);
             $sheet->setCellValue("C$row",$c['last_name']); $sheet->setCellValue("D$row",$c['first_name']);
             $sheet->setCellValue("E$row",$c['course']); $sheet->setCellValue("F$row",$c['votes']); $sheet->setCellValue("G$row",$pct.'%');
@@ -333,7 +336,14 @@ elseif ($type === 'results') {
             $sheet->getStyle("F{$row}:G{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getRowDimension($row)->setRowHeight(18); $row++;
         }
-        $sheet->mergeCells("A{$row}:E{$row}"); $sheet->setCellValue("A{$row}",'Total votes for '.$pos['title']); $sheet->setCellValue("F{$row}",$pos['total_votes']); $sheet->setCellValue("G{$row}",'100%');
+        // Abstain row
+        $absPct = $pos['grand']>0 ? round($pos['abstain']/$pos['grand']*100,1) : 0;
+        $sheet->mergeCells("A{$row}:E{$row}"); $sheet->setCellValue("A{$row}",'Abstain'); $sheet->setCellValue("F{$row}",$pos['abstain']); $sheet->setCellValue("G{$row}",$absPct.'%');
+        $sheet->getStyle("A{$row}:G{$row}")->applyFromArray(['font'=>['italic'=>true,'color'=>['rgb'=>'92400E']],'fill'=>['fillType'=>Fill::FILL_SOLID,'startColor'=>['rgb'=>'FEF3C7']]]);
+        $sheet->getStyle("A{$row}:G{$row}")->applyFromArray(bStyle());
+        $sheet->getStyle("F{$row}:G{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getRowDimension($row)->setRowHeight(18); $row++;
+        $sheet->mergeCells("A{$row}:E{$row}"); $sheet->setCellValue("A{$row}",'Total votes for '.$pos['title'].' (incl. abstain)'); $sheet->setCellValue("F{$row}",$pos['grand']); $sheet->setCellValue("G{$row}",$pos['grand']>0?'100%':'0%');
         $sheet->getStyle("A{$row}:G{$row}")->applyFromArray(['font'=>['bold'=>true,'italic'=>true,'color'=>['rgb'=>$GRAY_T]],'fill'=>['fillType'=>Fill::FILL_SOLID,'startColor'=>['rgb'=>'F3F4F6']],'borders'=>['allBorders'=>['borderStyle'=>Border::BORDER_THIN,'color'=>['rgb'=>'E5E7EB']]]]);
         $sheet->getStyle("F{$row}:G{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         $row += 2;
@@ -568,7 +578,7 @@ elseif ($type === 'winners') {
             }
         }
         foreach ($status as $st) if ($st === 'Winner') $winnerCount++;
-        $out[] = ['pos' => $pos, 'cands' => $cands, 'status' => $status, 'total' => $total, 'abstain' => $abstain, 'slots' => $slots];
+        $out[] = ['pos' => $pos, 'cands' => $cands, 'status' => $status, 'total' => $total, 'abstain' => $abstain, 'grand' => $total + $abstain, 'slots' => $slots];
     }
 
     $pct = fn($v, $t) => $t > 0 ? round($v / $t * 100, 1) . '%' : '0%';
@@ -609,7 +619,7 @@ elseif ($type === 'winners') {
             $sheet->setCellValue("E$row", $c['course']);
             $sheet->setCellValue("F$row", $c['party'] ?: 'Independent');
             $sheet->setCellValue("G$row", (int)$c['votes']);
-            $sheet->setCellValue("H$row", $pct((int)$c['votes'], $o['total']));
+            $sheet->setCellValue("H$row", $pct((int)$c['votes'], $o['grand']));
             $sheet->setCellValue("I$row", $st === 'TIE' ? 'TIE — needs tie-break' : 'Winner');
             if ($st === 'TIE') $sheet->getStyle("A{$row}:I{$row}")->applyFromArray(['font' => ['bold' => true, 'color' => ['rgb' => '92400E']], 'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FEF3C7']]]);
             else               $sheet->getStyle("A{$row}:I{$row}")->applyFromArray(['font' => ['bold' => true, 'color' => ['rgb' => $GREEN]], 'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $GREEN_L]]]);
@@ -643,7 +653,7 @@ elseif ($type === 'winners') {
         $row++;
     }
     $sheet->mergeCells("A{$row}:I{$row}");
-    $sheet->setCellValue("A{$row}", 'Percentages are computed from the votes cast for candidates in each position (abstentions are not counted). See the "Full Results" sheet for the complete count.');
+    $sheet->setCellValue("A{$row}", 'Percentages are computed from all votes cast in each position, including abstentions. See the "Full Results" sheet for the complete count with Abstain.');
     $sheet->getStyle("A{$row}")->applyFromArray($noteStyle);
     foreach ([5,22,28,14,10,22,9,11,22] as $i => $w) $sheet->getColumnDimension(chr(65 + $i))->setWidth($w);
 
@@ -662,7 +672,7 @@ elseif ($type === 'winners') {
             $full->setCellValue("C$r", $fullName($c));
             $full->setCellValue("D$r", $c['party'] ?: 'Independent');
             $full->setCellValue("E$r", (int)$c['votes']);
-            $full->setCellValue("F$r", $pct((int)$c['votes'], $o['total']));
+            $full->setCellValue("F$r", $pct((int)$c['votes'], $o['grand']));
             $full->setCellValue("G$r", $st === 'TIE' ? 'TIE' : $st);
             zebraRow($full, $r, 'G', $r % 2 === 0);
             if ($st === 'Winner') $full->getStyle("A{$r}:G{$r}")->getFont()->setBold(true)->getColor()->setRGB($GREEN);
@@ -673,9 +683,10 @@ elseif ($type === 'winners') {
         $full->setCellValue("A$r", $o['pos']['title']);
         $full->setCellValue("C$r", 'Abstain');
         $full->setCellValue("E$r", $o['abstain']);
+        $full->setCellValue("F$r", $pct($o['abstain'], $o['grand']));
         $full->getStyle("A{$r}:G{$r}")->applyFromArray(['font' => ['italic' => true, 'color' => ['rgb' => $GRAY_T]], 'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'F3F4F6']]]);
         $full->getStyle("A{$r}:G{$r}")->applyFromArray(bStyle());
-        $full->getStyle("E$r")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        foreach (['E','F'] as $cc) $full->getStyle("$cc$r")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         $r++;
     }
     foreach ([22,7,28,22,9,11,10] as $i => $w) $full->getColumnDimension(chr(65 + $i))->setWidth($w);

@@ -110,6 +110,12 @@ function msgUnreadStaffCount(PDO $pdo): int {
     return (int)$pdo->query("SELECT COUNT(*) FROM osa_messages WHERE staff_unread = 1")->fetchColumn();
 }
 
+// Sidebar badge for "Messages": returns the <span> (or '') - safe if table doesn't exist yet.
+function msgSidebarBadge(PDO $pdo): string {
+    try { $n = msgUnreadStaffCount($pdo); } catch (Throwable $e) { return ''; }
+    return $n > 0 ? '<span class="badge-count">' . $n . '</span>' : '';
+}
+
 // Sends an in-app notification (and email) to every active staff/admin account.
 function msgNotifyStaff(PDO $pdo, string $message, string $link): void {
     $ids = $pdo->query("SELECT id FROM osa_staff WHERE is_active = 1")->fetchAll(PDO::FETCH_COLUMN);

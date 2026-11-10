@@ -44,3 +44,8 @@
 .msg-reply { margin-top:16px; padding-top:16px; border-top:1px solid #F3F4F6; }
 .msg-reply textarea { resize:vertical; min-height:90px; }
 .msg-reply-actions { display:flex; justify-content:flex-end; margin-top:8px; }
+/* Voice button + Send reply on the SAME row (wraps on very small screens) */
+.msg-reply { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.msg-reply > .form-group { flex:0 0 100%; margin-bottom:0; }
+.msg-reply .voice-row { flex:1 1 auto; margin:0; }
+.msg-reply .msg-reply-actions { flex:0 0 auto; margin:0; }
