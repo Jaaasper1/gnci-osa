@@ -44,6 +44,7 @@ if (isset($_POST['ajax_action'])) {
     }
 
     if ($action === 'approve') {
+        session_write_close(); // release session lock so bulk approvals can run in parallel
         $stmt = $pdo->prepare("UPDATE students SET is_active=1, approved_at=NOW() WHERE id=? AND is_active=0");
         $stmt->execute([$id]);
         if ($stmt->rowCount() > 0) {
@@ -52,11 +53,10 @@ if (isset($_POST['ajax_action'])) {
             $student->execute([$id]);
             $s = $student->fetch();
 
-            // Notify the student: in-app notification + email (if they gave one)
-            addNotification($pdo, $s['id'], 'Your account has been approved! You can now log in.', '../index.php');
-            if (!empty($s['email'])) {
-                sendApprovalEmail($s['email'], $s['first_name']);
-            }
+            // Notify the student: in-app notification now; the approval email is sent AFTER we answer
+            // the browser (so approving many students at once doesn't wait on Gmail for each one).
+            addNotification($pdo, $s['id'], 'Your account has been approved! You can now log in.', '../index.php', false);
+            ob_start();
 
             echo json_encode([
                 'success'    => true,
@@ -70,6 +70,10 @@ if (isset($_POST['ajax_action'])) {
                     'is_active'  => 1,
                 ]
             ]);
+            if (!empty($s['email'])) {
+                finishResponseAndContinue();
+                sendApprovalEmail($s['email'], $s['first_name']);
+            }
         } else {
             echo json_encode(['success' => false, 'message' => t('msg.student_not_found_or_already_approved_a2d6', 'Student not found or already approved.')]);
         }
@@ -1697,7 +1701,7 @@ function doStudentImport() {
 <script src="../assets/js/alerts.js"></script>
 <script src="../assets/js/sidebar.js?v=5"></script>
 <?php if (($_SESSION['user_type'] ?? '') !== 'admin'): ?><style>.admin-only{display:none!important}</style><?php endif; ?>
-<script src="../assets/js/bulk-select.js?v=6"></script>
+<script src="../assets/js/bulk-select.js?v=7"></script>
 <script>
 (function () {
   // Bulk actions reuse the same per-student server handlers (same permission + CSRF checks).
@@ -1716,7 +1720,7 @@ function doStudentImport() {
     rows: '#pending-tbody tr[data-bulk-id]', before: pw, noun: 'student',
     actions: [
       { label: __t('Approve'), icon: 'ti-check', confirm: function (n) { return 'Approve ' + n + __t(' registration(s)? Each student will be notified.'); },
-        run: function (id) { return stuPost('approve', id); } },
+        parallel: 4, run: function (id) { return stuPost('approve', id); } },
       { label: __t('Reject'), icon: 'ti-x', danger: true, reason: true, confirm: function (n) { return 'Reject ' + n + __t(' registration(s)? The same reason will be emailed to each student.'); },
         run: function (id, reason) { return stuPost('reject', id, reason); } }
     ]

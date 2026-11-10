@@ -141,8 +141,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $end       = $_POST['end_date'] ?? '';
     $positions = array_filter(array_map('trim', explode("\n", $_POST['positions'] ?? '')));
     $course    = $_POST['course'] ?? '';
-    $course    = ($course === '__ALL__') ? '' : trim($course);
-    if (!$title || !$start || !$end || !isset($_POST['course']) || $_POST['course'] === '' || empty($positions)) {
+    $course    = trim($course);
+    if (!$title || !$start || !$end || !isset($_POST['course']) || $_POST['course'] === '' || $_POST['course'] === '__ALL__' || empty($positions)) {
         $error = t('msg.please_fill_in_all_fields_including_cour_4dd4', 'Please fill in all fields including course.');
     } else {
         $stmt = $pdo->prepare("INSERT INTO elections (title, description, course, start_date, end_date, created_by) VALUES (?,?,?,?,?,?)");
@@ -169,12 +169,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $error = t('msg.please_confirm_the_change_with_the_email_1213', 'Please confirm the change with the emailed code first.');
     } else {
         $course_edit = $_POST['course'] ?? '';
-        $course_edit = ($course_edit === '__ALL__') ? '' : trim($course_edit);
+        $course_edit = trim($course_edit);
+        if ($course_edit === '' || $course_edit === '__ALL__') {
+            $error = t('msg.please_fill_in_all_fields_including_cour_4dd4', 'Please fill in all fields including course.');
+        } else {
         $__before = auditRow($pdo, 'elections', $eid);
         $pdo->prepare("UPDATE elections SET title=?, description=?, course=?, start_date=?, end_date=? WHERE id=?")
             ->execute([$title, $desc, $course_edit, $start, $end, $eid]);
         auditLog($pdo, 'update', 'election', $eid, $__before, ['title' => $title, 'course' => $course_edit, 'start_date' => $start, 'end_date' => $end]);
         $success = t('msg.election_updated_70a3', 'Election updated!');
+        }
     }
     header('Location: elections.php?edit='.$eid.'&success='.urlencode($success).'&error='.urlencode($error)); exit;
 }
@@ -309,7 +313,6 @@ $allCourses = getCourseOptions();
                     <div class="form-group course-search-wrap">
                         <label><?= t('ui.course_d0a6', 'Course *') ?></label>
                         <select name="course" class="form-control" id="ee-course-select" required>
-                            <option value="__ALL__" <?= $editElection['course']===''?'selected':'' ?>><?= t('ui.all_courses_supreme_council_bf6a', '🏫 All Courses (Supreme Council)') ?></option>
                             <?php foreach($allCourses as $c): ?><option value="<?= e($c) ?>" <?= $editElection['course']==$c?'selected':'' ?>><?= e($c) ?></option><?php endforeach; ?>
                         </select>
                     </div>
@@ -568,7 +571,6 @@ $allCourses = getCourseOptions();
                     <label><?= t('ui.course_d0a6', 'Course *') ?></label>
                     <select name="course" class="form-control" id="ne-course-select" required>
                         <option value=""><?= t('ui.select_course_247e', '— Select Course —') ?></option>
-                        <option value="__ALL__"><?= t('ui.all_courses_supreme_council_bf6a', '🏫 All Courses (Supreme Council)') ?></option>
                         <?php foreach($allCourses as $c): ?><option value="<?= e($c) ?>"><?= e($c) ?></option><?php endforeach; ?>
                     </select>
                 </div>

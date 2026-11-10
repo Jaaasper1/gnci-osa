@@ -102,7 +102,7 @@ function getUnreadNotifCount($pdo, $student_id) {
 }
 
 // Add notification for student
-function addNotification($pdo, $student_id, $message, $link = null) {
+function addNotification($pdo, $student_id, $message, $link = null, $sendEmail = true) {
     $stmt = $pdo->prepare("INSERT INTO notifications (student_id, message, link) VALUES (?, ?, ?)");
     $stmt->execute([$student_id, $message, $link]);
 
@@ -110,7 +110,7 @@ function addNotification($pdo, $student_id, $message, $link = null) {
     $stmt2 = $pdo->prepare("SELECT first_name, last_name, email FROM students WHERE id = ?");
     $stmt2->execute([$student_id]);
     $student = $stmt2->fetch();
-    if ($student && !empty($student['email'])) {
+    if ($sendEmail && $student && !empty($student['email'])) {
         sendNotificationEmail($student['email'], $student['first_name'] . ' ' . $student['last_name'], $message);
     }
 }
@@ -279,3 +279,20 @@ function autoArchiveComplaints($pdo) {
 }
 
 require_once __DIR__ . '/export-helpers.php';
+
+// Send the JSON/HTML already echoed to the browser NOW, then let the script keep running
+// (used to send emails after the page has already answered, so the admin never waits on SMTP).
+// Call ob_start() BEFORE echoing the response.
+function finishResponseAndContinue() {
+    ignore_user_abort(true);
+    @set_time_limit(120);
+    if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
+    if (ob_get_level() > 0) {
+        header('Content-Encoding: none');
+        header('Content-Length: ' . ob_get_length());
+        header('Connection: close');
+        while (ob_get_level() > 0) ob_end_flush();
+    }
+    flush();
+    if (function_exists('fastcgi_finish_request')) fastcgi_finish_request();
+}

@@ -261,15 +261,17 @@ window.__t = window.__t || function (s) { return s; };
         .then(function (res) {
           if (!res) return;
           busy = true; render();
-          var done = 0, failed = 0, chain = Promise.resolve();
-          ids.forEach(function (id) {
-            chain = chain.then(function () {
-              countEl.textContent = 'Working... ' + (done + 1) + ' / ' + n;
-              return Promise.resolve(a.run(id, res.reason)).then(function (ok) { if (ok === false) failed++; })
-                .catch(function () { failed++; }).then(function () { done++; });
-            });
-          });
-          chain.then(function () {
+          var done = 0, failed = 0, next = 0;
+          var workers = Math.max(1, Math.min(a.parallel || 1, n)), pool = [];
+          function worker() {
+            if (next >= n) return Promise.resolve();
+            var id = ids[next++];
+            countEl.textContent = 'Working... ' + (done + 1) + ' / ' + n;
+            return Promise.resolve(a.run(id, res.reason)).then(function (ok) { if (ok === false) failed++; })
+              .catch(function () { failed++; }).then(function () { done++; return worker(); });
+          }
+          for (var w = 0; w < workers; w++) pool.push(worker());
+          Promise.all(pool).then(function () {
             busy = false;
             finish(n - failed, failed, (n - failed) + ' of ' + n + ' done.' + (failed ? ' ' + failed + ' failed or were skipped.' : ''));
           });
