@@ -5,6 +5,7 @@
     '.pw-wrap>input{padding-right:46px!important}' +
     'input[type=password]::-ms-reveal,input[type=password]::-ms-clear{display:none}' +
     '.pw-eye{position:absolute;top:50%;right:6px;transform:translateY(-50%);width:34px;height:34px;border:0;border-radius:50%;background:transparent;color:#6b7280;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;opacity:.85}' +
+    '.pw-eye.pw-empty{display:none}' +
     '.pw-eye:hover,.pw-eye:focus-visible{opacity:1;background:rgba(0,0,0,.06);outline:none}' +
     'html[data-theme="dark"] .pw-eye{color:#B0B3B8}' +
     'html[data-theme="dark"] .pw-eye:hover,html[data-theme="dark"] .pw-eye:focus-visible{background:rgba(255,255,255,.12)}';
@@ -35,7 +36,13 @@
       paint();
       input.focus();
     });
+    // Show the eye only while the field has text
+    function sync() { b.classList.toggle('pw-empty', input.value === ''); }
+    ['input', 'change', 'keyup', 'focus', 'blur'].forEach(function (ev) { input.addEventListener(ev, sync); });
+    // catches autofill and values set/cleared from JS (e.g. modals resetting the field)
+    setInterval(sync, 300);
     paint();
+    sync();
     wrap.appendChild(b);
   }
 
