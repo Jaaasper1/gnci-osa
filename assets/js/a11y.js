@@ -10,7 +10,7 @@ window.__t = window.__t || function (s) { return s; };
 
   function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
   function apply() {
-    var c = root.className.replace(/\ba11y-\S+/g, '').replace(/\s+/g, ' ').trim();
+    var c = root.className.replace(/\ba11y-(?!raised\b)\S+/g, '').replace(/\s+/g, ' ').trim();
     var add = [];
     if (S.size) add.push('a11y-size-' + S.size);
     if (S.sp) add.push('a11y-sp-' + S.sp);
