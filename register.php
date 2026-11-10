@@ -348,6 +348,7 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
                             <label><?= t('auto.confirm_password_4c23', 'Confirm password') ?> <span style="color:#991B1B;">*</span></label>
                             <input type="password" name="password_confirm" class="form-control" minlength="8"
                                    placeholder="<?= htmlspecialchars(t('auto.retype_password_1778', 'Retype password'), ENT_QUOTES) ?>" autocomplete="new-password" required>
+                            <div id="pw-match-msg" role="status" aria-live="polite" style="display:none;font-size:12px;margin-top:5px;font-weight:600;"></div>
                         </div>
                     </div>
                     <div style="font-size:12px;color:#6B7280;margin-top:4px;">
@@ -389,6 +390,27 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
     v.muted = true;
     var p = v.play();
     if (p && p.catch) p.catch(function () {});
+})();
+</script>
+<script>
+// Live "passwords match" check on the Confirm password field
+(function(){
+    var p1 = document.querySelector('input[name="password"]');
+    var p2 = document.querySelector('input[name="password_confirm"]');
+    var msg = document.getElementById('pw-match-msg');
+    if (!p1 || !p2 || !msg) return;
+    var T_BAD = <?= json_encode(t('msg.passwords_do_not_match_live', 'Passwords do not match.')) ?>;
+    var T_OK  = <?= json_encode(t('msg.passwords_match_live', 'Passwords match.')) ?>;
+    function check(){
+        if (p2.value === '') { msg.style.display = 'none'; p2.setCustomValidity(''); return; }
+        var ok = p1.value === p2.value;
+        msg.style.display = 'block';
+        msg.style.color = ok ? '#15803D' : '#991B1B';
+        msg.textContent = (ok ? '\u2714 ' : '\u2716 ') + (ok ? T_OK : T_BAD);
+        p2.setCustomValidity(ok ? '' : T_BAD);
+    }
+    p1.addEventListener('input', check);
+    p2.addEventListener('input', check);
 })();
 </script>
 </body>
