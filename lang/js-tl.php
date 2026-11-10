@@ -210,6 +210,7 @@ return [
     'Please select a candidate or choose Abstain for each position.' => 'Pumili ng kandidato o piliin ang Abstain sa bawat posisyon.',
     'Show %n more (%l left)' => 'Ipakita ang %n pa (%l ang natitira)',
     'Install App' => 'I-install ang App',
+    'NEW' => 'BAGO',
     'Install OSA Portal on your iPhone' => 'I-install ang OSA Portal sa iyong iPhone',
     'Got it' => 'Sige, nakuha ko',
     'This in-app browser cannot install apps. Tap the menu (the three dots or the compass icon) and choose <b>Open in Safari</b>.' => 'Hindi makapag-install ng app ang in-app browser na ito. I-tap ang menu (ang tatlong tuldok o compass icon) at piliin ang <b>Open in Safari</b>.',

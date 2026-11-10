@@ -193,16 +193,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $lname = trim($_POST['last_name'] ?? '');
         $email = trim($_POST['email'] ?? '');
         $role  = $_POST['role'] ?? 'staff';
-        if (!$uname || !$fname || !$lname || !$email) { $error = t('msg.please_fill_in_all_required_fields_d5a0', 'Please fill in all required fields.'); }
+        $newPw = (string)($_POST['password'] ?? '');   // optional: blank = email-code login only
+        if ($newPw !== '' && strlen($newPw) < 9) { $error = t('msg.new_password_must_be_at_least_9_characte_d1ff', 'New password must be at least 9 characters.'); }
+        elseif (!$uname || !$fname || !$lname || !$email) { $error = t('msg.please_fill_in_all_required_fields_d5a0', 'Please fill in all required fields.'); }
         elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) { $error = t('msg.please_enter_a_valid_email_address_b5bc', 'Please enter a valid email address.'); }
         else {
             try {
                 // Staff log in with an emailed code only, so the password column gets a random,
                 // unusable hash (the column is NOT NULL in the schema).
-                $unusable = password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT);
-                $pdo->prepare("INSERT INTO osa_staff (username,first_name,last_name,email,role,password) VALUES (?,?,?,?,?,?)")->execute([$uname,$fname,$lname,$email,$role,$unusable]);
+                // If the admin typed a password, that account can also log in with it.
+                $hash = ($newPw !== '') ? password_hash($newPw, PASSWORD_DEFAULT) : password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT);
+                $pdo->prepare("INSERT INTO osa_staff (username,first_name,last_name,email,role,password) VALUES (?,?,?,?,?,?)")->execute([$uname,$fname,$lname,$email,$role,$hash]);
+                $newId = (int)$pdo->lastInsertId();
+                if ($newPw !== '') { adminMarkPasswordSet($pdo, $newId); }
                 $success = t('msg.staff_member_added_74d0', 'Staff member added!');
-                auditLog($pdo, 'create', 'staff', (int)$pdo->lastInsertId(), [], ['username' => $uname, 'role' => $role]);
+                auditLog($pdo, 'create', 'staff', $newId, [], ['username' => $uname, 'role' => $role]);
             } catch (Exception $e) { $error = t('msg.duplicate_username_ccc3', 'Duplicate username.'); }
         }
     }
@@ -398,6 +403,11 @@ $staffList = $pdo->query("SELECT * FROM osa_staff ORDER BY role DESC, last_name"
                     <input type="email" name="email" id="modal-email" class="form-control" placeholder="name@gmail.com" style="margin-bottom:0;" required>
                     <div style="font-size:11px;color:#6B7280;margin-top:4px;"><?= t('ui.login_codes_are_sent_to_this_email_6a95', 'Login codes are sent to this email. No password needed.') ?></div>
                 </div>
+                <div style="grid-column:1/-1;">
+                    <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px;"><?= t('ui.password', 'Password') ?> <span style="color:#6B7280;font-weight:400;"><?= t('ui.optional_f53d', '(optional)') ?></span></label>
+                    <input type="password" name="password" id="modal-password" class="form-control" minlength="9" placeholder="<?= htmlspecialchars(t('ui.leave_blank_to_use_email_code_only', 'Leave blank to use the email code only. At least 9 characters.'), ENT_QUOTES) ?>" style="margin-bottom:0;" autocomplete="new-password">
+                    <div style="font-size:11px;color:#6B7280;margin-top:4px;"><?= t('ui.staff_can_log_in_with_this_password', 'If set, this staff member can log in with this password or the email code.') ?></div>
+                </div>
                 <div>
                     <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px;"><?= t('ui.role_bbba', 'Role') ?> <span style="color:#EF4444;">*</span></label>
                     <select name="role" class="form-control" style="margin-bottom:0;">
@@ -496,6 +506,7 @@ function openAddModal() {
 }
 
 function closeAddModal() {
+    var pw = document.getElementById('modal-password'); if (pw) pw.value = '';
     document.getElementById('add-modal-overlay').style.display = 'none';
 }
 

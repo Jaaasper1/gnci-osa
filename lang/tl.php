@@ -1057,4 +1057,17 @@ return [
     'ui.view_credentials' => 'Tingnan ang credentials',
     'ui.close' => 'Isara',
     'ui.view_all' => 'Tingnan lahat',
+
+    // ===== Added: staff password option, survey, register password match =====
+    'ui.password' => 'Password',
+    'ui.leave_blank_to_use_email_code_only' => 'Iwanang blangko kung email code lang ang gagamitin. Hindi bababa sa 9 na character.',
+    'ui.staff_can_log_in_with_this_password' => 'Kapag nilagyan, makaka-log in ang staff na ito gamit ang password o ang email code.',
+    'survey.title_after' => 'Tulungan kaming mapabuti: sagutan ang 3-minutong survey',
+    'survey.desc_after' => 'Ngayong nasubukan mo na ang voting system, nais naming marinig ang iyong feedback. Kumpidensyal ang iyong mga sagot.',
+    'survey.open' => 'Buksan ang Survey',
+    'survey.done_after' => 'Nasagutan ko na ang survey',
+    'survey.hint' => 'Buksan muna ang survey',
+    'survey.hint_ready' => 'Tapos na? Pindutin dito para itago ang mensaheng ito',
+    'msg.passwords_do_not_match_live' => 'Hindi magkatugma ang mga password.',
+    'msg.passwords_match_live' => 'Magkatugma ang mga password.',
 ];
