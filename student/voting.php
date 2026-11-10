@@ -146,6 +146,40 @@ $alreadyVoted = hasVotedAll($pdo, $student_id, $election_id);
 $voucherVerified = isset($_SESSION['voucher_verified'][$election_id]) && $_SESSION['voucher_verified'][$election_id] === true;
 $voucherError = '';
 
+// ── Post-vote survey ──────────────────────────────────────────────────────
+// Paste your Google Form link below. Shown after the student has voted. Leave it empty ('') to turn the survey off.
+$SURVEY_URL = 'https://forms.gle/DVqEGhaxYK958VBQ7';
+
+$surveyRequired = ($SURVEY_URL !== '');
+$surveyDone = false;
+if ($surveyRequired) {
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `survey_acks` (
+            `student_id` int NOT NULL,
+            `election_id` int NOT NULL,
+            `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+            PRIMARY KEY (`student_id`, `election_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        // Student confirms they answered the survey
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['survey_ack']) && $alreadyVoted) {
+            $pdo->prepare("INSERT IGNORE INTO survey_acks (student_id, election_id) VALUES (?,?)")
+                ->execute([$student_id, $election_id]);
+            header('Location: voting.php'); exit;
+        }
+        $chk = $pdo->prepare("SELECT 1 FROM survey_acks WHERE student_id=? AND election_id=?");
+        $chk->execute([$student_id, $election_id]);
+        $surveyDone = (bool)$chk->fetchColumn();
+    } catch (Throwable $e) {
+        // Table unavailable: fall back to remembering the answer in the session so the survey card still shows
+        error_log('survey_acks: ' . $e->getMessage());
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['survey_ack']) && $alreadyVoted) {
+            $_SESSION['survey_ack'][$election_id] = true;
+            header('Location: voting.php'); exit;
+        }
+        $surveyDone = !empty($_SESSION['survey_ack'][$election_id]);
+    }
+}
+
 // POST: voucher submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['voucher_code']) && !$alreadyVoted) {
     $inputCode = strtoupper(trim($_POST['voucher_code']));
@@ -320,6 +354,36 @@ $error   = $error ?? '';
             <i class="ti ti-circle-check" style="font-size:52px;color:#059669;"></i>
             <h2 style="margin:12px 0 6px;color:#065F46;"><?= t('ui.you_have_already_voted_c56f', 'You have already voted!') ?></h2>
             <p style="color:#9CA3AF;"><?= t('ui.your_vote_has_been_recorded_for_ccbe', 'Your vote has been recorded for') ?> <?= htmlspecialchars($election['title']) ?>.</p>
+            <?php if ($surveyRequired && !$surveyDone): ?>
+            <div style="max-width:440px;margin:22px auto 4px;padding:16px 18px;border:1.5px solid #E5E7EB;border-left:4px solid var(--maroon);border-radius:12px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.05);text-align:left;">
+                <div style="display:flex;gap:12px;align-items:flex-start;">
+                    <i class="ti ti-clipboard-check" style="font-size:26px;color:var(--maroon);flex-shrink:0;margin-top:2px;"></i>
+                    <div style="flex:1;">
+                        <div style="font-size:14px;font-weight:600;color:var(--maroon-dark);"><?= t('survey.title_after', 'Help us improve: answer a 3-minute survey') ?></div>
+                        <div style="font-size:12.5px;color:#6B7280;margin:3px 0 12px;line-height:1.5;"><?= t('survey.desc_after', 'Now that you have tried the voting system, we would like to hear your feedback. Your answers are confidential.') ?></div>
+                        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                            <a href="<?= htmlspecialchars($SURVEY_URL, ENT_QUOTES) ?>" target="_blank" rel="noopener" id="survey-link" class="btn btn-primary" style="padding:10px 20px;font-size:14px;font-weight:600;"><i class="ti ti-external-link"></i> <?= t('survey.open', 'Open the Survey') ?></a>
+                            <form method="POST" autocomplete="off" style="margin:0;">
+                                <?= csrfField() ?>
+                                <input type="hidden" name="survey_ack" value="1">
+                                <button type="submit" id="survey-done-btn" disabled style="border:1.5px solid #D1D5DB;background:#F3F4F6;color:#9CA3AF;font-size:13px;border-radius:8px;padding:9px 14px;cursor:not-allowed;"><i class="ti ti-check"></i> <?= t('survey.done_after', "I've answered the survey") ?></button>
+                                <div id="survey-hint" style="font-size:11.5px;color:#9CA3AF;margin-top:4px;"><?= t('survey.hint', 'Open the survey first') ?></div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <script>
+            document.getElementById('survey-link').addEventListener('click', function(){
+                var b = document.getElementById('survey-done-btn');
+                setTimeout(function(){
+                    b.disabled = false;
+                    b.style.cssText = 'border:1.5px solid var(--maroon);background:#fff;color:var(--maroon);font-size:13px;font-weight:600;border-radius:8px;padding:9px 14px;cursor:pointer;';
+                    var h = document.getElementById('survey-hint'); if (h) { h.textContent = <?= json_encode(t('survey.hint_ready', 'Done? Click here to hide this message')) ?>; }
+                }, 1500);
+            });
+            </script>
+            <?php endif; ?>
             <?php if ($election['show_results']): ?>
                 <a href="results.php?id=<?= $election_id ?>" class="btn btn-primary" style="margin-top:16px;"><?= t('ui.view_live_results_e222', 'View Live Results') ?></a>
             <?php endif; ?>
