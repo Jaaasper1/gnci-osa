@@ -179,7 +179,6 @@ $base = $isAdmin ? '../admin/' : '';   // admins get the full admin menu, staff 
     <div class="sidebar-section"><?= t('sidebar.system', 'System') ?></div>
     <a class="sitem" href="../admin/students.php"><i class="ti ti-user-plus"></i> <?= t('sidebar.students', 'Students') ?></a>
     <a class="sitem" href="../admin/staff.php"><i class="ti ti-shield-check"></i> <?= t('sidebar.osa_staff', 'OSA Staff') ?></a>
-    <a class="sitem" href="../admin/audit-log.php"><i class="ti ti-history"></i> <?= t('sidebar.audit_log', 'Audit Log') ?></a>
     <a class="sitem" href="../admin/reports.php"><i class="ti ti-report-analytics"></i> <?= t('sidebar.reports', 'Reports') ?></a>
     <div class="sidebar-section"><?= t('sidebar.account', 'Account') ?></div>
     <a class="sitem" href="../admin/notifications.php"><i class="ti ti-bell"></i> <?= t('sidebar.notifications', 'Notifications') ?><?php if ($notifCount > 0): ?><span class="badge-count"><?= $notifCount ?></span><?php endif; ?></a>

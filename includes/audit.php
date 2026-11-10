@@ -4,6 +4,8 @@
 // The table is created automatically. Passwords are never logged.
 // ============================================================
 
+if (!defined('AUDIT_LOG_ENABLED')) define('AUDIT_LOG_ENABLED', false);
+
 function auditEnsureTable(PDO $pdo): void {
     $pdo->exec("CREATE TABLE IF NOT EXISTS `audit_log` (
         `id`          int(11)      NOT NULL AUTO_INCREMENT,
@@ -38,6 +40,8 @@ function auditRow(PDO $pdo, string $table, int $id): array {
 
 // Records one change. $before = old values, $after = new values (both optional).
 function auditLog(PDO $pdo, string $action, string $entity, int $entityId, array $before = [], array $after = []): void {
+    // Audit logging is switched OFF to save database/hosting space. Set to true to turn it back on.
+    if (!AUDIT_LOG_ENABLED) return;
     try {
         auditEnsureTable($pdo);
         $details = json_encode(['before' => $before, 'after' => $after], JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR);
