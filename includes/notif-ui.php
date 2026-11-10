@@ -176,9 +176,9 @@ function notifCss(string $accent = 'var(--maroon)', string $accentPale = 'var(--
         }
         .btn-mark-read:hover { background:var(--nacc-pale); }
         /* ── Multi-select / bulk actions ── */
-        .notif-check { display:none; flex-shrink:0; width:20px; height:20px; margin-top:7px; appearance:none; -webkit-appearance:none; border:2px solid #9CA3AF; border-radius:50%; background:#fff center/12px no-repeat; transition:background-color .12s,border-color .12s; cursor:pointer; }
-        @media (hover:hover) and (min-width:769px) { .notif-check { display:block; } }
-        .notif-wrap.selecting .notif-check { display:block; }
+        .notif-check { display:none; flex-shrink:0; width:20px; height:20px; margin:0; align-self:center; appearance:none; -webkit-appearance:none; border:2px solid #9CA3AF; border-radius:50%; background:#fff center/12px no-repeat; transition:background-color .12s,border-color .12s; cursor:pointer; }
+        @media (hover:hover) and (min-width:769px) { .notif-check { display:block; opacity:0; } .notif-row:hover .notif-check, .notif-check:focus-visible { opacity:1; } }
+        .notif-wrap.selecting .notif-check { display:block; opacity:1; }
         .notif-row.selected { background:var(--nacc-pale); margin:0 -12px 8px; padding-left:12px; padding-right:12px; border-radius:10px; border-bottom-color:transparent; outline:2px solid var(--nacc); outline-offset:-2px; }
         .notif-wrap.selecting .notif-row { cursor:pointer; -webkit-user-select:none; user-select:none; }
         .notif-wrap.selecting .notif-row .notif-link { pointer-events:none; }
@@ -255,11 +255,6 @@ function notifRenderCard(array $rows, array $counts, string $filter, int $page, 
                 <?php else: ?>0 <?= tx('notifications') ?><?php endif; ?>
             </span>
             <div class="notif-actions">
-                <button class="btn-select" type="button" onclick="notifEnterSelect()"><i class="ti ti-checkbox"></i> <?= t('notif.select', 'Select') ?></button>
-                <?php if (($counts['unread'] ?? 0) > 0): ?>
-                <button class="btn-mark-read" onclick="markAllRead()"><i class="ti ti-checks"></i> <?= t('notif.mark_all_read', 'Mark all as read') ?></button>
-                <?php endif; ?>
-                <button class="btn-delete-all" onclick="askDeleteAll()"><i class="ti ti-trash"></i> <?= t('notif.delete_all', 'Delete All') ?></button>
             </div>
         </div>
 
@@ -388,7 +383,7 @@ function notifToggle(id, force) {
     id = String(id);
     const on = (typeof force === 'boolean') ? force : !notifSel.has(id);
     if (on) notifSel.add(id); else notifSel.delete(id);
-    if (!notifSelecting) notifEnterSelect(false);
+    if (!notifSelecting) notifEnterSelect(true);
     if (notifSelecting && notifAutoExit && notifSel.size === 0) { notifExitSelect(); return; }
     notifRender();
 }
