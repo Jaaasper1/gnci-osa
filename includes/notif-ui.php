@@ -176,10 +176,10 @@ function notifCss(string $accent = 'var(--maroon)', string $accentPale = 'var(--
         }
         .btn-mark-read:hover { background:var(--nacc-pale); }
         /* ── Multi-select / bulk actions ── */
-        .notif-check { display:none; flex-shrink:0; width:20px; height:20px; margin-top:7px; accent-color:var(--nacc); cursor:pointer; }
+        .notif-check { display:none; flex-shrink:0; width:20px; height:20px; margin-top:7px; appearance:none; -webkit-appearance:none; border:2px solid #9CA3AF; border-radius:50%; background:#fff center/12px no-repeat; transition:background-color .12s,border-color .12s; cursor:pointer; }
         @media (hover:hover) and (min-width:769px) { .notif-check { display:block; } }
         .notif-wrap.selecting .notif-check { display:block; }
-        .notif-row.selected { background:var(--nacc-pale); margin:0 -12px; padding-left:12px; padding-right:12px; border-radius:8px; outline:2px solid var(--nacc); outline-offset:-2px; }
+        .notif-row.selected { background:var(--nacc-pale); margin:0 -12px 8px; padding-left:12px; padding-right:12px; border-radius:10px; border-bottom-color:transparent; outline:2px solid var(--nacc); outline-offset:-2px; }
         .notif-wrap.selecting .notif-row { cursor:pointer; -webkit-user-select:none; user-select:none; }
         .notif-wrap.selecting .notif-row .notif-link { pointer-events:none; }
         .notif-row { -webkit-touch-callout:none; }
@@ -202,7 +202,9 @@ function notifCss(string $accent = 'var(--maroon)', string $accentPale = 'var(--
         .notif-wrap.selecting .notif-bulkbar { display:flex; }
         .notif-wrap.selecting .notif-header-row, .notif-wrap.selecting .notif-tabs { display:none; }
         .notif-bulkbar label { display:flex; align-items:center; gap:6px; font-size:13px; color:#374151; cursor:pointer; }
-        .notif-bulkbar input { width:18px; height:18px; accent-color:var(--nacc); }
+        .notif-bulkbar input { width:20px; height:20px; flex-shrink:0; cursor:pointer; appearance:none; -webkit-appearance:none; border:2px solid #9CA3AF; border-radius:50%; background:#fff center/12px no-repeat; transition:background-color .12s,border-color .12s; }
+        .notif-check:checked, .notif-bulkbar input:checked { background-color:var(--nacc); border-color:var(--nacc); background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-7'/%3E%3C/svg%3E"); }
+        .notif-check:hover, .notif-bulkbar input:hover { border-color:var(--nacc); }
         .notif-bulkbar .sel-count { font-size:13px; font-weight:600; color:#1F2937; margin-right:auto; }
         .notif-bulkbar button {
             font-size:13px; border-radius:8px; padding:6px 12px; cursor:pointer;
