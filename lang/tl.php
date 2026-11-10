@@ -1052,4 +1052,9 @@ return [
     'ev.tab_past' => 'Nakaraan',
     'pg.showing' => 'Ipinapakita',
     'pg.unit.student' => 'estudyante',
+    'ui.show_more' => 'Ipakita pa',
+    'ui.show_less' => 'Ipakita nang kaunti',
+    'ui.view_credentials' => 'Tingnan ang credentials',
+    'ui.close' => 'Isara',
+    'ui.view_all' => 'Tingnan lahat',
 ];

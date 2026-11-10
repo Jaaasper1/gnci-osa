@@ -428,7 +428,11 @@ $error   = $error ?? '';
                 <?php endif; ?>
                 <div class="cpos"><?= htmlspecialchars($cand['course']) ?></div>
                 <?php if (!empty($cand['credentials'])): ?>
-                <div class="ccred" style="font-size:11px;color:#C9943A;font-weight:600;margin:2px 0 4px;line-height:1.3;"><?= nl2br(htmlspecialchars($cand['credentials'])) ?></div>
+                <?php $credTxt = (string)$cand['credentials']; $credLong = (substr_count($credTxt, "\n") >= 4 || strlen($credTxt) > 120); ?>
+                <div class="ccred cred-src<?= $credLong ? ' cred-collapsed' : '' ?>" style="font-size:11px;color:#C9943A;font-weight:600;margin:2px 0 4px;line-height:1.3;"><?= nl2br(htmlspecialchars($credTxt)) ?></div>
+                <?php if ($credLong): ?>
+                <button type="button" class="cred-open" data-name="<?= htmlspecialchars($cand['first_name'] . ' ' . $cand['last_name']) ?>"><i class="ti ti-eye"></i> <?= htmlspecialchars(t('ui.view_all', 'View all')) ?></button>
+                <?php endif; ?>
                 <?php endif; ?>
                 <button type="button" class="vote-select-btn"
                         data-position="<?= $pos['id'] ?>"
@@ -456,6 +460,7 @@ $error   = $error ?? '';
     <?php endif; // alreadyVoted ?>
 </div></div>
 
+<?php require_once '../includes/cred-modal.php'; ?>
 <script>
 function formatVoucher(input) {
     let v = input.value.replace(/[^A-Z0-9]/gi, '').toUpperCase();

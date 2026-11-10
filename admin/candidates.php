@@ -284,7 +284,11 @@ if ($eid) {
                 <td><?= e($c['course'] ?? '') ?></td>
                 <td style="max-width:220px;">
                     <?php if (!empty($c['credentials'])): ?>
-                        <span style="font-size:12px;color:#374151;"><?= nl2br(e($c['credentials'])) ?></span>
+                        <?php $credTxt = (string)$c['credentials']; $credLong = (substr_count($credTxt, "\n") >= 5 || strlen($credTxt) > 300); ?>
+                        <div class="cred-src<?= $credLong ? ' cred-collapsed' : '' ?>" style="font-size:12px;color:#374151;"><?= nl2br(e($credTxt)) ?></div>
+                        <?php if ($credLong): ?>
+                        <button type="button" class="cred-open" data-name="<?= e($c['first_name'].' '.$c['last_name']) ?>"><i class="ti ti-eye"></i> <?= e(t('ui.view_credentials', 'View credentials')) ?></button>
+                        <?php endif; ?>
                     <?php else: ?>
                         <span style="color:#D1D5DB;font-size:12px;">—</span>
                     <?php endif; ?>
@@ -568,6 +572,7 @@ if (photoInput) {
 }
 </script>
 
+<?php require_once '../includes/cred-modal.php'; ?>
 <script>
 var _editCandId = null;
 
