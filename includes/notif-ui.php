@@ -223,6 +223,15 @@ function notifCss(string $accent = 'var(--maroon)', string $accentPale = 'var(--
         .notif-empty .ne-ic { width:54px; height:54px; border-radius:50%; background:var(--nacc-pale); color:var(--nacc); display:flex; align-items:center; justify-content:center; font-size:26px; }
 <?php }
 
+/** Message notifications store the bare link "messages.php?id=N". That page lives in /osa/, so when the
+ *  notification is shown from /admin/ the relative link 404s. Point it at ../osa/messages.php there. */
+function notifFixLink(string $link): string {
+    if (preg_match('#^messages\.php(\?|$)#', $link) && preg_match('#/admin/[^/]*$#', (string)($_SERVER['SCRIPT_NAME'] ?? ''))) {
+        return '../osa/' . $link;
+    }
+    return $link;
+}
+
 /** Tabs + header + grouped list + pager. */
 function notifRenderCard(array $rows, array $counts, string $filter, int $page, int $totalForFilter, int $perPage = NOTIF_PER_PAGE, string $table = 'notifications'): void {
     $pages = max(1, (int)ceil($totalForFilter / $perPage));
@@ -276,7 +285,7 @@ function notifRenderCard(array $rows, array $counts, string $filter, int $page, 
                 <div class="notif-body">
                     <div class="notif-msg"><?= $unread ? '<span class="notif-dot"></span>' : '' ?><?= e(tlNotifMsg($n['message'])) ?></div>
                     <div class="notif-time"><span class="notif-type"><?= e($typeLabel) ?></span><?= e(notifTimeAgo($n['created_at'])) ?></div>
-                    <?php if ($n['link']): ?><a href="<?= e($n['link']) ?>" class="notif-link"><?= t('notif.view', 'View →') ?></a><?php endif; ?>
+                    <?php if ($n['link']): ?><a href="<?= e(notifFixLink($n['link'])) ?>" class="notif-link"><?= t('notif.view', 'View →') ?></a><?php endif; ?>
                 </div>
                 <?php if ($unread): ?>
                 <button class="notif-read-btn" onclick="markOneRead(<?= (int)$n['id'] ?>)" title="Mark as read"><i class="ti ti-check"></i></button>
