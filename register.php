@@ -272,7 +272,7 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
                     <div class="alert alert-error"><i class="ti ti-alert-circle"></i> <?= htmlspecialchars($error) ?></div>
                 <?php endif; ?>
 
-                <form method="POST" action="register.php" class="auth-form" enctype="multipart/form-data" data-loading-text="<?= htmlspecialchars(t('msg.sending_verification_code_738a', 'Sending verification code...'), ENT_QUOTES) ?>">
+                <form id="reg-form" method="POST" action="register.php" class="auth-form" enctype="multipart/form-data" data-loading-text="<?= htmlspecialchars(t('msg.sending_verification_code_738a', 'Sending verification code...'), ENT_QUOTES) ?>">
                     <?= csrfField() ?>
                     <input type="hidden" name="step" value="details">
 
@@ -369,7 +369,8 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
                     <!-- Certificate of Registration (COR) attachment -->
                     <div class="form-group" style="margin-bottom:0;">
                         <label><?= t('register.cor_label', 'Certificate of Registration (COR)') ?> <span style="color:#991B1B;">*</span></label>
-                        <input type="file" name="cor_file" class="form-control" accept=".jpg,.jpeg,.png,.pdf" required>
+                        <input type="file" name="cor_file" id="cor-file" class="form-control" accept=".jpg,.jpeg,.png,.pdf" required>
+                        <div id="cor-size" role="status" aria-live="polite" style="display:none;margin-top:6px;font-size:12.5px;font-weight:600;"></div>
                         <div style="font-size:12px;color:#6B7280;margin-top:4px;">
                             <i class="ti ti-info-circle"></i> <?= t('register.cor_hint', 'Upload a clear photo or PDF of your COR this school year, so OSA can confirm you\'re an enrolled student. JPG, PNG, or PDF, max 5MB.') ?>
                         </div>
@@ -441,6 +442,86 @@ PwPolicy.attach({
     }
     p1.addEventListener('input', check);
     p2.addEventListener('input', check);
+})();
+</script>
+<script>
+// COR: live size indicator (max 5MB) + submit via fetch so the page never reloads
+// on an error -- the selected COR file stays in place.
+(function(){
+    var form = document.getElementById('reg-form');
+    var file = document.getElementById('cor-file');
+    var box  = document.getElementById('cor-size');
+    if (!form || !file || !box) return;
+    var MAX = 5 * 1024 * 1024;
+    var T_OVER = <?= json_encode(t('register.cor_over', 'is too large. Max is 5 MB.')) ?>;
+    var T_OVERBY = <?= json_encode(t('register.cor_over_by', 'Over by')) ?>;
+    var T_BADTYPE = <?= json_encode(t('msg.cor_must_be_a_jpg_png_or_pdf_file_76ff', 'COR must be a JPG, PNG, or PDF file.')) ?>;
+    function mb(b){ return (b / 1048576).toFixed(2) + ' MB'; }
+    function typeOk(f){ return /\.(jpe?g|png|pdf)$/i.test(f.name); }
+    function state(){
+        var f = file.files && file.files[0];
+        file.setCustomValidity('');
+        if (!f) { box.style.display = 'none'; return true; }
+        box.style.display = 'block';
+        if (!typeOk(f)) {
+            box.style.color = '#991B1B'; box.textContent = '\u2716 ' + T_BADTYPE;
+            file.setCustomValidity(T_BADTYPE); return false;
+        }
+        if (f.size > MAX) {
+            box.style.color = '#991B1B';
+            box.textContent = '\u2716 ' + f.name + ' (' + mb(f.size) + ') ' + T_OVER + ' ' + T_OVERBY + ' ' + mb(f.size - MAX) + '.';
+            file.setCustomValidity(T_OVER); return false;
+        }
+        box.style.color = '#15803D';
+        box.textContent = '\u2714 ' + f.name + ' \u2014 ' + mb(f.size) + ' / 5 MB';
+        return true;
+    }
+    file.addEventListener('change', state);
+
+    function showError(msg){
+        var el = document.getElementById('reg-ajax-alert');
+        if (!el) {
+            el = form.parentNode.querySelector('.alert-error');
+            if (!el) { el = document.createElement('div'); form.parentNode.insertBefore(el, form); }
+            el.id = 'reg-ajax-alert';
+        }
+        el.className = 'alert alert-error';
+        el.innerHTML = '<i class="ti ti-alert-circle"></i> ';
+        el.appendChild(document.createTextNode(msg));
+        el.scrollIntoView({behavior:'smooth', block:'center'});
+    }
+    function hideOverlay(){
+        var o = document.querySelector('.app-loading-overlay');
+        if (o) o.classList.remove('show');
+    }
+
+    // Capture phase: runs before the global loading-overlay submit handler.
+    document.addEventListener('submit', function(e){
+        if (e.target !== form) return;
+        if (!form.checkValidity()) { state(); return; }        // native messages first
+        e.preventDefault(); e.stopImmediatePropagation();
+        if (!state()) { form.reportValidity(); return; }
+        if (window.appShowLoadingOverlay) window.appShowLoadingOverlay(form.dataset.loadingText || 'Loading...');
+        fetch(form.action, {method:'POST', body:new FormData(form), credentials:'same-origin'})
+          .then(function(r){ return r.text().then(function(t){ return {ok:r.ok, text:t}; }); })
+          .then(function(res){
+              var doc = new DOMParser().parseFromString(res.text, 'text/html');
+              var newForm = doc.getElementById('reg-form');
+              if (!newForm) {                     // success -> OTP screen
+                  window.location.href = 'register.php'; return;
+              }
+              hideOverlay();
+              var err = doc.querySelector('.auth-panel .alert-error');
+              showError(err ? err.textContent.trim() : 'Something went wrong. Please try again.');
+              var tok = newForm.querySelector('input[name="csrf_token"]');
+              var cur = form.querySelector('input[name="csrf_token"]');
+              if (tok && cur) cur.value = tok.value;
+          })
+          .catch(function(){
+              hideOverlay();
+              showError('Network error. Please check your connection and try again.');
+          });
+    }, true);
 })();
 </script>
 </body>

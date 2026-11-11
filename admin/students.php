@@ -52,6 +52,7 @@ if (isset($_POST['ajax_action'])) {
             $student = $pdo->prepare("SELECT * FROM students WHERE id=?");
             $student->execute([$id]);
             $s = $student->fetch();
+            deleteCorFile($pdo, (int)$id); // approved -> COR no longer needed, free the disk space
 
             // Notify the student: in-app notification now; the approval email is sent AFTER we answer
             // the browser (so approving many students at once doesn't wait on Gmail for each one).
@@ -93,6 +94,7 @@ if (isset($_POST['ajax_action'])) {
         $stmt = $pdo->prepare("DELETE FROM students WHERE id=? AND is_active=0");
         $stmt->execute([$id]);
         if ($stmt->rowCount() > 0) {
+            if ($s && !empty($s['cor_file'])) deleteCorFileByName($s['cor_file']);
             $emailed = false;
             if ($s && !empty($s['email'])) {
                 $emailed = sendRejectionEmail($s['email'], $s['first_name'], $reason);
@@ -200,6 +202,7 @@ if (isset($_POST['ajax_action'])) {
             $del->execute([$sid]);
             if ($del->rowCount() > 0) {
                 $okCount++;
+                if ($s && !empty($s['cor_file'])) deleteCorFileByName($s['cor_file']);
                 if ($s && !empty($s['email'])) sendAccountDeletedEmail($s['email'], $s['first_name']);
             }
         }
@@ -227,6 +230,7 @@ if (isset($_POST['ajax_action'])) {
             $student = $pdo->prepare("SELECT * FROM students WHERE id=?");
             $student->execute([$id]);
             $s = $student->fetch();
+            deleteCorFile($pdo, (int)$id);
 
             addNotification($pdo, $s['id'], 'Your account has been re-enabled. You can now log in.', '../index.php');
             if (!empty($s['email'])) {
@@ -262,6 +266,7 @@ if (isset($_POST['ajax_action'])) {
         $stmt = $pdo->prepare("DELETE FROM students WHERE id=? AND is_active=0 AND disabled_at IS NOT NULL");
         $stmt->execute([$id]);
         if ($stmt->rowCount() > 0) {
+            if ($s && !empty($s['cor_file'])) deleteCorFileByName($s['cor_file']);
             if ($s && !empty($s['email'])) sendAccountDeletedEmail($s['email'], $s['first_name']);
             auditLog($pdo, 'delete', 'student', (int)$id, $s ?: []);
             echo json_encode(['success' => true, 'message' => t('msg.disabled_account_deleted_permanently_c57d', 'Disabled account deleted permanently.')]);
@@ -282,6 +287,7 @@ if (isset($_POST['ajax_action'])) {
         $stmt = $pdo->prepare("DELETE FROM students WHERE id=? AND is_active=1");
         $stmt->execute([$id]);
         if ($stmt->rowCount() > 0) {
+            if ($s && !empty($s['cor_file'])) deleteCorFileByName($s['cor_file']);
             if ($s && !empty($s['email'])) sendAccountDeletedEmail($s['email'], $s['first_name']);
             auditLog($pdo, 'delete', 'student', (int)$id, $s ?: []);
             echo json_encode(['success' => true, 'message' => t('msg.student_account_deleted_permanently_7896', 'Student account deleted permanently.')]);
@@ -310,6 +316,7 @@ if (isset($_POST['toggle'])) {
         die('Disabling requires the OTP confirmation. Please use the Disable button on the Students page.');
     }
     $pdo->prepare("UPDATE students SET is_active=1, disabled_at=NULL, approved_at=COALESCE(approved_at, NOW()) WHERE id=?")->execute([(int)$_POST['id']]);
+    deleteCorFile($pdo, (int)$_POST['id']);
     auditLog($pdo, 'enable', 'student', (int)$_POST['id'], [], ['is_active' => 1]);
     header('Location: students.php'); exit;
 }
@@ -318,7 +325,9 @@ if (isset($_POST['toggle'])) {
 if (isset($_POST['approve'])) {
     requireCsrf();
     $approveId = (int)$_POST['approve'];
-    $pdo->prepare("UPDATE students SET is_active=1, approved_at=NOW() WHERE id=? AND is_active=0 AND disabled_at IS NULL")->execute([$approveId]);
+    $apv = $pdo->prepare("UPDATE students SET is_active=1, approved_at=NOW() WHERE id=? AND is_active=0 AND disabled_at IS NULL");
+    $apv->execute([$approveId]);
+    if ($apv->rowCount() > 0) deleteCorFile($pdo, $approveId);
     auditLog($pdo, 'approve', 'student', $approveId, [], ['is_active' => 1]);
     $s = $pdo->prepare("SELECT * FROM students WHERE id=?");
     $s->execute([$approveId]);
@@ -338,6 +347,7 @@ if (isset($_POST['reject'])) {
     $s->execute([$rejectId]);
     $s = $s->fetch();
     $pdo->prepare("DELETE FROM students WHERE id=? AND is_active=0 AND disabled_at IS NULL")->execute([$rejectId]);
+    if ($s && !empty($s['cor_file'])) deleteCorFileByName($s['cor_file']);
     auditLog($pdo, 'reject', 'student', $rejectId, $s ?: []);
     if ($s && !empty($s['email'])) sendRejectionEmail($s['email'], $s['first_name']);
     $success = t('msg.pending_registration_removed_7ecd', 'Pending registration removed.');
@@ -345,6 +355,7 @@ if (isset($_POST['reject'])) {
 
 // Auto-delete accounts that have been disabled for 30+ days (at most once every 5 minutes, not on every request)
 if (empty($_SESSION['stu_clean_ts']) || time() - (int)$_SESSION['stu_clean_ts'] > 300) {
+    foreach ($pdo->query("SELECT cor_file FROM students WHERE is_active=0 AND disabled_at IS NOT NULL AND disabled_at <= (NOW() - INTERVAL 30 DAY) AND cor_file IS NOT NULL")->fetchAll(PDO::FETCH_COLUMN) as $__cf) deleteCorFileByName($__cf);
     $pdo->exec("DELETE FROM students WHERE is_active=0 AND disabled_at IS NOT NULL AND disabled_at <= (NOW() - INTERVAL 30 DAY)");
     $_SESSION['stu_clean_ts'] = time();
 }
@@ -594,7 +605,7 @@ function stuUrl($overrides = []) {
                 <td><?= e(maskEmail($p['email']) ?: '—') ?></td>
                 <td style="white-space:nowrap;">
                     <?php if (!empty($p['cor_file'])): ?>
-                        <a href="../uploads/<?= e($p['cor_file']) ?>" target="_blank" class="btn btn-sm btn-outline">
+                        <a href="../uploads/<?= e($p['cor_file']) ?>" target="_blank" rel="noopener" class="btn btn-sm btn-outline cor-view">
                             <i class="ti ti-file-text"></i> <?= t('ui.view_cor_927f', 'View COR') ?>
                         </a>
                     <?php else: ?>
@@ -1697,6 +1708,59 @@ function doStudentImport() {
         result.style.display = 'block';
     });
 }
+</script>
+<!-- COR viewer popup -->
+<style>
+.cor-ov{position:fixed;inset:0;z-index:10050;background:rgba(15,23,42,.65);display:none;align-items:center;justify-content:center;padding:16px}
+.cor-ov.show{display:flex}
+.cor-box{background:#fff;color:#111827;border-radius:12px;width:min(900px,100%);height:min(90vh,100%);display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.35);overflow:hidden}
+.cor-head{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #E5E7EB;font-weight:600;font-size:14px}
+.cor-head .cor-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cor-head a,.cor-head button{background:none;border:1px solid #D1D5DB;border-radius:8px;padding:5px 10px;font-size:13px;cursor:pointer;color:inherit;text-decoration:none;line-height:1.2}
+.cor-body{flex:1;overflow:auto;background:#F3F4F6;display:flex;align-items:flex-start;justify-content:center}
+.cor-body img{max-width:100%;height:auto;cursor:zoom-in}
+.cor-body img.zoom{max-width:none;cursor:zoom-out}
+.cor-body iframe{width:100%;height:100%;border:0;background:#fff}
+html[data-theme="dark"] .cor-box{background:#1F2937;color:#F3F4F6}
+html[data-theme="dark"] .cor-head{border-color:#374151}
+html[data-theme="dark"] .cor-head a,html[data-theme="dark"] .cor-head button{border-color:#4B5563}
+html[data-theme="dark"] .cor-body{background:#111827}
+</style>
+<div class="cor-ov" id="cor-ov" role="dialog" aria-modal="true" aria-labelledby="cor-title">
+  <div class="cor-box">
+    <div class="cor-head">
+      <span class="cor-title" id="cor-title">COR</span>
+      <a id="cor-newtab" href="#" target="_blank" rel="noopener"><i class="ti ti-external-link"></i></a>
+      <button type="button" id="cor-close" aria-label="Close"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="cor-body" id="cor-body"></div>
+  </div>
+</div>
+<script>
+(function(){
+  var ov=document.getElementById('cor-ov'), body=document.getElementById('cor-body'),
+      title=document.getElementById('cor-title'), nt=document.getElementById('cor-newtab');
+  function close(){ ov.classList.remove('show'); body.innerHTML=''; }
+  document.addEventListener('click', function(e){
+    var a=e.target.closest && e.target.closest('a.cor-view');
+    if(!a) return;
+    e.preventDefault(); e.stopPropagation();
+    var url=a.getAttribute('href'), name=url.split('/').pop();
+    title.textContent=(a.closest('tr') && a.closest('tr').querySelector('td') ? '' : '')+name;
+    nt.href=url; body.innerHTML='';
+    if(/\.pdf$/i.test(name)){
+      var f=document.createElement('iframe'); f.src=url; body.appendChild(f);
+    } else {
+      var im=document.createElement('img'); im.src=url; im.alt='COR';
+      im.onclick=function(){ im.classList.toggle('zoom'); };
+      body.appendChild(im);
+    }
+    ov.classList.add('show');
+  }, true);
+  document.getElementById('cor-close').onclick=close;
+  ov.addEventListener('click', function(e){ if(e.target===ov) close(); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape' && ov.classList.contains('show')) close(); });
+})();
 </script>
 <script src="../assets/js/alerts.js"></script>
 <script src="../assets/js/sidebar.js?v=5"></script>

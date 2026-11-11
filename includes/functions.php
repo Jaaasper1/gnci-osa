@@ -189,6 +189,9 @@ function uploadCorFile($file) {
     $allowed = ['jpg','jpeg','png','pdf'];
     $maxSize = 5 * 1024 * 1024; // 5MB
 
+    if (isset($file['error']) && in_array($file['error'], [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+        return ['error' => t('msg.cor_file_is_too_large_max_5mb_e301', 'COR file is too large. Max 5MB.')];
+    }
     if (!isset($file['error']) || $file['error'] !== UPLOAD_ERR_OK) {
         return ['error' => t('msg.please_attach_a_copy_of_your_certificate_1c59', 'Please attach a copy of your Certificate of Registration (COR).')];
     }
@@ -207,6 +210,25 @@ function uploadCorFile($file) {
         return ['success' => true, 'filename' => $filename];
     }
     return ['error' => t('msg.upload_failed_make_sure_the_uploads_fold_009a', 'Upload failed. Make sure the uploads/ folder is writable.')];
+}
+
+// ── COR file cleanup ────────────────────────────────────────────────────────
+// Deletes a COR file from /uploads (by file name only, never a path).
+function deleteCorFileByName($name) {
+    $name = basename((string)$name);
+    if (!preg_match('/^cor_[A-Za-z0-9]+\.(jpg|jpeg|png|pdf)$/i', $name)) return false;
+    $path = __DIR__ . '/../uploads/' . $name;
+    return is_file($path) ? @unlink($path) : false;
+}
+// Deletes the COR of a student (by students.id) and clears students.cor_file.
+function deleteCorFile($pdo, $studentDbId) {
+    $q = $pdo->prepare("SELECT cor_file FROM students WHERE id=?");
+    $q->execute([(int)$studentDbId]);
+    $name = $q->fetchColumn();
+    if ($name) {
+        deleteCorFileByName($name);
+        $pdo->prepare("UPDATE students SET cor_file=NULL WHERE id=?")->execute([(int)$studentDbId]);
+    }
 }
 
 // Format date to readable Filipino format
