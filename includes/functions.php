@@ -231,6 +231,16 @@ function deleteCorFile($pdo, $studentDbId) {
     }
 }
 
+// Normalizes a person's name: "JUAN dela CRUZ" -> "Juan Dela Cruz". Handles spaces, hyphens, apostrophes and dots.
+function formatPersonName($name) {
+    $name = trim(preg_replace('/\s+/u', ' ', (string)$name));
+    if ($name === '') return '';
+    $name = mb_strtolower($name, 'UTF-8');
+    return preg_replace_callback('/(^|[\s\-\'\x{2019}.])(\p{L})/u', function ($m) {
+        return $m[1] . mb_strtoupper($m[2], 'UTF-8');
+    }, $name);
+}
+
 // Format date to readable Filipino format
 function formatDate($date) {
     return function_exists('tlDate') ? tlDate('F j, Y · g:i A', strtotime($date)) : date('F j, Y · g:i A', strtotime($date));

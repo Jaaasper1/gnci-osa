@@ -45,8 +45,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['step'] ?? '') === 'details
     requireCsrf();
 
     $sid    = trim($_POST['student_id'] ?? '');
-    $fname  = trim($_POST['first_name'] ?? '');
-    $lname  = trim($_POST['last_name']  ?? '');
+    $fname  = formatPersonName($_POST['first_name'] ?? '');
+    $lname  = formatPersonName($_POST['last_name']  ?? '');
     $email  = trim($_POST['email']      ?? '');
     $course = trim($_POST['course']     ?? '');
     $pw     = (string)($_POST['password'] ?? '');
