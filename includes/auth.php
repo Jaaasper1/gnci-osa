@@ -125,6 +125,7 @@ function loginStudent($pdo, $student_id, $password) {
         $_SESSION['name']                 = $student['first_name'] . ' ' . $student['last_name'];
         $_SESSION['student_id']           = $student['student_id'];
         $_SESSION['must_change_password'] = (bool)($student['must_change_password'] ?? 0);
+        $_SESSION['login_method']         = 'password';
         return true;
     }
     return false;
@@ -146,6 +147,7 @@ function finalizeStudentSession($student) {
     $_SESSION['name']                 = $student['first_name'] . ' ' . $student['last_name'];
     $_SESSION['student_id']           = $student['student_id'];
     $_SESSION['must_change_password'] = (bool)($student['must_change_password'] ?? 0);
+    $_SESSION['login_method']         = 'otp';
 }
 
 function loginStaff($pdo, $username, $password) {

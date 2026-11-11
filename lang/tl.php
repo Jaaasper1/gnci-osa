@@ -1070,4 +1070,7 @@ return [
     'survey.hint_ready' => 'Tapos na? Pindutin dito para itago ang mensaheng ito',
     'msg.passwords_do_not_match_live' => 'Hindi magkatugma ang mga password.',
     'msg.passwords_match_live' => 'Magkatugma ang mga password.',
+    'ui.at_least_8_characters_f641' => 'Hindi bababa sa 8 na character',
+    'settings.sub_profile' => 'Ang iyong pangalan, email, course at Student ID',
+    'settings.sub_password' => 'Palitan ang password na ginagamit mo sa pag-login',
 ];
