@@ -65,7 +65,7 @@ if (file_exists($vendorPath)) {
 
     // Title row
     $sheet->mergeCells('A1:H1');
-    $sheet->setCellValue('A1', 'Voting Vouchers — ' . $election['title'] . ' (' . $election['course'] . ')');
+    $sheet->setCellValue('A1', 'Voting Vouchers — ' . $election['title'] . ' (' . (($election['course'] ?? '') !== '' ? $election['course'] : 'All Courses') . ')');
     $sheet->getStyle('A1')->applyFromArray([
         'font'      => ['bold' => true, 'size' => 13, 'color' => ['rgb' => 'FFFFFF']],
         'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '6B1A2A']],

@@ -142,7 +142,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $positions = array_filter(array_map('trim', explode("\n", $_POST['positions'] ?? '')));
     $course    = $_POST['course'] ?? '';
     $course    = trim($course);
-    if (!$title || !$start || !$end || !isset($_POST['course']) || $_POST['course'] === '' || $_POST['course'] === '__ALL__' || empty($positions)) {
+    $__courseChosen = isset($_POST['course']) && $_POST['course'] !== '';
+    if ($course === '__ALL__') $course = '';   // "All Courses" is stored as a blank course
+    if (!$title || !$start || !$end || !$__courseChosen || empty($positions)) {
         $error = t('msg.please_fill_in_all_fields_including_cour_4dd4', 'Please fill in all fields including course.');
     } else {
         $stmt = $pdo->prepare("INSERT INTO elections (title, description, course, start_date, end_date, created_by) VALUES (?,?,?,?,?,?)");
@@ -170,7 +172,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     } else {
         $course_edit = $_POST['course'] ?? '';
         $course_edit = trim($course_edit);
-        if ($course_edit === '' || $course_edit === '__ALL__') {
+        $__editChosen = isset($_POST['course']) && $_POST['course'] !== '';
+        if ($course_edit === '__ALL__') $course_edit = '';   // All Courses
+        if (!$__editChosen) {
             $error = t('msg.please_fill_in_all_fields_including_cour_4dd4', 'Please fill in all fields including course.');
         } else {
         $__before = auditRow($pdo, 'elections', $eid);
@@ -313,7 +317,8 @@ $allCourses = getCourseOptions();
                     <div class="form-group course-search-wrap">
                         <label><?= t('ui.course_d0a6', 'Course *') ?></label>
                         <select name="course" class="form-control" id="ee-course-select" required>
-                            <?php foreach($allCourses as $c): ?><option value="<?= e($c) ?>" <?= $editElection['course']==$c?'selected':'' ?>><?= e($c) ?></option><?php endforeach; ?>
+                            <option value="__ALL__" <?= ($editElection['course'] ?? '') === '' ? 'selected' : '' ?>>All Courses</option>
+                            <?php foreach($allCourses as $c): ?><option value="<?= e($c) ?>" <?= ($editElection['course'] !== '' && $editElection['course']==$c)?'selected':'' ?>><?= e($c) ?></option><?php endforeach; ?>
                         </select>
                     </div>
                     <div class="form-group">
@@ -456,7 +461,7 @@ $allCourses = getCourseOptions();
             <div style="display:flex;justify-content:space-between;align-items:flex-start;">
                 <div>
                     <div style="font-size:13px;font-weight:600;color:#1F2937;"><?= e($el['title']) ?></div>
-                    <div style="margin-top:4px;"><span style="background:#EDE9FE;color:#5B21B6;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:600;"><?= $el['course'] !== '' ? e($el['course']) : '🏫 All Courses' ?></span></div>
+                    <div style="margin-top:4px;"><span style="background:#EDE9FE;color:#5B21B6;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:600;"><?= $el['course'] !== '' ? e($el['course']) : 'All Courses' ?></span></div>
                     <div style="font-size:11px;color:#9CA3AF;margin-top:3px;">
                         <?= date('M j', strtotime($el['start_date'])) ?> – <?= date('M j, Y', strtotime($el['end_date'])) ?>
                         · <?= $el['pos_count'] ?> <?= t('ui.positions_b17c', 'positions ·') ?> <?= $el['vote_count'] ?> <?= t('ui.votes_dfa5', 'votes') ?>
@@ -571,6 +576,7 @@ $allCourses = getCourseOptions();
                     <label><?= t('ui.course_d0a6', 'Course *') ?></label>
                     <select name="course" class="form-control" id="ne-course-select" required>
                         <option value=""><?= t('ui.select_course_247e', '— Select Course —') ?></option>
+                        <option value="__ALL__">All Courses</option>
                         <?php foreach($allCourses as $c): ?><option value="<?= e($c) ?>"><?= e($c) ?></option><?php endforeach; ?>
                     </select>
                 </div>

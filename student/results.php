@@ -14,7 +14,7 @@ $sc_stmt->execute([$student_id]);
 $student_course = $sc_stmt->fetchColumn();
 
 // Load the election — must match student course AND show_results enabled
-$stmt = $pdo->prepare("SELECT * FROM elections WHERE id = ? AND course = ? AND show_results = 1");
+$stmt = $pdo->prepare("SELECT * FROM elections WHERE id = ? AND (course = ? OR course = '' OR course IS NULL) AND show_results = 1");
 $stmt->execute([$eid, $student_course]);
 $election = $stmt->fetch();
 

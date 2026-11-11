@@ -431,7 +431,7 @@ $showAll = isset($_GET['all']) && $_GET['all'] == '1';
     <select id="elecSelect" onchange="location.href='?election_id='+this.value+(<?= $showAll ? 'true' : 'false' ?> ? '&all=1' : '')">
         <?php foreach ($elections as $el): ?>
         <option value="<?= $el['id'] ?>" <?= $el['id'] == $election_id ? 'selected' : '' ?>>
-            <?= e($el['title']) ?> (<?= e($el['course']) ?>)
+            <?= e($el['title']) ?> (<?= e(($el['course'] ?? '') !== '' ? $el['course'] : 'All Courses') ?>)
         </option>
         <?php endforeach; ?>
     </select>
@@ -451,7 +451,7 @@ $showAll = isset($_GET['all']) && $_GET['all'] == '1';
         <div class="print-page-header">
             <div class="pph-left">
                 <div class="pph-title"><?= e($election['title']) ?></div>
-                <div class="pph-sub"><?= e($election['course']) ?></div>
+                <div class="pph-sub"><?= e(($election['course'] ?? '') !== '' ? $election['course'] : 'All Courses') ?></div>
             </div>
         </div>
         <div class="empty-state">
@@ -466,7 +466,7 @@ $showAll = isset($_GET['all']) && $_GET['all'] == '1';
         <div class="pph-left">
             <div class="pph-title">Voting Vouchers — <?= e($election['title']) ?></div>
             <div class="pph-sub">
-                Guagua National College &nbsp;·&nbsp; <?= e($election['course']) ?>
+                Guagua National College &nbsp;·&nbsp; <?= e(($election['course'] ?? '') !== '' ? $election['course'] : 'All Courses') ?>
                 <?= $showAll ? '' : ' &nbsp;·&nbsp; Active vouchers only' ?>
             </div>
         </div>

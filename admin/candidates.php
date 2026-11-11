@@ -324,7 +324,7 @@ if ($eid) {
                 <label><?= t('ui.election_7099', 'Election *') ?></label>
                 <select name="election_id" class="form-control" onchange="location.href='?election='+this.value" required>
                     <?php foreach ($elections as $el): ?>
-                    <option value="<?= $el['id'] ?>" <?= $el['id']==$eid?'selected':'' ?>>[<?= e($el['course']) ?>] <?= e($el['title']) ?></option>
+                    <option value="<?= $el['id'] ?>" <?= $el['id']==$eid?'selected':'' ?>>[<?= e(($el['course'] ?? '') !== '' ? $el['course'] : 'All Courses') ?>] <?= e($el['title']) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>

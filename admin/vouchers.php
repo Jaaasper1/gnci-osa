@@ -68,9 +68,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'gener
     $election = $election->fetch();
     if (!$election) { echo json_encode(['ok'=>false,'msg'=>t('msg.election_not_found_fee4', 'Election not found.')]); exit; }
 
-    $students = $pdo->prepare("SELECT id FROM students WHERE course=? AND is_active=1");
-    $students->execute([$election['course']]);
-    $students = $students->fetchAll();
+    if (($election['course'] ?? '') === '') {            // All Courses election
+        $students = $pdo->query("SELECT id FROM students WHERE is_active=1")->fetchAll();
+    } else {
+        $students = $pdo->prepare("SELECT id FROM students WHERE course=? AND is_active=1");
+        $students->execute([$election['course']]);
+        $students = $students->fetchAll();
+    }
 
     $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     $generated = 0;
@@ -157,17 +161,17 @@ if ($selected_election_id) {
         $c = $pdo->prepare("SELECT COUNT(*) t, COALESCE(SUM(is_used=1),0) u, COALESCE(SUM(is_used=0),0) a FROM voting_vouchers WHERE election_id=?");
         $c->execute([$selected_election_id]);
         $cr = $c->fetch();
-        $n = $pdo->prepare("SELECT COUNT(*) FROM students s WHERE s.course=? AND s.is_active=1
+        $n = $pdo->prepare("SELECT COUNT(*) FROM students s WHERE (s.course=? OR ?='') AND s.is_active=1
                             AND NOT EXISTS (SELECT 1 FROM voting_vouchers v WHERE v.election_id=? AND v.student_id=s.id)");
-        $n->execute([$selected_election['course'], $selected_election_id]);
+        $n->execute([$selected_election['course'], $selected_election['course'], $selected_election_id]);
         $stat['used'] = (int)$cr['u']; $stat['unused'] = (int)$cr['a']; $stat['none'] = (int)$n->fetchColumn();
         $stat['total'] = (int)$cr['t'] + $stat['none'];
 
         // One paginated list: students of this course (with or without voucher) + any voucher holder
         $from = "FROM students s
                  LEFT JOIN voting_vouchers vv ON vv.student_id = s.id AND vv.election_id = ?
-                 WHERE (vv.id IS NOT NULL OR (s.course = ? AND s.is_active = 1))";
-        $args = [$selected_election_id, $selected_election['course']];
+                 WHERE (vv.id IS NOT NULL OR ((s.course = ? OR ? = '') AND s.is_active = 1))";
+        $args = [$selected_election_id, $selected_election['course'], $selected_election['course']];
         if ($vstatus === 'active') $from .= " AND vv.id IS NOT NULL AND vv.is_used = 0";
         if ($vstatus === 'used')   $from .= " AND vv.is_used = 1";
         if ($vstatus === 'none')   $from .= " AND vv.id IS NULL";
@@ -347,7 +351,7 @@ $notifCount = getUnreadStaffNotifCount($pdo, $_SESSION['user_id']);
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
             <div>
                 <div style="font-size:14px;font-weight:600;color:var(--maroon-dark);margin-bottom:2px;"><?= t('ui.bulk_generate_3894', 'Bulk Generate') ?></div>
-                <div style="font-size:12px;color:#6B7280;"><?= t('ui.generate_vouchers_for_all_1988', 'Generate vouchers for all') ?> <?= e($selected_election['course']) ?> <?= t('ui.students_who_don_t_have_one_yet_8a9f', 'students who don\'t have one yet.') ?></div>
+                <div style="font-size:12px;color:#6B7280;"><?= t('ui.generate_vouchers_for_all_1988', 'Generate vouchers for all') ?> <?= ($selected_election['course'] ?? '') !== '' ? e($selected_election['course']) : 'All Courses' ?> <?= t('ui.students_who_don_t_have_one_yet_8a9f', 'students who don\'t have one yet.') ?></div>
             </div>
             <?php if ($noVoucherCount > 0): ?>
             <button class="btn btn-primary" onclick="generateAll()">

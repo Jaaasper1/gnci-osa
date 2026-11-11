@@ -250,7 +250,7 @@ $showAll = isset($_GET['all']) && $_GET['all'] == '1';
     <select onchange="location.href='?election_id='+this.value+(<?= $showAll ? 'true' : 'false' ?> ? '&all=1' : '')">
         <?php foreach ($elections as $el): ?>
         <option value="<?= $el['id'] ?>" <?= $el['id'] == $election_id ? 'selected' : '' ?>>
-            <?= e($el['title']) ?> (<?= e($el['course']) ?>)
+            <?= e($el['title']) ?> (<?= e(($el['course'] ?? '') !== '' ? $el['course'] : 'All Courses') ?>)
         </option>
         <?php endforeach; ?>
     </select>
@@ -267,7 +267,7 @@ $showAll = isset($_GET['all']) && $_GET['all'] == '1';
     <div class="page-header-block">
         <div>
             <div class="phb-title">Voting Vouchers — <?= e($election['title']) ?></div>
-            <div class="phb-sub">Guagua National College &nbsp;·&nbsp; <?= e($election['course']) ?><?= $showAll ? '' : ' &nbsp;·&nbsp; Active vouchers only' ?></div>
+            <div class="phb-sub">Guagua National College &nbsp;·&nbsp; <?= e(($election['course'] ?? '') !== '' ? $election['course'] : 'All Courses') ?><?= $showAll ? '' : ' &nbsp;·&nbsp; Active vouchers only' ?></div>
         </div>
         <div class="phb-right">
             <span class="phb-count"><?= count($vouchers) ?> voucher<?= count($vouchers) !== 1 ? 's' : '' ?></span><br>
