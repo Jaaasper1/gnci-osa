@@ -286,7 +286,7 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
                         <div class="form-group" style="margin-bottom:0;">
                             <label><?= t('login.label_student_id', 'Student ID') ?> <span style="color:#991B1B;">*</span></label>
                             <input type="text" name="student_id" class="form-control"
-                                   placeholder="20193372"
+                                   placeholder="2019****"
                                    value="<?= htmlspecialchars($_POST['student_id'] ?? '') ?>"
                                    inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/[^0-9]/g,'')"
                                    autocomplete="off" required>
