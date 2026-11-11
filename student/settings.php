@@ -5,6 +5,7 @@ require_once '../includes/auth.php';
 require_once '../includes/functions.php';
 require_once '../includes/lang.php';
 require_once '../includes/csrf.php';
+require_once '../includes/password-policy.php';
 requireStudent();
 
 $student_id = $_SESSION['user_id'];
@@ -43,10 +44,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = t('settings.err_current_wrong', 'Current password is incorrect.');
         } elseif ($current === '' && $method === 'password') {
             $error = t('msg.enter_your_current_password_d333', 'Enter your current password.');
-        } elseif (strlen($new_pass) < 8) {
-            $error = t('msg.password_must_be_at_least_8_characters_7667', 'Password must be at least 8 characters.');
         } elseif ($new_pass !== $confirm) {
             $error = t('register.err_pw_mismatch', 'Passwords do not match.');
+        } elseif (!empty($student['password']) && password_verify($new_pass, $student['password'])) {
+            // New password must differ from the one currently saved
+            $error = t('settings.err_same_password', 'Your new password must be different from your current password.');
+        } elseif (($pwErr = passwordPolicyError($new_pass, [$student['student_id'] ?? '', $student['email'] ?? ''], 8, [$student['first_name'] ?? '', $student['last_name'] ?? ''])) !== null) {
+            $error = $pwErr;
         } else {
             $hash = password_hash($new_pass, PASSWORD_DEFAULT);
             $pdo->prepare("UPDATE students SET password=? WHERE id=?")->execute([$hash, $student_id]);
@@ -59,7 +63,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$openPw = (($_POST['action'] ?? '') === 'change_password');
+// Reopen the password popup only if the password form came back with an error
+$openPw = (($_POST['action'] ?? '') === 'change_password') && $error !== '';
 $notifCount = getUnreadNotifCount($pdo, $student_id);
 $election = getAnyActiveOrRecentElection($pdo);
 ?>
@@ -71,22 +76,38 @@ $election = getAnyActiveOrRecentElection($pdo);
     <link rel="stylesheet" href="../assets/css/style.css?v=27">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <style>
-.set-acc{background:#fff;border:1px solid #E5E7EB;border-radius:14px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-.set-acc summary{list-style:none;display:flex;align-items:center;gap:14px;padding:16px 18px;cursor:pointer;-webkit-user-select:none;user-select:none}
-.set-acc summary::-webkit-details-marker{display:none}
-.set-acc summary:hover{background:#F9FAFB}
+.set-row{width:100%;text-align:left;font:inherit;background:#fff;border:1px solid #E5E7EB;border-radius:14px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.04);display:flex;align-items:center;gap:14px;padding:16px 18px;cursor:pointer}
+.set-row:hover{background:#F9FAFB}
+.set-row:focus-visible{outline:2px solid var(--maroon,#6B1A2A);outline-offset:2px}
 .set-ic{width:38px;height:38px;border-radius:50%;background:var(--maroon-pale,#F9EEF0);color:var(--maroon,#6B1A2A);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
 .set-tt{flex:1;min-width:0}
 .set-tt b{display:block;font-size:14.5px;color:#1F2937;font-weight:600}
 .set-tt span{display:block;font-size:12px;color:#6B7280;margin-top:2px}
-.set-chev{color:#9CA3AF;font-size:18px;transition:transform .2s}
-.set-acc[open] .set-chev{transform:rotate(90deg)}
-.set-acc[open] summary{border-bottom:1px solid #F3F4F6}
-.set-body{padding:18px}
-html[data-theme="dark"] .set-acc{background:#242526;border-color:#3A3B3C}
-html[data-theme="dark"] .set-acc summary:hover{background:#2D2E30}
+.set-chev{color:#9CA3AF;font-size:18px}
+/* Popup */
+dialog.set-modal{position:fixed;inset:0;margin:auto;border:0;padding:0;border-radius:16px;width:min(480px,94vw);max-height:90vh;background:#fff;color:#1F2937;box-shadow:0 20px 50px rgba(0,0,0,.25);overflow:hidden}
+dialog.set-modal[open]{display:flex;flex-direction:column;animation:setPop .18s ease-out}
+dialog.set-modal::backdrop{background:rgba(17,24,39,.55)}
+@keyframes setPop{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
+.set-mh{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid #F3F4F6}
+.set-mh .set-tt b{font-size:16px}
+.set-x{background:none;border:0;font-size:22px;line-height:1;color:#6B7280;cursor:pointer;padding:6px;border-radius:8px}
+.set-x:hover{background:#F3F4F6}
+.set-body{padding:18px;overflow-y:auto}
+.pw-rules{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:3px;font-size:12px;color:#6B7280}
+.pw-rules li i{font-size:13px;vertical-align:-1px}
+.pw-rules li.ok{color:#15803D}
+.pw-rules li.no{color:#B91C1C}
+.pw-bad{display:none;margin-top:6px;font-size:12px;font-weight:600;color:#B91C1C}
+html[data-theme="dark"] .pw-rules li.ok{color:#4ADE80}
+html[data-theme="dark"] .pw-rules li.no{color:#F87171}
+html[data-theme="dark"] .pw-bad{color:#F87171}
+html[data-theme="dark"] .set-row{background:#242526;border-color:#3A3B3C}
+html[data-theme="dark"] .set-row:hover{background:#2D2E30}
 html[data-theme="dark"] .set-tt b{color:#E4E6EB}
-html[data-theme="dark"] .set-acc[open] summary{border-color:#3A3B3C}
+html[data-theme="dark"] dialog.set-modal{background:#242526;color:#E4E6EB}
+html[data-theme="dark"] .set-mh{border-color:#3A3B3C}
+html[data-theme="dark"] .set-x:hover{background:#3A3B3C}
 </style>
 <?php include __DIR__.'/../includes/pwa-head.php'; ?></head>
 <body>
@@ -145,7 +166,7 @@ html[data-theme="dark"] .set-acc[open] summary{border-color:#3A3B3C}
     </div>
     <?php endif; ?>
 
-    <?php if ($error): ?>
+    <?php if ($error && !$openPw): ?>
     <div class="alert-error" style="display:flex;align-items:center;gap:10px;background:#FEE2E2;border:1px solid #FECACA;border-radius:10px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:#991B1B;">
         <i class="ti ti-alert-circle" style="font-size:18px;"></i> <?= e($error) ?>
     </div>
@@ -153,13 +174,18 @@ html[data-theme="dark"] .set-acc[open] summary{border-color:#3A3B3C}
 
     <div style="max-width: 560px; margin: 0 auto;">
 
-        <!-- Basic Info -->
-        <details class="set-acc" name="settings" <?= $openPw ? '' : 'open' ?>>
-            <summary>
-                <span class="set-ic"><i class="ti ti-user"></i></span>
+        <!-- info -->
+        <button type="button" class="set-row" data-open="m-info">
+            <span class="set-ic"><i class="ti ti-user"></i></span>
                 <span class="set-tt"><b><?= t('ui.basic_information_87ca', 'Basic Information') ?></b><span><?= t('settings.sub_profile', 'Your name, email, course and Student ID') ?></span></span>
-                <i class="ti ti-chevron-right set-chev"></i>
-            </summary>
+            <i class="ti ti-chevron-right set-chev"></i>
+        </button>
+        <dialog class="set-modal" id="m-info" aria-labelledby="m-info-t">
+            <div class="set-mh">
+                <span class="set-ic"><i class="ti ti-user"></i></span>
+                <span class="set-tt"><b id="m-info-t"><?= t('ui.basic_information_87ca', 'Basic Information') ?></b><span><?= t('settings.sub_profile', 'Your name, email, course and Student ID') ?></span></span>
+                <button type="button" class="set-x" data-close aria-label="Close">&times;</button>
+            </div>
             <div class="set-body">
             <form method="POST">
                 <?= csrfField() ?>
@@ -192,16 +218,24 @@ html[data-theme="dark"] .set-acc[open] summary{border-color:#3A3B3C}
                 <button type="submit" class="btn btn-primary btn-block"><i class="ti ti-device-floppy"></i> <?= t('ui.save_changes_f5d6', 'Save Changes') ?></button>
             </form>
             </div>
-        </details>
+        </dialog>
 
-        <!-- Change Password -->
-        <details class="set-acc" name="settings" <?= $openPw ? 'open' : '' ?>>
-            <summary>
-                <span class="set-ic"><i class="ti ti-lock"></i></span>
+        <!-- pw -->
+        <button type="button" class="set-row" data-open="m-pw">
+            <span class="set-ic"><i class="ti ti-lock"></i></span>
                 <span class="set-tt"><b><?= t('settings.change_password', 'Change Password') ?></b><span><?= t('settings.sub_password', 'Update the password you use to log in') ?></span></span>
-                <i class="ti ti-chevron-right set-chev"></i>
-            </summary>
+            <i class="ti ti-chevron-right set-chev"></i>
+        </button>
+        <dialog class="set-modal" id="m-pw" aria-labelledby="m-pw-t">
+            <div class="set-mh">
+                <span class="set-ic"><i class="ti ti-lock"></i></span>
+                <span class="set-tt"><b id="m-pw-t"><?= t('settings.change_password', 'Change Password') ?></b><span><?= t('settings.sub_password', 'Update the password you use to log in') ?></span></span>
+                <button type="button" class="set-x" data-close aria-label="Close">&times;</button>
+            </div>
             <div class="set-body">
+            <?php if ($openPw): ?>
+            <div class="alert-error" style="display:flex;align-items:center;gap:10px;background:#FEE2E2;border:1px solid #FECACA;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;color:#991B1B;"><i class="ti ti-alert-circle" style="font-size:18px;"></i> <?= e($error) ?></div>
+            <?php endif; ?>
             <form method="POST" autocomplete="off">
                 <?= csrfField() ?>
                 <input type="hidden" name="action" value="change_password">
@@ -212,7 +246,15 @@ html[data-theme="dark"] .set-acc[open] summary{border-color:#3A3B3C}
                 </div>
                 <div class="form-group">
                     <label><?= t('newpass.label', 'New Password') ?> <span style="color:#EF4444;">*</span></label>
-                    <input type="password" name="new_password" class="form-control" minlength="8" placeholder="<?= htmlspecialchars(t('ui.at_least_8_characters_f641', 'At least 8 characters'), ENT_QUOTES) ?>" autocomplete="new-password" required>
+                    <input type="password" name="new_password" class="form-control" minlength="8" placeholder="<?= htmlspecialchars(t('ui.at_least_8_characters_f641', 'At least 8 characters'), ENT_QUOTES) ?>" autocomplete="new-password" maxlength="72" required>
+                    <ul id="pw-rules" class="pw-rules">
+                        <li data-r="len"><i class="ti ti-circle"></i> <?= t('pw.rule_len', 'At least 8 characters') ?></li>
+                        <li data-r="up"><i class="ti ti-circle"></i> <?= t('pw.rule_up', 'One uppercase letter (A-Z)') ?></li>
+                        <li data-r="low"><i class="ti ti-circle"></i> <?= t('pw.rule_low', 'One lowercase letter (a-z)') ?></li>
+                        <li data-r="num"><i class="ti ti-circle"></i> <?= t('pw.rule_num', 'One number (0-9)') ?></li>
+                        <li data-r="sym"><i class="ti ti-circle"></i> <?= t('pw.rule_sym', 'One special character (! @ # $ % &)') ?></li>
+                    </ul>
+                    <div id="pw-bad" class="pw-bad" role="alert"></div>
                 </div>
                 <div class="form-group">
                     <label><?= t('register.confirm_password', 'Confirm New Password') ?> <span style="color:#EF4444;">*</span></label>
@@ -222,7 +264,7 @@ html[data-theme="dark"] .set-acc[open] summary{border-color:#3A3B3C}
                 <button type="submit" class="btn btn-primary btn-block"><i class="ti ti-lock"></i> <?= t('settings.change_password', 'Change Password') ?></button>
             </form>
             </div>
-        </details>
+        </dialog>
 
     </div>
 </div></div>
@@ -248,11 +290,32 @@ html[data-theme="dark"] .set-acc[open] summary{border-color:#3A3B3C}
 })();
 </script>
 <script>
-document.querySelectorAll('details.set-acc').forEach(function(d){
-    d.addEventListener('toggle', function(){
-        if (!d.open) return;
-        document.querySelectorAll('details.set-acc').forEach(function(o){ if (o !== d) o.open = false; });
+(function(){
+    document.querySelectorAll('[data-open]').forEach(function(b){
+        b.addEventListener('click', function(){
+            var d = document.getElementById(b.getAttribute('data-open'));
+            if (d && d.showModal) d.showModal();
+        });
     });
+    document.querySelectorAll('dialog.set-modal').forEach(function(d){
+        d.querySelectorAll('[data-close]').forEach(function(x){ x.addEventListener('click', function(){ d.close(); }); });
+        // click on the dark backdrop closes the popup
+        d.addEventListener('mousedown', function(e){ if (e.target === d) d.close(); });
+    });
+    <?php if ($openPw): ?>
+    var pw = document.getElementById('m-pw'); if (pw && pw.showModal) pw.showModal();
+    <?php endif; ?>
+})();
+</script>
+<script src="../assets/js/pw-policy.js?v=1"></script>
+<script>
+PwPolicy.attach({
+    input: document.querySelector('input[name="new_password"]'),
+    list: document.getElementById('pw-rules'),
+    bad: document.getElementById('pw-bad'),
+    cfg: <?= json_encode(passwordPolicyJsConfig(8), JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE) ?>,
+    ctx: <?= json_encode([$student['student_id'] ?? '', $student['email'] ?? ''], JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE) ?>,
+    names: <?= json_encode([$student['first_name'] ?? '', $student['last_name'] ?? ''], JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE) ?>
 });
 </script>
 <script src="../assets/js/sidebar.js?v=5"></script>

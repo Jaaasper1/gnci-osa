@@ -5,6 +5,7 @@ require_once '../includes/auth.php';
 require_once '../includes/functions.php';
 require_once '../includes/password-login.php';
 require_once '../includes/lang.php';
+require_once '../includes/password-policy.php';
 requireStaff();
 
 $staff_id = $_SESSION['user_id'];
@@ -47,10 +48,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = t('settings.err_current_wrong', 'Current password is incorrect.');
         } elseif ($current === '' && $method === 'password') {
             $error = t('msg.enter_your_current_password_d333', 'Enter your current password.');
-        } elseif (strlen($new_pass) < 9) {
-            $error = t('register.err_pw_length', t('msg.new_password_must_be_at_least_9_characte_d1ff', 'New password must be at least 9 characters.'));
+        } elseif (($pwErr = passwordPolicyError($new_pass, [$staff['username'] ?? '', $staff['email'] ?? ''], 9, [$staff['first_name'] ?? '', $staff['last_name'] ?? ''])) !== null) {
+            $error = $pwErr;
         } elseif ($new_pass !== $confirm) {
             $error = t('register.err_pw_mismatch', 'Passwords do not match.');
+        } elseif (!empty($staff['password']) && password_verify($new_pass, $staff['password'])) {
+            $error = t('settings.err_same_password', 'Your new password must be different from your current password.');
         } else {
             $pdo->prepare("UPDATE osa_staff SET password=? WHERE id=?")
                 ->execute([password_hash($new_pass, PASSWORD_DEFAULT), $staff_id]);
@@ -175,9 +178,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="form-group">
                     <label><?= t('newpass.label', 'New Password') ?> <span style="color:#EF4444;">*</span></label>
                     <div style="position:relative;">
-                        <input type="password" name="new_password" id="new-pass" class="form-control" placeholder="<?= t('register.min_chars', 'Min. 9 characters') ?>" style="padding-right:38px;" required>
+                        <input type="password" name="new_password" id="new-pass" class="form-control" placeholder="<?= t('register.min_chars', 'Min. 9 characters') ?>" maxlength="72" autocomplete="new-password" style="padding-right:38px;" required>
                         <button type="button" onclick="toggleVis('new-pass','new-eye')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:16px;" tabindex="-1"><i class="ti ti-eye" id="new-eye"></i></button>
                     </div>
+                    <ul id="pw-rules" class="pw-rules">
+                        <li data-r="len"><i class="ti ti-circle"></i> <?= t('pw.rule_len', 'At least 9 characters') ?></li>
+                        <li data-r="up"><i class="ti ti-circle"></i> <?= t('pw.rule_up', 'One uppercase letter (A-Z)') ?></li>
+                        <li data-r="low"><i class="ti ti-circle"></i> <?= t('pw.rule_low', 'One lowercase letter (a-z)') ?></li>
+                        <li data-r="num"><i class="ti ti-circle"></i> <?= t('pw.rule_num', 'One number (0-9)') ?></li>
+                        <li data-r="sym"><i class="ti ti-circle"></i> <?= t('pw.rule_sym', 'One special character (! @ # $ % &)') ?></li>
+                    </ul>
+                    <div id="pw-bad" class="pw-bad" role="alert"></div>
                 </div>
                 <div class="form-group">
                     <label><?= t('register.confirm_password', 'Confirm New Password') ?> <span style="color:#EF4444;">*</span></label>
@@ -193,6 +204,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 </div></div>
 
+<style>
+.pw-rules{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:3px;font-size:12px;color:#6B7280}
+.pw-rules li i{font-size:13px;vertical-align:-1px}
+.pw-rules li.ok{color:#15803D}
+.pw-rules li.no{color:#B91C1C}
+.pw-bad{display:none;margin-top:6px;font-size:12px;font-weight:600;color:#B91C1C}
+html[data-theme="dark"] .pw-rules li.ok{color:#4ADE80}
+html[data-theme="dark"] .pw-rules li.no{color:#F87171}
+html[data-theme="dark"] .pw-bad{color:#F87171}
+</style>
 <script>
 function toggleVis(inputId, eyeId) {
     var inp = document.getElementById(inputId);
@@ -200,6 +221,17 @@ function toggleVis(inputId, eyeId) {
     inp.type = inp.type === 'password' ? 'text' : 'password';
     eye.className = inp.type === 'password' ? 'ti ti-eye' : 'ti ti-eye-off';
 }
+</script>
+<script src="../assets/js/pw-policy.js?v=1"></script>
+<script>
+PwPolicy.attach({
+    input: document.querySelector('#new-pass'),
+    list: document.getElementById('pw-rules'),
+    bad: document.getElementById('pw-bad'),
+    cfg: <?= json_encode(passwordPolicyJsConfig(9), JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE) ?>,
+    ctx: <?= json_encode([$staff['username'] ?? '', $staff['email'] ?? ''], JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE) ?>,
+    names: <?= json_encode([$staff['first_name'] ?? '', $staff['last_name'] ?? ''], JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE) ?>
+});
 </script>
 <script src="../assets/js/sidebar.js?v=5"></script>
 </body>

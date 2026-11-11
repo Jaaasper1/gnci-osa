@@ -5,6 +5,7 @@ require_once 'includes/lang.php';
 require_once 'includes/functions.php';
 require_once 'includes/csrf.php';
 require_once 'includes/mailer.php';
+require_once 'includes/password-policy.php';
 
 if (isLoggedIn()) {
     if ($_SESSION['user_type'] === 'student') header('Location: student/dashboard.php');
@@ -57,8 +58,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['step'] ?? '') === 'details
         $error = t('register.err_sid_format', 'Invalid Student ID format. Numbers only, no dashes (e.g. 20193372).');
     } elseif (!in_array($course, $courses, true)) {
         $error = t('msg.please_select_a_valid_course_from_the_li_ea27', 'Please select a valid course from the list.');
-    } elseif (mb_strlen($pw) < 8) {
-        $error = t('msg.password_must_be_at_least_8_characters_7667', 'Password must be at least 8 characters.');
+    } elseif (($pwErr = passwordPolicyError($pw, [$sid, $email], 8, [$fname, $lname])) !== null) {
+        $error = $pwErr;
     } elseif ($pw !== $pw2) {
         $error = t('msg.the_passwords_do_not_match_f6d1', 'The passwords do not match.');
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -342,7 +343,15 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
                         <div class="form-group" style="margin-bottom:0;">
                             <label>Password <span style="color:#991B1B;">*</span></label>
                             <input type="password" name="password" class="form-control" minlength="8"
-                                   placeholder="<?= htmlspecialchars(t('auto.at_least_8_characters_f641', 'At least 8 characters'), ENT_QUOTES) ?>" autocomplete="new-password" required>
+                                   placeholder="<?= htmlspecialchars(t('auto.at_least_8_characters_f641', 'At least 8 characters'), ENT_QUOTES) ?>" maxlength="72" autocomplete="new-password" required>
+                            <ul id="pw-rules" class="pw-rules">
+                        <li data-r="len"><i class="ti ti-circle"></i> <?= t('pw.rule_len', 'At least 8 characters') ?></li>
+                        <li data-r="up"><i class="ti ti-circle"></i> <?= t('pw.rule_up', 'One uppercase letter (A-Z)') ?></li>
+                        <li data-r="low"><i class="ti ti-circle"></i> <?= t('pw.rule_low', 'One lowercase letter (a-z)') ?></li>
+                        <li data-r="num"><i class="ti ti-circle"></i> <?= t('pw.rule_num', 'One number (0-9)') ?></li>
+                        <li data-r="sym"><i class="ti ti-circle"></i> <?= t('pw.rule_sym', 'One special character (! @ # $ % &)') ?></li>
+                    </ul>
+                    <div id="pw-bad" class="pw-bad" role="alert"></div>
                         </div>
                         <div class="form-group" style="margin-bottom:0;">
                             <label><?= t('auto.confirm_password_4c23', 'Confirm password') ?> <span style="color:#991B1B;">*</span></label>
@@ -380,7 +389,28 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
     </main>
 </div>
 
+<style>
+.pw-rules{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:3px;font-size:12px;color:#6B7280}
+.pw-rules li i{font-size:13px;vertical-align:-1px}
+.pw-rules li.ok{color:#15803D}
+.pw-rules li.no{color:#B91C1C}
+.pw-bad{display:none;margin-top:6px;font-size:12px;font-weight:600;color:#B91C1C}
+html[data-theme="dark"] .pw-rules li.ok{color:#4ADE80}
+html[data-theme="dark"] .pw-rules li.no{color:#F87171}
+html[data-theme="dark"] .pw-bad{color:#F87171}
+</style>
 <script src="assets/js/sidebar.js?v=5"></script>
+<script src="assets/js/pw-policy.js?v=1"></script>
+<script>
+PwPolicy.attach({
+    input: document.querySelector('input[name="password"]'),
+    list: document.getElementById('pw-rules'),
+    bad: document.getElementById('pw-bad'),
+    cfg: <?= json_encode(passwordPolicyJsConfig(8), JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE) ?>,
+    ctx: function(){ return [(document.querySelector('[name="student_id"]')||{}).value, (document.querySelector('[name="email"]')||{}).value]; },
+    names: function(){ return [(document.querySelector('[name="first_name"]')||{}).value, (document.querySelector('[name="last_name"]')||{}).value]; }
+});
+</script>
 <script src="assets/js/otp-input.js"></script>
 <script>
 (function () {
