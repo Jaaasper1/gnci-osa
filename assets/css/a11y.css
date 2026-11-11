@@ -52,3 +52,7 @@ html.a11y-dys #a11y-mag{font-family:'OpenDyslexic','Comic Sans MS',sans-serif;fo
 /* Pages that already have a bottom-right floating button (Ask OSA bubble on student pages, Live Results on login): sit above it */
 html.a11y-raised #a11y-btn{right:20px;bottom:calc(96px + env(safe-area-inset-bottom,0px))}
 html.a11y-raised #a11y-panel{bottom:calc(152px + env(safe-area-inset-bottom,0px));max-height:calc(100vh - 170px)}
+
+/* Student pages: sit directly above the Ask OSA bubble (48px circle at right:24px) with the same size and centre line */
+html.a11y-raised-chat #a11y-btn{right:24px;width:48px;height:48px;bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+html.a11y-raised-chat #a11y-panel{bottom:calc(142px + env(safe-area-inset-bottom,0px));max-height:calc(100vh - 160px)}

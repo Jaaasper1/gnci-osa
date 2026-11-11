@@ -151,6 +151,8 @@ window.__t = window.__t || function (s) { return s; };
     build(); initMag();
     /* Lift the button only where another floating button already sits at the bottom-right */
     if (document.querySelector('#osaChatWrap, .liveresults-fab')) root.classList.add('a11y-raised');
+    /* Ask OSA bubble is 48px at right:24px: line the accessibility button up with its centre */
+    if (document.querySelector('#osaChatWrap')) root.classList.add('a11y-raised-chat');
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount); else mount();
 })();
