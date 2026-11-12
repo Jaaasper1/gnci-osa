@@ -15,6 +15,10 @@ if (isLoggedIn()) {
     exit;
 }
 
+// Email OTP at registration is OFF (too many students for one Gmail to send to).
+// Admin approval + COR are still required. Set to true to bring the OTP step back.
+$requireOtp = false;
+
 $error   = '';
 $success = false;
 $courses = getCourseOptions();
@@ -81,6 +85,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['step'] ?? '') === 'details
             $corResult = uploadCorFile($_FILES['cor_file']);
             if (!empty($corResult['error'])) {
                 $error = $corResult['error'];
+            } elseif (!$requireOtp) {
+                // No email code: create the account right away (still pending admin approval).
+                try {
+                    $pdo->prepare("INSERT INTO students (student_id, first_name, last_name, email, course, cor_file, password, is_active)
+                                   VALUES (?, ?, ?, ?, ?, ?, ?, 0)")
+                        ->execute([$sid, $fname, $lname, $email, $course, $corResult['filename'], password_hash($pw, PASSWORD_DEFAULT)]);
+                    $success = true;
+                } catch (PDOException $e) {
+                    @unlink(__DIR__ . '/uploads/' . $corResult['filename']);
+                    $error = t('register.err_duplicate', 'This Student ID or email is already registered. Contact the OSA office if you have a concern.');
+                }
             } else {
                 $otp = generateOtpCode();
                 $sent = sendRegistrationOtp($email, $fname, $otp);
@@ -212,7 +227,7 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
                 </p>
                 <div class="alert" style="background:#FEF3C7;border:1px solid #FCD34D;">
                     <i class="ti ti-info-circle" style="color:#92400E;"></i>
-                    <span style="color:#92400E;"><?= t('register.approval_note', 'Once approved, log in anytime with just your Student ID — we\'ll email you a code.') ?></span>
+                    <span style="color:#92400E;"><?= t('register.approval_note2', 'Once approved, log in with your Student ID and the password you set.') ?></span>
                 </div>
                 <a href="index.php" class="auth-btn" data-loading-text="<?= htmlspecialchars(t('msg.back_to_login_6c85', 'Back to login...'), ENT_QUOTES) ?>">
                     <?= t('register.back_to_login', 'Back to Login') ?>
@@ -270,13 +285,13 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
                 <!-- REGISTER FORM (STEP 1) -->
                 <a href="index.php" class="auth-back" data-loading-text="<?= htmlspecialchars(t('msg.back_to_login_6c85', 'Back to login...'), ENT_QUOTES) ?>"><i class="ti ti-arrow-left"></i> <?= t('common.go_back', 'Go back') ?></a>
                 <h1 class="auth-title"><?= t('login.register', 'Register') ?></h1>
-                <p class="auth-sub"><?= t('register.subtitle_otp', "Create an account. Set a password, or log in with an email code each time.") ?></p>
+                <p class="auth-sub"><?= $requireOtp ? t('register.subtitle_otp', "Create an account. Set a password, or log in with an email code each time.") : t('register.subtitle_nootp', 'Create an account and set a password to log in.') ?></p>
 
                 <?php if ($error): ?>
                     <div class="alert alert-error"><i class="ti ti-alert-circle"></i> <?= htmlspecialchars($error) ?></div>
                 <?php endif; ?>
 
-                <form id="reg-form" method="POST" action="register.php" class="auth-form" enctype="multipart/form-data" data-loading-text="<?= htmlspecialchars(t('msg.sending_verification_code_738a', 'Sending verification code...'), ENT_QUOTES) ?>">
+                <form id="reg-form" method="POST" action="register.php" class="auth-form" enctype="multipart/form-data" data-loading-text="<?= htmlspecialchars($requireOtp ? t('msg.sending_verification_code_738a', 'Sending verification code...') : 'Submitting...', ENT_QUOTES) ?>">
                     <?= csrfField() ?>
                     <input type="hidden" name="step" value="details">
 
@@ -305,7 +320,7 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
                         </div>
                     </div>
                     <div style="font-size:12px;color:#6B7280;margin-top:4px;">
-                        <i class="ti ti-info-circle"></i> <?= t('auto.must_be_a_gmail_address_this_is_also_how_24ae', 'Must be a Gmail address — this is also how you\'ll log in, we\'ll send a code here every time.') ?>
+                        <i class="ti ti-info-circle"></i> <?= $requireOtp ? t('auto.must_be_a_gmail_address_this_is_also_how_24ae', 'Must be a Gmail address — this is also how you\'ll log in, we\'ll send a code here every time.') : t('register.email_hint_nootp', 'Must be a Gmail address that you can access.') ?>
                     </div>
 
                     <div style="height:12px;"></div>
@@ -365,7 +380,7 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
                         </div>
                     </div>
                     <div style="font-size:12px;color:#6B7280;margin-top:4px;">
-                        <i class="ti ti-info-circle"></i> <?= t('auto.you_can_log_in_with_your_password_or_use_b627', 'You can log in with your password, or use the email code.') ?>
+                        <i class="ti ti-info-circle"></i> <?= $requireOtp ? t('auto.you_can_log_in_with_your_password_or_use_b627', 'You can log in with your password, or use the email code.') : t('register.pw_hint_nootp', 'Use this password with your Student ID to log in.') ?>
                     </div>
 
                     <div style="height:12px;"></div>
@@ -382,7 +397,7 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
 
                     <div style="height:20px;"></div>
 
-                    <button type="submit" class="auth-btn"><?= t('auto.send_verification_code_fe80', 'Send Verification Code') ?></button>
+                    <button type="submit" class="auth-btn"><?= $requireOtp ? t('auto.send_verification_code_fe80', 'Send Verification Code') : t('register.submit_nootp', 'Submit Registration') ?></button>
                 </form>
 
                 <div class="auth-aside-box">
@@ -514,8 +529,8 @@ PwPolicy.attach({
               if (__sbtn) __sbtn.disabled = false;
               var doc = new DOMParser().parseFromString(res.text, 'text/html');
               var newForm = doc.getElementById('reg-form');
-              if (!newForm) {                     // success -> OTP screen
-                  window.location.href = 'register.php'; return;
+              if (!newForm) {                     // success (or OTP screen): show the page the server returned
+                  document.open(); document.write(res.text); document.close(); return;
               }
               hideOverlay();
               var err = doc.querySelector('.auth-panel .alert-error');

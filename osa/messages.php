@@ -292,9 +292,6 @@ $base = '../admin/';   // admin and staff share the full menu
         <button type="button" id="msgSearchClear" aria-label="<?= t('ui.clear_search_9983', 'Clear search') ?>" <?= $q === '' ? 'hidden' : '' ?>><i class="ti ti-x"></i></button>
     </div>
 
-    <div class="msgm-seltools">
-        <button type="button" id="selBtn" class="btn btn-outline btn-sm"><i class="ti ti-checkbox"></i> Select</button>
-    </div>
     <div class="msgm-bulkbar" id="bulkBar" hidden>
         <label><input type="checkbox" id="selAll"> Select all</label>
         <span id="selCount">0 selected</span>
@@ -386,7 +383,6 @@ $__in  = 0; foreach ($__stu as $__s) if (!empty($__s['last_login_at'])) $__in++;
 $__out = count($__stu) - $__in;
 ?>
 <style>
-  .msgm-seltools{max-width:720px;display:flex;justify-content:flex-end;margin:0 0 8px}
   .msgm-bulkbar{max-width:720px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;position:sticky;top:0;z-index:20;background:#fff;padding:8px 0 10px;margin:0 0 6px;border-bottom:1px solid #F3F4F6;font-size:13px;color:#374151}
   .msgm-bulkbar[hidden]{display:none}
   .msgm-bulkbar label{display:flex;align-items:center;gap:6px;font-size:13px;color:#374151;cursor:pointer}
@@ -400,7 +396,9 @@ $__out = count($__stu) - $__in;
   .msgm-bulkbar input:checked,.msgm-check:checked{background-color:#6B1A2A;border-color:#6B1A2A;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-7'/%3E%3C/svg%3E")}
   .msgm-bulkbar input:hover,.msgm-check:hover{border-color:#6B1A2A}
   .msgm-check{display:none;margin:0 10px 0 0;align-self:center}
-  .msgm-list.selecting .msgm-check{display:block}
+  @media (hover:hover) and (min-width:769px){ .msgm-check{display:block;opacity:0} .msgm-item:hover .msgm-check,.msgm-check:focus-visible{opacity:1} }
+  .msgm-list.selecting .msgm-check{display:block;opacity:1}
+  .msgm-item{-webkit-touch-callout:none}
   .msgm-list.selecting .msgm-item{cursor:pointer;-webkit-user-select:none;user-select:none}
   .msgm-list.selecting .msgm-item.selected{background:#F9EEF0}
   .msgm-compose{border:0;background:transparent;color:#6B1A2A;width:44px;height:44px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
@@ -477,61 +475,95 @@ $__out = count($__stu) - $__in;
 })();
 </script>
 <script>
-// Multi-select: Select -> tick conversations -> Delete / Mark closed (same idea as the Notifications page).
+// Multi-select (same as Notifications): click the circle on a row (desktop) or long-press a row (phone).
 (function () {
-  var box = document.getElementById('msgList'), selBtn = document.getElementById('selBtn'), bar = document.getElementById('bulkBar');
-  if (!box || !selBtn || !bar) return;
+  var box = document.getElementById('msgList'), bar = document.getElementById('bulkBar');
+  if (!box || !bar) return;
   var all = document.getElementById('selAll'), count = document.getElementById('selCount'),
       form = document.getElementById('bulkForm'), act = document.getElementById('bulkAction'), idsBox = document.getElementById('bulkIds');
-  function checks() { return Array.prototype.slice.call(box.querySelectorAll('.msgm-check')); }
-  function refresh() {
-    var cs = checks(), n = 0, hasUnread = false, hasRead = false, hasOpen = false;
+  var sel = new Set(), selecting = false, autoExit = false, suppressClick = false;
+  function cbs() { return Array.prototype.slice.call(box.querySelectorAll('.msgm-check')); }
+  function rowOf(c) { return c.closest('.msgm-item'); }
+  function render() {
+    var cs = cbs(), present = {};
+    cs.forEach(function (c) { present[c.dataset.id] = true; });
+    sel.forEach(function (id) { if (!present[id]) sel.delete(id); });   // rows that disappeared (live search)
+    var hasUnread = false, hasRead = false, hasOpen = false;
     cs.forEach(function (c) {
-      var it = c.closest('.msgm-item');
-      if (c.checked) {
-        n++;
-        if (it && it.dataset.unread === '1') hasUnread = true; else hasRead = true;
-        if (it && it.dataset.status !== 'closed') hasOpen = true;
+      var on = sel.has(c.dataset.id), it = rowOf(c);
+      c.checked = on;
+      if (it) it.classList.toggle('selected', on);
+      if (on && it) {
+        if (it.dataset.unread === '1') hasUnread = true; else hasRead = true;
+        if (it.dataset.status !== 'closed') hasOpen = true;
       }
-      if (it) it.classList.toggle('selected', c.checked);
     });
+    var n = sel.size;
     count.textContent = n + ' selected';
-    all.checked = cs.length > 0 && n === cs.length;
-    document.getElementById('bulkRead').disabled   = !hasUnread;   // nothing unread selected -> nothing to mark as read
-    document.getElementById('bulkUnread').disabled = !hasRead;     // nothing read selected -> nothing to mark as unread
-    document.getElementById('bulkClose').disabled  = !hasOpen;     // all selected are already closed
+    all.checked = n > 0 && n === cs.length;
+    all.indeterminate = n > 0 && n < cs.length;
+    document.getElementById('bulkRead').disabled   = !hasUnread;
+    document.getElementById('bulkUnread').disabled = !hasRead;
+    document.getElementById('bulkClose').disabled  = !hasOpen;
     document.getElementById('bulkDelete').disabled = (n === 0);
   }
-  function setMode(on) {
-    box.classList.toggle('selecting', on);
-    bar.hidden = !on;
-    selBtn.style.display = on ? 'none' : '';
-    if (!on) checks().forEach(function (c) { c.checked = false; });
-    refresh();
+  function enter(auto) { selecting = true; autoExit = !!auto; box.classList.add('selecting'); bar.hidden = false; render(); }
+  function exit()      { selecting = false; autoExit = false; sel.clear(); box.classList.remove('selecting'); bar.hidden = true; render(); }
+  function toggle(id, force) {
+    id = String(id);
+    var on = (typeof force === 'boolean') ? force : !sel.has(id);
+    if (on) sel.add(id); else sel.delete(id);
+    if (!selecting) enter(true);
+    if (selecting && autoExit && sel.size === 0) { exit(); return; }
+    render();
   }
-  selBtn.addEventListener('click', function () { setMode(true); });
-  document.getElementById('selCancel').addEventListener('click', function () { setMode(false); });
-  all.addEventListener('change', function () { checks().forEach(function (c) { c.checked = all.checked; }); refresh(); });
+  all.addEventListener('change', function () {
+    cbs().forEach(function (c) { if (all.checked) sel.add(c.dataset.id); else sel.delete(c.dataset.id); });
+    if (autoExit && sel.size === 0) { exit(); return; }
+    render();
+  });
+  document.getElementById('selCancel').addEventListener('click', exit);
+
+  // Clicks: the circle always selects; while selecting, clicking anywhere on a row selects too.
   box.addEventListener('click', function (e) {
-    if (!box.classList.contains('selecting')) return;
+    if (suppressClick) { suppressClick = false; e.preventDefault(); return; }
     var it = e.target.closest('.msgm-item'); if (!it) return;
     var c = it.querySelector('.msgm-check'); if (!c) return;
-    if (e.target !== c) { e.preventDefault(); c.checked = !c.checked; }
-    refresh();
+    if (e.target === c) { e.preventDefault(); toggle(c.dataset.id); return; }
+    if (selecting) { e.preventDefault(); toggle(c.dataset.id); }
   });
-  new MutationObserver(refresh).observe(box, { childList: true });   // live search re-renders the rows
+
+  // Long-press on a row (touch / pen) = start selecting
+  var timer = null, sx = 0, sy = 0;
+  function cancel() { if (timer) { clearTimeout(timer); timer = null; } }
+  box.addEventListener('pointerdown', function (e) {
+    if (e.pointerType === 'mouse') return;
+    var it = e.target.closest('.msgm-item'); if (!it || e.target.closest('input')) return;
+    var c = it.querySelector('.msgm-check'); if (!c) return;
+    sx = e.clientX; sy = e.clientY; cancel();
+    timer = setTimeout(function () {
+      timer = null; suppressClick = true;
+      if (navigator.vibrate) { try { navigator.vibrate(30); } catch (_) {} }
+      toggle(c.dataset.id, true);
+    }, 450);
+  });
+  box.addEventListener('pointermove', function (e) { if (timer && (Math.abs(e.clientX - sx) > 8 || Math.abs(e.clientY - sy) > 8)) cancel(); });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) { box.addEventListener(ev, cancel); });
+  box.addEventListener('contextmenu', function (e) { if (e.target.closest('.msgm-item') && 'ontouchstart' in window) e.preventDefault(); });
+
+  new MutationObserver(render).observe(box, { childList: true });   // live search re-renders the rows
+
   function submit(action, msg) {
-    var picked = checks().filter(function (c) { return c.checked; });
-    if (!picked.length || !confirm(msg.replace('{n}', picked.length))) return;
+    if (!sel.size || !confirm(msg.replace('{n}', sel.size))) return;
     act.value = action; idsBox.innerHTML = '';
-    picked.forEach(function (c) { var i = document.createElement('input'); i.type = 'hidden'; i.name = 'ids[]'; i.value = c.dataset.id; idsBox.appendChild(i); });
+    sel.forEach(function (id) { var i = document.createElement('input'); i.type = 'hidden'; i.name = 'ids[]'; i.value = id; idsBox.appendChild(i); });
     form.submit();
   }
   document.getElementById('bulkDelete').addEventListener('click', function () { submit('bulk_delete', 'Delete {n} conversation(s) permanently? This cannot be undone.'); });
   document.getElementById('bulkRead').addEventListener('click', function () { submit('bulk_read', 'Mark {n} conversation(s) as read?'); });
   document.getElementById('bulkUnread').addEventListener('click', function () { submit('bulk_unread', 'Mark {n} conversation(s) as unread?'); });
   document.getElementById('bulkClose').addEventListener('click', function () { submit('bulk_close', 'Mark {n} conversation(s) as closed?'); });
-  refresh();
+  render();
 })();
 </script>
 <script>
