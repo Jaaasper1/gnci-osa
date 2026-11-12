@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/mailer.php';
 require_once __DIR__ . '/audit.php';
+require_once __DIR__ . '/notify-settings.php';
 
 // Sanitize output to prevent XSS
 function e($str) {
@@ -128,12 +129,20 @@ function addStaffNotification($pdo, $staff_id, $message, $link = null) {
     $stmt = $pdo->prepare("INSERT INTO staff_notifications (staff_id, message, link) VALUES (?, ?, ?)");
     $stmt->execute([$staff_id, $message, $link]);
 
-    // In addition to the in-app notification, also email the staff member's Gmail if available
-    $stmt2 = $pdo->prepare("SELECT first_name, last_name, email FROM osa_staff WHERE id = ?");
+    // Email rule: only admin accounts get email notifications (sent to the admin
+    // Notification Gmail). Regular staff get the in-app bell only, unless the admin
+    // turns on "Also email staff" in Admin > Notification Gmail.
+    $stmt2 = $pdo->prepare("SELECT first_name, last_name, email, role FROM osa_staff WHERE id = ?");
     $stmt2->execute([$staff_id]);
     $staff = $stmt2->fetch();
-    if ($staff && !empty($staff['email'])) {
-        sendNotificationEmail($staff['email'], $staff['first_name'] . ' ' . $staff['last_name'], $message, portalUrl('staff-login.php'));
+    if ($staff) {
+        $isAdmin = (($staff['role'] ?? '') === 'admin');
+        if ($isAdmin || getAppSetting($pdo, STAFF_EMAIL_NOTIF_KEY, '0') === '1') {
+            $to = notifyEmailFor($pdo, $staff);
+            if ($to !== '') {
+                sendNotificationEmail($to, $staff['first_name'] . ' ' . $staff['last_name'], $message, portalUrl('staff-login.php'));
+            }
+        }
     }
 }
 

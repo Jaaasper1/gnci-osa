@@ -3,6 +3,7 @@ require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/lang.php';
 require_once 'includes/functions.php';
+require_once __DIR__ . '/includes/rate-limit.php';
 require_once 'includes/csrf.php';
 require_once 'includes/mailer.php';
 require_once 'includes/password-policy.php';
@@ -73,6 +74,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['step'] ?? '') === 'details
         $check->execute([$sid, $email]);
         if ($check->fetch()) {
             $error = t('register.err_duplicate', 'This Student ID or email is already registered. Contact the OSA office if you have a concern.');
+        } elseif (!actionRateLimit($pdo, 'register_ip', $_SERVER['REMOTE_ADDR'] ?? '', 10, 900)
+               || !actionRateLimit($pdo, 'register_sid', $sid, 3, 900)) {
+            $error = 'Too many registration attempts. Please wait 15 minutes, then try again.';
         } else {
             $corResult = uploadCorFile($_FILES['cor_file']);
             if (!empty($corResult['error'])) {
@@ -502,9 +506,12 @@ PwPolicy.attach({
         e.preventDefault(); e.stopImmediatePropagation();
         if (!state()) { form.reportValidity(); return; }
         if (window.appShowLoadingOverlay) window.appShowLoadingOverlay(form.dataset.loadingText || 'Loading...');
+        var __sbtn = form.querySelector('button[type="submit"]');
+        if (__sbtn) __sbtn.disabled = true;
         fetch(form.action, {method:'POST', body:new FormData(form), credentials:'same-origin'})
           .then(function(r){ return r.text().then(function(t){ return {ok:r.ok, text:t}; }); })
           .then(function(res){
+              if (__sbtn) __sbtn.disabled = false;
               var doc = new DOMParser().parseFromString(res.text, 'text/html');
               var newForm = doc.getElementById('reg-form');
               if (!newForm) {                     // success -> OTP screen
@@ -518,6 +525,7 @@ PwPolicy.attach({
               if (tok && cur) cur.value = tok.value;
           })
           .catch(function(){
+              if (__sbtn) __sbtn.disabled = false;
               hideOverlay();
               showError('Network error. Please check your connection and try again.');
           });

@@ -31,6 +31,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    if ($action === 'staff_toggle') {
+        setAppSetting($pdo, STAFF_EMAIL_NOTIF_KEY, isset($_POST['staff_email']) ? '1' : '0');
+        $success = isset($_POST['staff_email'])
+            ? 'Staff will now also receive email notifications.'
+            : 'Email notifications now go to the admin only. Staff still get in-app notifications.';
+    }
+
     if ($action === 'test') {
         $target = getAdminNotifyEmail($pdo);
         if ($target === '') {
@@ -44,6 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $currentGmail = getAdminNotifyEmail($pdo);
+$staffEmail   = getAppSetting($pdo, STAFF_EMAIL_NOTIF_KEY, '0') === '1';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -111,6 +119,14 @@ $currentGmail = getAdminNotifyEmail($pdo);
                     <div style="font-size:11px;color:#9CA3AF;margin-top:3px;"><i class="ti ti-info-circle"></i> <?= t('ui.must_end_in_gmail_com_7646', 'Must end in @gmail.com') ?></div>
                 </div>
                 <button type="submit" class="btn btn-primary btn-block"><i class="ti ti-device-floppy"></i> <?= t('ui.save_c9cc', 'Save') ?></button>
+            </form>
+            <form method="POST" style="margin-top:12px;">
+                <?= csrfField() ?>
+                <input type="hidden" name="action" value="staff_toggle">
+                <label style="display:flex;gap:8px;align-items:center;font-size:13px;color:#374151;">
+                    <input type="checkbox" name="staff_email" value="1" <?= $staffEmail ? 'checked' : '' ?> onchange="this.form.submit()">
+                    Also email regular staff (default: off, admin only)
+                </label>
             </form>
             <form method="POST" style="margin-top:12px;">
                 <?= csrfField() ?>

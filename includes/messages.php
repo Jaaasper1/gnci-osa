@@ -116,6 +116,19 @@ function msgSidebarBadge(PDO $pdo): string {
     return $n > 0 ? '<span class="badge-count">' . $n . '</span>' : '';
 }
 
+// All active students with their last sign-in (NULL = has not signed in yet).
+function msgStudentSignInList(PDO $pdo): array {
+    try {
+        $has = $pdo->query("SHOW COLUMNS FROM students LIKE 'last_login_at'")->fetch();
+        if (!$has) $pdo->exec("ALTER TABLE students ADD COLUMN last_login_at DATETIME DEFAULT NULL");
+        return $pdo->query("SELECT id, student_id, first_name, last_name, course, last_login_at
+                            FROM students WHERE is_active = 1
+                            ORDER BY last_name, first_name")->fetchAll();
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
 // Sends an in-app notification (and email) to every active staff/admin account.
 function msgNotifyStaff(PDO $pdo, string $message, string $link): void {
     $ids = $pdo->query("SELECT id FROM osa_staff WHERE is_active = 1")->fetchAll(PDO::FETCH_COLUMN);
@@ -144,7 +157,16 @@ function msgSaveUploadedVoice(): array {
     if ($f['size'] <= 0 || $f['size'] > VOICE_MAX_BYTES) {
         return ['file' => null, 'error' => 'Masyadong mahaba ang voice message (max 5 MB).'];
     }
-    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($f['tmp_name']);
+    if (class_exists('finfo')) {
+        $mime = (new finfo(FILEINFO_MIME_TYPE))->file($f['tmp_name']);
+    } else {
+        // PHP "fileinfo" extension is off on this host: detect the format from the file's first bytes.
+        $h = (string)@file_get_contents($f['tmp_name'], false, null, 0, 12);
+        if (strncmp($h, "\x1A\x45\xDF\xA3", 4) === 0)       $mime = 'audio/webm';
+        elseif (strncmp($h, 'OggS', 4) === 0)                  $mime = 'audio/ogg';
+        elseif (substr($h, 4, 4) === 'ftyp')                   $mime = 'audio/mp4';
+        else                                                   $mime = '';
+    }
     $map = [
         'audio/webm' => 'webm', 'video/webm' => 'webm',
         'audio/ogg' => 'ogg', 'application/ogg' => 'ogg', 'video/ogg' => 'ogg',

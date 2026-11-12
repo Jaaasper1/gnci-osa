@@ -368,6 +368,11 @@ $allCourses = getCourseOptions();
                         <button type="button" class="pos-add-btn" onclick="posBuilderAddRow('ap-positions-builder','ap-positions-hidden','','ex. Auditor'); document.querySelector('#ap-positions-builder .pos-row:last-child .pos-input').focus();">
                             <i class="ti ti-plus"></i> <?= t('ui.add_position_0089', 'Add Position') ?>
                         </button>
+                        <input type="file" id="ap-pos-file" accept=".xlsx,.xls,.csv,.txt" style="display:none" onchange="importPositionsFile(this,'ap-positions-builder','ap-positions-hidden')">
+                        <button type="button" class="pos-add-btn" style="margin-top:8px;" onclick="document.getElementById('ap-pos-file').click()">
+                            <i class="ti ti-file-import"></i> <?= t('ui.import_positions_from_excel_csv', 'Import positions from Excel / CSV') ?>
+                        </button>
+                        <small style="color:#9CA3AF;font-size:11px;display:block;margin-top:6px;"><a href="import-positions.php?template=1" style="color:var(--maroon);"><?= t('ui.download_template', 'Download template') ?></a> · <?= t('ui.one_position_per_row', 'one position per row, in ballot order. Election title (column D) is optional.') ?></small>
                         <small style="color:#9CA3AF;font-size:11px;display:block;margin-top:6px;"><?= t('ui.these_will_be_added_to_the_end_of__b267', 'These will be added to the end of the positions list, in this order.') ?></small>
                     </div>
                     <button type="submit" class="btn btn-gold btn-block"><i class="ti ti-plus"></i> <?= t('ui.add_positions_21ae', 'Add Positions') ?></button>
@@ -615,6 +620,11 @@ $allCourses = getCourseOptions();
                     <button type="button" class="pos-add-btn" onclick="posBuilderAddRow('ne-positions-builder','ne-positions-hidden','','ex. Auditor'); document.querySelector('#ne-positions-builder .pos-row:last-child .pos-input').focus();">
                         <i class="ti ti-plus"></i> <?= t('ui.add_position_0089', 'Add Position') ?>
                     </button>
+                    <input type="file" id="ne-pos-file" accept=".xlsx,.xls,.csv,.txt" style="display:none" onchange="importPositionsFile(this,'ne-positions-builder','ne-positions-hidden')">
+                    <button type="button" class="pos-add-btn" style="margin-top:8px;" onclick="document.getElementById('ne-pos-file').click()">
+                        <i class="ti ti-file-import"></i> <?= t('ui.import_positions_from_excel_csv', 'Import positions from Excel / CSV') ?>
+                    </button>
+                    <small style="color:#9CA3AF;font-size:11px;display:block;margin-top:6px;"><a href="import-positions.php?template=1" style="color:var(--maroon);"><?= t('ui.download_template', 'Download template') ?></a> · <?= t('ui.one_position_per_row', 'one position per row, in ballot order. Election title (column D) is optional.') ?></small>
                     <small style="color:#9CA3AF;font-size:11px;display:block;margin-top:6px;"><?= t('ui.use_the_arrows_to_set_the_order_th_2ca3', 'Use the arrows to set the order they\'ll appear on the ballot.') ?></small>
                 </div>
 
@@ -695,6 +705,36 @@ function posBuilderSync(containerId, hiddenInputId) {
     var vals = Array.prototype.map.call(container.querySelectorAll('.pos-input'), function(i) { return i.value.trim(); })
         .filter(function(v) { return v.length > 0; });
     hidden.value = vals.join('\n');
+}
+
+
+// Import positions from .xlsx/.csv/.txt: fills the builder rows (nothing is saved yet)
+function importPositionsFile(input, containerId, hiddenInputId) {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    var fd = new FormData();
+    fd.append('file', file);
+    fd.append('csrf_token', window.CSRF_TOKEN);
+    fetch('import-positions.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+        .then(function(r) { return r.json().catch(function() { return { ok: false, error: 'Import failed. Please try again.' }; }); })
+        .then(function(d) {
+            input.value = '';
+            if (!d.ok) { alert(d.error || 'Import failed.'); return; }
+            // New Election form only: fill the Title box if it is still empty
+            var titleBox = (containerId === 'ne-positions-builder') ? document.getElementById('ne-title') : null;
+            if (titleBox && d.title && !titleBox.value.trim()) titleBox.value = d.title;
+            var container = document.getElementById(containerId);
+            // keep what the admin already typed, drop empty rows, skip duplicates
+            var existing = Array.prototype.map.call(container.querySelectorAll('.pos-input'), function(i) { return i.value.trim(); })
+                .filter(function(v) { return v.length > 0; });
+            var have = {};
+            existing.forEach(function(v) { have[v.toLowerCase()] = true; });
+            var added = d.positions.filter(function(v) { return !have[v.toLowerCase()]; });
+            container.innerHTML = '';
+            existing.concat(added).forEach(function(v) { posBuilderAddRow(containerId, hiddenInputId, v, null); });
+            if (!container.querySelector('.pos-row')) posBuilderAddRow(containerId, hiddenInputId, '', null);
+        })
+        .catch(function() { input.value = ''; alert('Import failed. Please try again.'); });
 }
 
 // ============================================

@@ -13,6 +13,7 @@
 // ============================================================
 
 const ADMIN_NOTIFY_EMAIL_KEY = 'admin_notify_gmail';
+const STAFF_EMAIL_NOTIF_KEY  = 'staff_email_notifs'; // '1' = regular staff also get emails (default '0' = admin only)
 
 function ensureAppSettingsTable(PDO $pdo): void {
     $pdo->exec("CREATE TABLE IF NOT EXISTS `app_settings` (

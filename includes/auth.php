@@ -115,6 +115,20 @@ function _loginRedirect() {
     exit;
 }
 
+// Remembers when a student last signed in (shown in Admin/OSA > Messages > Students).
+// Adds the students.last_login_at column on first use, so no SQL import is needed.
+// Never blocks a login: any error is ignored.
+function markStudentLogin($pdo, $id) {
+    try {
+        try {
+            $pdo->prepare("UPDATE students SET last_login_at = NOW() WHERE id = ?")->execute([(int)$id]);
+        } catch (Throwable $e) {
+            $pdo->exec("ALTER TABLE students ADD COLUMN last_login_at DATETIME DEFAULT NULL");
+            $pdo->prepare("UPDATE students SET last_login_at = NOW() WHERE id = ?")->execute([(int)$id]);
+        }
+    } catch (Throwable $e) { /* ignore */ }
+}
+
 function loginStudent($pdo, $student_id, $password) {
     $stmt = $pdo->prepare("SELECT * FROM students WHERE student_id = ? AND is_active = 1");
     $stmt->execute([$student_id]);
@@ -126,6 +140,7 @@ function loginStudent($pdo, $student_id, $password) {
         $_SESSION['student_id']           = $student['student_id'];
         $_SESSION['must_change_password'] = (bool)($student['must_change_password'] ?? 0);
         $_SESSION['login_method']         = 'password';
+        markStudentLogin($pdo, $student['id']);
         return true;
     }
     return false;
@@ -148,6 +163,8 @@ function finalizeStudentSession($student) {
     $_SESSION['student_id']           = $student['student_id'];
     $_SESSION['must_change_password'] = (bool)($student['must_change_password'] ?? 0);
     $_SESSION['login_method']         = 'otp';
+    global $pdo;
+    if (isset($pdo)) markStudentLogin($pdo, $student['id']);
 }
 
 function loginStaff($pdo, $username, $password) {

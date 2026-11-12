@@ -6,7 +6,10 @@ require_once '../includes/audit.php';
 require_once '../includes/functions.php';
 require_once '../includes/lang.php';
 require_once '../includes/pager.php';
+require_once '../includes/admin-otp.php';
 requireStaff();
+adminOtpHandleAjax($pdo);   // emails / checks the confirmation code (admin only)
+$canDelete = (($_SESSION['user_type'] ?? '') === 'admin');   // only the admin can delete complaints
 $notifCount = getUnreadStaffNotifCount($pdo, $_SESSION['user_id']);
 
 // Auto-archive/cleanup is heavy on big tables, so it runs at most once every 5 minutes (not on every request)
@@ -20,6 +23,28 @@ if (isset($_GET['_arc_check'])) {
     session_write_close();
     echo '<span data-archived-count="' . (int)$pdo->query("SELECT COUNT(*) FROM complaints WHERE is_archived=1")->fetchColumn() . '"></span>';
     exit;
+}
+
+// Delete a complaint (admin only, confirmed with the admin password or emailed code)
+if (isset($_POST['del_complaint'])) {
+    requireCsrf();
+    $delId  = (int)$_POST['del_complaint'];
+    $backTab = (($_GET['tab'] ?? '') === 'archived') ? 'archived' : 'active';
+    $res = 'error';
+    if ($canDelete && adminOtpConsumeApproval('delete_complaint', $delId)) {
+        $row = auditRow($pdo, 'complaints', $delId);
+        if ($row) {
+            try { $pdo->prepare("DELETE FROM complaint_reviews WHERE complaint_id = ?")->execute([$delId]); } catch (Throwable $e) {}
+            $pdo->prepare("DELETE FROM complaints WHERE id = ?")->execute([$delId]);
+            foreach (['attachment', 'admin_attachment'] as $col) {
+                $f = basename((string)($row[$col] ?? ''));
+                if ($f !== '' && is_file(__DIR__ . '/../uploads/' . $f)) @unlink(__DIR__ . '/../uploads/' . $f);
+            }
+            auditLog($pdo, 'delete', 'complaint', $delId, $row);
+            $res = 'deleted';
+        }
+    }
+    header('Location: complaints.php?tab=' . $backTab . '&' . $res . '=1'); exit;
 }
 
 // Release the session lock now. PHP locks the session per request, so without this the 30s poll,
@@ -232,6 +257,8 @@ function buildUrl($overrides = []) {
 </aside>
 <div class="main"><div class="content">
     <div class="page-header"><h1><?= t('admin.complaints.title', 'All Complaints') ?></h1><p><?= $tab === "archived" ? t('admin.complaints.archived_note', 'Archived complaints are automatically deleted after 30 days.') : t('admin.complaints.autoarchive_note', 'Resolved/Rejected complaints auto-archive after 30 days.') ?></p></div>
+    <?php if (isset($_GET['deleted'])): ?><div class="alert alert-success"><i class="ti ti-check"></i> Complaint deleted.</div><?php endif; ?>
+    <?php if (isset($_GET['error'])): ?><div class="alert alert-error"><i class="ti ti-alert-circle"></i> Could not delete. Please confirm with your admin password or emailed code first.</div><?php endif; ?>
 
     <!-- Tabs -->
     <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:2px solid #F3F4F6;">
@@ -346,6 +373,12 @@ function buildUrl($overrides = []) {
                         <i class="ti ti-archive-off"></i> <?= t('ui.unarchive_9fd0', 'Unarchive') ?>
                     </button>
                     <?php endif; ?>
+                    <?php if ($canDelete): ?>
+                    <button type="button" class="btn btn-danger btn-sm" style="font-size:12px;"
+                        onclick="confirmDeleteComplaint(<?= (int)$c['id'] ?>, <?= e(json_encode('#' . $c['id'] . ' - ' . $c['title'], JSON_HEX_APOS | JSON_HEX_QUOT)) ?>)">
+                        <i class="ti ti-trash"></i> <?= t('ui.delete_f2a6', 'Delete') ?>
+                    </button>
+                    <?php endif; ?>
                     <a href="view-complaint.php?id=<?= $c['id'] ?>" class="btn btn-outline btn-sm"><?= t('ui.view_4351', 'View') ?></a>
                 </td>
             </tr>
@@ -398,6 +431,12 @@ function buildUrl($overrides = []) {
                         <i class="ti ti-archive-off"></i> <?= t('ui.unarchive_9fd0', 'Unarchive') ?>
                     </button>
                     <?php endif; ?>
+                    <?php if ($canDelete): ?>
+                    <button type="button" class="btn btn-danger btn-sm" style="font-size:12px;"
+                        onclick="confirmDeleteComplaint(<?= (int)$c['id'] ?>, <?= e(json_encode('#' . $c['id'] . ' - ' . $c['title'], JSON_HEX_APOS | JSON_HEX_QUOT)) ?>)">
+                        <i class="ti ti-trash"></i> <?= t('ui.delete_f2a6', 'Delete') ?>
+                    </button>
+                    <?php endif; ?>
                     <a href="view-complaint.php?id=<?= $c['id'] ?>" class="btn btn-primary btn-sm">
                         <i class="ti ti-eye"></i> <?= t('ui.view_4351', 'View') ?>
                     </a>
@@ -437,6 +476,16 @@ function buildUrl($overrides = []) {
 
 <script src="../assets/js/table-tools.js?v=6"></script>
 <script>
+function confirmDeleteComplaint(id, label) {
+    AdminOtp.confirmThen({
+        op: 'delete_complaint',
+        targetId: id,
+        title: __t('Delete Complaint'),
+        subtitle: label,
+        body: __t('This permanently deletes the complaint, its reviews and attachments. This cannot be undone. Confirm with your admin password or emailed code.'),
+        confirmLabel: __t('Delete')
+    }, function () { postAction({ del_complaint: id }); });
+}
 function openUnarchiveModal(id) {
     document.getElementById('unarchive-confirm-btn').dataset.id = id;
     document.getElementById('unarchive-modal').style.display = 'flex';

@@ -420,7 +420,7 @@ if ($dYear) {
 }
 $hasFilter = ($search !== '' || $courseSel !== '' || $dYear);
 
-$votedExpr = $activeElection ? '(EXISTS (SELECT 1 FROM votes v WHERE v.student_id = s.id AND v.election_id = ' . (int)$activeElection['id'] . '))' : '0';
+$votedExpr = $activeElection ? '(EXISTS (SELECT 1 FROM votes v WHERE v.student_id = s.id AND v.election_id = ' . (int)$activeElection['id'] . '))' : '(0)';   // (0) not 0: a bare 0 in ORDER BY means a column position and crashes
 $D = strtoupper($dir);
 $sortSql = [
     'sid'      => "CAST(s.student_id AS UNSIGNED) $D, s.student_id $D",

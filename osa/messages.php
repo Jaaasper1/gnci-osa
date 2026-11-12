@@ -19,7 +19,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tid    = (int)($_POST['message_id'] ?? 0);
     $m      = $tid ? msgGet($pdo, $tid) : null;
 
-    if (!$m) {
+    if ($action === 'start') {
+        // Staff starts a NEW conversation with a student (Messenger-style compose)
+        $sid = (int)($_POST['student_id'] ?? 0);
+        $stu = $pdo->prepare("SELECT id, first_name, last_name FROM students WHERE id = ? AND is_active = 1");
+        $stu->execute([$sid]);
+        $stu = $stu->fetch();
+        $body = trim($_POST['body'] ?? '');
+        if (!$stu) {
+            $error = 'Student not found.';
+        } elseif ($body === '' && !msgHasVoiceUpload()) {
+            $error = t('msg.please_write_a_reply_or_record_a_voice_m_8bec', 'Please write a reply or record a voice message.');
+        } elseif (mb_strlen($body) > 2000) {
+            $error = t('msg.reply_must_be_2000_characters_or_less_c5e4', 'Reply must be 2000 characters or less.');
+        } else {
+            $voice = msgSaveUploadedVoice();
+            if ($voice['error']) {
+                $error = $voice['error'];
+            } else {
+                $pdo->prepare("INSERT INTO osa_messages (student_id, subject, staff_unread, last_activity) VALUES (?, ?, 0, NOW())")
+                    ->execute([$sid, 'Message from OSA']);
+                $newId = (int)$pdo->lastInsertId();
+                msgAddReply($pdo, $newId, 'staff', $staff_id, $_SESSION['name'], $body, $voice['file']);
+                auditLog($pdo, 'send', 'message', $newId, [], ['by' => 'staff', 'to_student' => $sid]);
+                addNotification($pdo, $sid, 'The OSA office sent you a message.', 'messages.php?id=' . $newId);
+                header('Location: messages.php?id=' . $newId . '&replied=1'); exit;
+            }
+        }
+        if ($error && !empty($stu['id'])) $_GET['to'] = (int)$stu['id'];   // stay in the compose view
+    } elseif (!$m) {
         $error = t('msg.message_not_found_cb53', 'Message not found.');
     } elseif ($action === 'reply') {
         $body = trim($_POST['body'] ?? '');
@@ -132,6 +160,19 @@ if ($thread) {
     msgMarkRead($pdo, $viewId, 'staff');
     $replies = msgReplies($pdo, $viewId);
 }
+// Messenger-style "New message": ?to=<student id> opens that student's open thread, or an empty compose view
+$newTo = (int)($_GET['to'] ?? 0);
+if (!$thread && $newTo) {
+    $stu = $pdo->prepare("SELECT id, first_name, last_name, student_id AS student_no FROM students WHERE id = ? AND is_active = 1");
+    $stu->execute([$newTo]);
+    $stu = $stu->fetch();
+    if (!$stu) { header('Location: messages.php'); exit; }
+    $ex = $pdo->prepare("SELECT id FROM osa_messages WHERE student_id = ? AND status = 'open' ORDER BY last_activity DESC LIMIT 1");
+    $ex->execute([$newTo]);
+    if ($exId = $ex->fetchColumn()) { header('Location: messages.php?id=' . (int)$exId); exit; }
+    $thread = ['id' => 0, 'student_id' => $stu['id'], 'first_name' => $stu['first_name'], 'last_name' => $stu['last_name'],
+               'student_no' => $stu['student_no'], 'status' => 'open', 'subject' => 'Message from OSA'];
+}
 $unreadTotal = msgUnreadStaffCount($pdo);
 $inConvo = (bool)$thread;   // false = conversation list (Messenger style)
 $backFilter = isset($_GET['filter']) ? $filter : (($thread['status'] ?? 'open') === 'closed' ? 'closed' : 'open');
@@ -161,18 +202,58 @@ $base = '../admin/';   // admin and staff share the full menu
     </div>
 </nav>
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
-<?php $activePage='messages'; include __DIR__.'/../includes/sidebar-full.php'; ?>
+<?php if (true): ?>
+<aside class="sidebar">
+    <div class="sidebar-section"><?= t('sidebar.overview', 'Overview') ?></div>
+    <a class="sitem" href="../admin/dashboard.php"><i class="ti ti-layout-dashboard"></i> <?= t('sidebar.dashboard', 'Dashboard') ?></a>
+    <div class="sidebar-section"><?= t('sidebar.complaints', 'Complaints') ?></div>
+    <a class="sitem" href="../admin/complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.all_complaints', 'All Complaints') ?></a>
+    <a class="sitem active" href="../osa/messages.php"><i class="ti ti-messages"></i> <?= t('sidebar.messages', 'Messages') ?><?php if ($unreadTotal > 0): ?><span class="badge-count"><?= $unreadTotal ?></span><?php endif; ?></a>
+    <div class="sidebar-section"><?= t('sidebar.election', 'Election') ?></div>
+    <a class="sitem" href="../admin/elections.php"><i class="ti ti-trophy"></i> <?= t('sidebar.elections', 'Elections') ?></a>
+    <a class="sitem" href="../admin/candidates.php"><i class="ti ti-users"></i> <?= t('sidebar.candidates', 'Candidates') ?></a>
+    <a class="sitem" href="../admin/party-lists.php"><i class="ti ti-flag"></i> <?= t('sidebar.party_lists', 'Party Lists') ?></a>
+    <a class="sitem" href="../admin/vouchers.php"><i class="ti ti-ticket"></i> <?= t('sidebar.vouchers', 'Vouchers') ?></a>
+    <a class="sitem" href="../admin/results.php"><i class="ti ti-chart-pie"></i> <?= t('sidebar.live_results', 'Live Results') ?></a>
+    <div class="sidebar-section"><?= t('sidebar.events', 'Events') ?></div>
+    <a class="sitem" href="../admin/events.php"><i class="ti ti-calendar-event"></i> <?= t('sidebar.events', 'Events') ?></a>
+    <div class="sidebar-section"><?= t('sidebar.system', 'System') ?></div>
+    <a class="sitem" href="../admin/students.php"><i class="ti ti-user-plus"></i> <?= t('sidebar.students', 'Students') ?></a>
+    <?php if ($isAdmin): ?><a class="sitem" href="../admin/staff.php"><i class="ti ti-shield-check"></i> <?= t('sidebar.osa_staff', 'OSA Staff') ?></a><?php endif; ?>
+    <a class="sitem" href="../admin/reports.php"><i class="ti ti-report-analytics"></i> <?= t('sidebar.reports', 'Reports') ?></a>
+    <div class="sidebar-section"><?= t('sidebar.account', 'Account') ?></div>
+    <a class="sitem" href="../admin/notifications.php"><i class="ti ti-bell"></i> <?= t('sidebar.notifications', 'Notifications') ?><?php if ($notifCount > 0): ?><span class="badge-count"><?= $notifCount ?></span><?php endif; ?></a>
+    <a class="sitem" href="../logout.php"><i class="ti ti-logout"></i> <?= t('nav.logout', 'Log out') ?></a>
+</aside>
+<?php else: ?>
+<aside class="sidebar">
+    <div class="sidebar-section"><?= t('sidebar.main', 'Main') ?></div>
+    <a class="sitem" href="dashboard.php"><i class="ti ti-layout-dashboard"></i> <?= t('sidebar.dashboard', 'Dashboard') ?></a>
+    <a class="sitem" href="complaints.php"><i class="ti ti-message-report"></i> <?= t('sidebar.complaints', 'Complaints') ?></a>
+    <a class="sitem active" href="messages.php"><i class="ti ti-messages"></i> <?= t('sidebar.messages', 'Messages') ?><?php if ($unreadTotal > 0): ?><span class="badge-count"><?= $unreadTotal ?></span><?php endif; ?></a>
+    <div class="sidebar-section"><?= t('sidebar.events', 'Events') ?></div>
+    <a class="sitem" href="events.php"><i class="ti ti-calendar-event"></i> <?= t('sidebar.events', 'Events') ?></a>
+    <div class="sidebar-section"><?= t('sidebar.account', 'Account') ?></div>
+    <a class="sitem" href="settings.php"><i class="ti ti-settings"></i> <?= t('sidebar.settings', 'Settings') ?></a>
+    <a class="sitem" href="notifications.php"><i class="ti ti-bell"></i> <?= t('sidebar.notifications', 'Notifications') ?><?php if ($notifCount > 0): ?><span class="badge-count"><?= $notifCount ?></span><?php endif; ?></a>
+    <a class="sitem" href="../logout.php"><i class="ti ti-logout"></i> <?= t('nav.logout', 'Log out') ?></a>
+</aside>
+<?php endif; ?>
 
 <div class="main"><div class="content">
 
 <?php if (!$inConvo): ?>
     <!-- ===== VIEW 1: conversation list (like Messenger's chat list) ===== -->
-    <div class="page-header">
+    <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;max-width:720px;">
         <div><h1><?= t('ui.messages_41de', 'Messages') ?></h1><p><?= t('ui.non_complaint_messages_from_studen_bfc4', 'Non-complaint messages from students') ?></p></div>
+        <button type="button" id="composeBtn" class="msgm-compose" title="New message" aria-label="New message">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4H8a4 4 0 0 0-4 4v8a4 4 0 0 0 4 4h8a4 4 0 0 0 4-4v-4"/><path d="M18.4 3.6a1.9 1.9 0 0 1 2.7 2.7L12.5 15 9 15.8l.8-3.5z"/></svg>
+        </button>
     </div>
 
     <?php if (isset($_GET['replied'])): ?><div class="alert alert-success"><i class="ti ti-check"></i> <?= t('ui.reply_sent_ce23', 'Reply sent.') ?></div><?php endif; ?>
     <?php if ($error): ?><div class="alert alert-error"><i class="ti ti-alert-circle"></i> <?= e($error) ?></div><?php endif; ?>
+
 
     <div class="msg-tabs" style="margin-bottom:14px;">
         <a href="messages.php?filter=open" class="<?= $filter === 'open' ? 'on' : '' ?>"><?= t('ui.open_c3bf', 'Open') ?></a>
@@ -201,7 +282,7 @@ $base = '../admin/';   // admin and staff share the full menu
                 <small>Student ID <?= e($thread['student_no']) ?></small>
             </div>
             <span class="msg-pill <?= $thread['status'] === 'closed' ? 'closed' : 'open' ?>"><?= $thread['status'] === 'closed' ? 'Closed' : 'Open' ?></span>
-            <form method="POST" style="margin:0;">
+            <form method="POST" style="margin:0;<?= empty($thread['id']) ? 'display:none;' : '' ?>">
                 <?= csrfField() ?>
                 <input type="hidden" name="message_id" value="<?= (int)$thread['id'] ?>">
                 <?php if ($thread['status'] === 'open'): ?>
@@ -228,14 +309,19 @@ $base = '../admin/';   // admin and staff share the full menu
 
         <form method="POST" class="msg-reply" enctype="multipart/form-data" data-voice-form>
             <?= csrfField() ?>
+            <?php if (!empty($thread['id'])): ?>
             <input type="hidden" name="action" value="reply">
             <input type="hidden" name="message_id" value="<?= (int)$thread['id'] ?>">
+            <?php else: ?>
+            <input type="hidden" name="action" value="start">
+            <input type="hidden" name="student_id" value="<?= (int)$thread['student_id'] ?>">
+            <?php endif; ?>
             <div class="form-group">
-                <label><?= t('ui.reply_to_student_829c', 'Reply to student') ?></label>
+                <label><?= empty($thread['id']) ? 'Message to student' : t('ui.reply_to_student_829c', 'Reply to student') ?></label>
                 <textarea name="body" class="form-control" rows="2" maxlength="2000" placeholder="<?= htmlspecialchars(t('auto.write_your_reply_c2f1', 'Write your reply...'), ENT_QUOTES) ?>"></textarea>
             </div>
             <div class="voice-row"><button type="button" class="btn btn-outline btn-sm voice-btn" data-voice-btn><i class="ti ti-microphone"></i> <span>Voice message</span></button><span class="voice-status" data-voice-status></span><input type="file" name="voice" accept="audio/*" hidden data-voice-input></div>
-            <div class="msg-reply-actions"><button type="submit" class="btn btn-primary btn-sm"><i class="ti ti-send"></i> <?= t('ui.send_reply_662f', 'Send reply') ?></button></div>
+            <div class="msg-reply-actions"><button type="submit" class="btn btn-primary btn-sm"><i class="ti ti-send"></i> <?= empty($thread['id']) ? 'Send message' : t('ui.send_reply_662f', 'Send reply') ?></button></div>
         </form>
     </div>
 <?php endif; ?>
@@ -243,6 +329,85 @@ $base = '../admin/';   // admin and staff share the full menu
 </div></div>
 
 <?php if (!$inConvo): ?>
+<?php
+$__stu = msgStudentSignInList($pdo);
+$__in  = 0; foreach ($__stu as $__s) if (!empty($__s['last_login_at'])) $__in++;
+$__out = count($__stu) - $__in;
+?>
+<style>
+  .msgm-compose{border:0;background:transparent;color:#6B1A2A;width:44px;height:44px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+  .msgm-compose:hover{background:#F6E7EA}
+  .nm-overlay{position:fixed;inset:0;background:rgba(17,24,39,.55);display:none;align-items:flex-start;justify-content:center;padding:6vh 14px;z-index:1000}
+  .nm-overlay.open{display:flex}
+  .nm-panel{background:#fff;border-radius:16px;width:100%;max-width:460px;max-height:86vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+  .nm-top{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 6px}
+  .nm-top h3{margin:0;font-size:17px;color:#1F2937}
+  .nm-x{border:0;background:#F3F4F6;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:18px;color:#4B5563}
+  .nm-search{margin:6px 16px 8px;position:relative}
+  .nm-search input{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #E5E7EB;border-radius:22px;background:#F3F4F6;font-size:14px}
+  .nm-chips{display:flex;gap:6px;flex-wrap:wrap;padding:0 16px 8px}
+  .nm-chip{border:1px solid #E5E7EB;background:#fff;color:#4B5563;border-radius:20px;padding:4px 11px;font-size:12px;font-weight:600;cursor:pointer}
+  .nm-chip.on{background:#6B1A2A;border-color:#6B1A2A;color:#fff}
+  .nm-list{overflow:auto;padding:0 8px 10px;flex:1}
+  .nm-item{display:flex;align-items:center;gap:12px;padding:8px;border-radius:10px;text-decoration:none;color:inherit}
+  .nm-item:hover{background:#F3F4F6}
+  .nm-av{width:40px;height:40px;border-radius:50%;background:#6B1A2A;color:#fff;font-weight:700;font-size:14px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;position:relative}
+  .nm-av.on::after{content:"";position:absolute;right:0;bottom:0;width:11px;height:11px;border-radius:50%;background:#22C55E;border:2px solid #fff}
+  .nm-nm{font-weight:600;font-size:14px;color:#1F2937}
+  .nm-sub{font-size:12px;color:#6B7280}
+  .nm-more,.nm-empty{display:block;text-align:center;font-size:13px;color:#6B7280;padding:10px}
+  .nm-more{border:0;background:transparent;color:#6B1A2A;font-weight:600;cursor:pointer;width:100%}
+</style>
+<div class="nm-overlay" id="nmOverlay" aria-hidden="true">
+  <div class="nm-panel" role="dialog" aria-label="New message">
+    <div class="nm-top"><h3>New message</h3><button type="button" class="nm-x" id="nmClose" aria-label="Close">&times;</button></div>
+    <div class="nm-search"><input type="text" id="nmSearch" placeholder="Search student name, ID or course" autocomplete="off" maxlength="80"></div>
+    <div class="nm-list" id="nmList">
+      <?php foreach ($__stu as $__s): $__ok = !empty($__s['last_login_at']); ?>
+        <a class="nm-item" href="messages.php?to=<?= (int)$__s['id'] ?>" data-s="<?= $__ok ? 'in' : 'out' ?>" data-search="<?= e(mb_strtolower($__s['student_id'] . ' ' . $__s['first_name'] . ' ' . $__s['last_name'] . ' ' . $__s['last_name'] . ' ' . $__s['first_name'] . ' ' . ($__s['course'] ?? ''))) ?>">
+          <span class="nm-av <?= $__ok ? 'on' : '' ?>"><?= e(msgInitials($__s['first_name'], $__s['last_name'])) ?></span>
+          <span><div class="nm-nm"><?= e($__s['first_name'] . ' ' . $__s['last_name']) ?></div>
+          <div class="nm-sub"><?= e($__s['student_id']) ?><?= !empty($__s['course']) ? ' · ' . e($__s['course']) : '' ?> · <?= $__ok ? 'Signed in' : 'Not yet signed in' ?></div></span>
+        </a>
+      <?php endforeach; ?>
+      <div class="nm-empty" id="nmEmpty" style="display:none;">No students match.</div>
+      <button type="button" class="nm-more" id="nmMore" style="display:none;">Show more</button>
+    </div>
+  </div>
+</div>
+<script>
+// "New message" picker: pick a student -> opens their conversation (or a new one).
+(function () {
+  var ov = document.getElementById('nmOverlay'), btn = document.getElementById('composeBtn'),
+      input = document.getElementById('nmSearch'), more = document.getElementById('nmMore'),
+      empty = document.getElementById('nmEmpty'), chips = document.querySelectorAll('.nm-chip'),
+      items = Array.prototype.slice.call(document.querySelectorAll('#nmList .nm-item')),
+      filter = 'all', limit = 40, STEP = 40;
+  if (!ov || !btn) return;
+  function apply() {
+    var q = input.value.trim().toLowerCase(), matched = 0;
+    items.forEach(function (r) {
+      var ok = (filter === 'all' || r.getAttribute('data-s') === filter) && (!q || (r.getAttribute('data-search') || '').indexOf(q) !== -1);
+      if (ok) { matched++; r.style.display = matched <= limit ? '' : 'none'; } else r.style.display = 'none';
+    });
+    empty.style.display = matched ? 'none' : 'block';
+    more.style.display = matched > limit ? 'block' : 'none';
+    more.textContent = 'Show more (' + (matched - limit) + ' left)';
+  }
+  function open() { ov.classList.add('open'); ov.setAttribute('aria-hidden', 'false'); limit = STEP; apply(); setTimeout(function () { input.focus(); }, 30); }
+  function close() { ov.classList.remove('open'); ov.setAttribute('aria-hidden', 'true'); }
+  btn.addEventListener('click', open);
+  document.getElementById('nmClose').addEventListener('click', close);
+  ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+  input.addEventListener('input', function () { limit = STEP; apply(); });
+  more.addEventListener('click', function () { limit += STEP; apply(); });
+  chips.forEach(function (c) { c.addEventListener('click', function () {
+    chips.forEach(function (x) { x.classList.remove('on'); }); c.classList.add('on');
+    filter = c.getAttribute('data-f'); limit = STEP; apply();
+  }); });
+})();
+</script>
 <script>
 // Live search: filters as you type (name, Student ID, subject, message text) across ALL messages.
 (function () {

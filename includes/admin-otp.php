@@ -26,6 +26,7 @@ function adminOtpLabel(string $op): string {
         'edit_party'      => 'Edit a party list',
         'edit_election'   => 'Edit an election',
         'delete_election' => 'Delete an election',
+        'delete_complaint' => 'Delete a complaint',
         'edit_event'      => 'Edit an event',
         'edit_student'    => 'Edit a student account',
         'bulk_delete_staff'      => 'Delete several staff accounts',
