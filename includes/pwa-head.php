@@ -94,10 +94,14 @@ $__v = function ($rel) { $f = dirname(__DIR__) . '/' . $rel; return is_file($f) 
   }
   var deferred = null;
   if (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone) return;
+  if (window.__osaInstallInit) return;      // this block can be included more than once on a page
+  window.__osaInstallInit = true;
 
   /* Install App button. Pages with a sidebar get a normal menu item just above "Log out" (nothing floats over the menu).
      Pages without a sidebar (login / register) keep the floating pill button. */
   function osaInstallEl(onclick){
+    // never stack: remove any Install App button that is already on the page
+    document.querySelectorAll('[data-osa-install]').forEach(function(x){ x.remove(); });
     var bar = document.querySelector('.sidebar');
     var logout = bar && bar.querySelector('a[href$="logout.php"]');
     var b;
