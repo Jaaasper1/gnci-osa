@@ -47,6 +47,21 @@ function ensureMessageTables(PDO $pdo): void {
     }
 }
 
+// Permanently deletes a conversation: its replies, any voice-message files, and the thread itself.
+function msgDeleteThread(PDO $pdo, int $id): void {
+    $q = $pdo->prepare("SELECT audio_file FROM osa_message_replies WHERE message_id = ? AND audio_file IS NOT NULL");
+    $q->execute([$id]);
+    foreach ($q->fetchAll(PDO::FETCH_COLUMN) as $f) {
+        $f = basename((string)$f);
+        if (preg_match('/^[a-f0-9]{32}\.(webm|ogg|m4a)$/', $f)) {
+            $path = __DIR__ . '/../uploads/voice/' . $f;
+            if (is_file($path)) @unlink($path);
+        }
+    }
+    $pdo->prepare("DELETE FROM osa_message_replies WHERE message_id = ?")->execute([$id]);
+    $pdo->prepare("DELETE FROM osa_messages WHERE id = ?")->execute([$id]);
+}
+
 // Starts a new thread with its first message. Returns the message id.
 function msgStartThread(PDO $pdo, int $studentId, string $subject, string $body, string $studentName, ?string $audioFile = null): int {
     $pdo->prepare("INSERT INTO osa_messages (student_id, subject, staff_unread, last_activity) VALUES (?, ?, 1, NOW())")

@@ -47,6 +47,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         if ($error && !empty($stu['id'])) $_GET['to'] = (int)$stu['id'];   // stay in the compose view
+    } elseif (in_array($action, ['bulk_delete', 'bulk_close', 'bulk_read', 'bulk_unread'], true)) {
+        $ids = array_slice(array_values(array_filter(array_unique(array_map('intval', (array)($_POST['ids'] ?? []))))), 0, 200);
+        $n = 0;
+        foreach ($ids as $bid) {
+            $bm = msgGet($pdo, $bid);
+            if (!$bm) continue;
+            if ($action === 'bulk_delete') {
+                auditLog($pdo, 'delete', 'message', $bid, ['student_id' => (int)$bm['student_id'], 'subject' => $bm['subject'], 'status' => $bm['status']], []);
+                msgDeleteThread($pdo, $bid);
+            } elseif ($action === 'bulk_close') {
+                $pdo->prepare("UPDATE osa_messages SET status = 'closed' WHERE id = ?")->execute([$bid]);
+                auditLog($pdo, 'close', 'message', $bid, ['status' => $bm['status']], ['status' => 'closed']);
+            } else {   // bulk_read / bulk_unread: only changes the staff "unread" flag
+                $pdo->prepare("UPDATE osa_messages SET staff_unread = ? WHERE id = ?")->execute([$action === 'bulk_unread' ? 1 : 0, $bid]);
+            }
+            $n++;
+        }
+        $bf = in_array($_POST['filter'] ?? '', ['open', 'closed', 'unread'], true) ? $_POST['filter'] : 'open';
+        header('Location: messages.php?filter=' . $bf . '&bulk=' . $n . '&did=' . ['bulk_delete' => 'deleted', 'bulk_close' => 'closed', 'bulk_read' => 'read', 'bulk_unread' => 'unread'][$action]); exit;
     } elseif (!$m) {
         $error = t('msg.message_not_found_cb53', 'Message not found.');
     } elseif ($action === 'reply') {
@@ -70,6 +89,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->prepare("UPDATE osa_messages SET status = 'closed' WHERE id = ?")->execute([$tid]);
         auditLog($pdo, 'close', 'message', $tid, ['status' => $m['status']], ['status' => 'closed']);
         header('Location: messages.php?id=' . $tid); exit;
+    } elseif ($action === 'delete') {
+        auditLog($pdo, 'delete', 'message', $tid, ['student_id' => (int)$m['student_id'], 'subject' => $m['subject'], 'status' => $m['status']], []);
+        msgDeleteThread($pdo, $tid);
+        header('Location: messages.php?filter=' . ($m['status'] === 'closed' ? 'closed' : 'open')); exit;
     } elseif ($action === 'reopen') {
         $pdo->prepare("UPDATE osa_messages SET status = 'open' WHERE id = ?")->execute([$tid]);
         auditLog($pdo, 'reopen', 'message', $tid, ['status' => $m['status']], ['status' => 'open']);
@@ -124,7 +147,8 @@ function msgRenderStaffList(array $list, array $previews, string $filter, string
         <div class="msg-card msg-empty"><i class="ti ti-<?= $q !== '' ? 'search-off' : 'inbox' ?>"></i><?= $q !== '' ? 'No messages match your search.' : 'No messages here.' ?></div>
     <?php endif;
     foreach ($list as $m): $unread = !empty($m['staff_unread']); ?>
-        <a class="msgm-item <?= $unread ? 'unread' : '' ?>" href="messages.php?filter=<?= e($filter) ?>&amp;id=<?= (int)$m['id'] ?><?= e($qs) ?>">
+        <a class="msgm-item <?= $unread ? 'unread' : '' ?>" data-unread="<?= $unread ? 1 : 0 ?>" data-status="<?= e($m['status']) ?>" href="messages.php?filter=<?= e($filter) ?>&amp;id=<?= (int)$m['id'] ?><?= e($qs) ?>">
+            <input type="checkbox" class="msgm-check" data-id="<?= (int)$m['id'] ?>" tabindex="-1" aria-label="Select conversation">
             <span class="msgm-avatar"><?= e(msgInitials($m['first_name'], $m['last_name'])) ?></span>
             <div class="msgm-body">
                 <div class="msgm-top">
@@ -252,6 +276,7 @@ $base = '../admin/';   // admin and staff share the full menu
     </div>
 
     <?php if (isset($_GET['replied'])): ?><div class="alert alert-success"><i class="ti ti-check"></i> <?= t('ui.reply_sent_ce23', 'Reply sent.') ?></div><?php endif; ?>
+    <?php if (isset($_GET['bulk'])): ?><div class="alert alert-success"><i class="ti ti-check"></i> <?= (int)$_GET['bulk'] ?> conversation(s) <?= ['closed' => 'marked as closed', 'read' => 'marked as read', 'unread' => 'marked as unread'][$_GET['did'] ?? ''] ?? 'deleted' ?>.</div><?php endif; ?>
     <?php if ($error): ?><div class="alert alert-error"><i class="ti ti-alert-circle"></i> <?= e($error) ?></div><?php endif; ?>
 
 
@@ -266,6 +291,26 @@ $base = '../admin/';   // admin and staff share the full menu
         <input type="text" id="msgSearch" value="<?= e($q) ?>" placeholder="<?= t('ui.search_name_student_id_or_message__ece8', 'Search name, Student ID, or message text…') ?>" autocomplete="off" maxlength="80" aria-label="<?= t('ui.search_messages_4863', 'Search messages') ?>">
         <button type="button" id="msgSearchClear" aria-label="<?= t('ui.clear_search_9983', 'Clear search') ?>" <?= $q === '' ? 'hidden' : '' ?>><i class="ti ti-x"></i></button>
     </div>
+
+    <div class="msgm-seltools">
+        <button type="button" id="selBtn" class="btn btn-outline btn-sm"><i class="ti ti-checkbox"></i> Select</button>
+    </div>
+    <div class="msgm-bulkbar" id="bulkBar" hidden>
+        <label><input type="checkbox" id="selAll"> Select all</label>
+        <span id="selCount">0 selected</span>
+        <span style="flex:1"></span>
+        <button type="button" id="bulkRead"><i class="ti ti-mail-opened"></i> Mark read</button>
+        <button type="button" id="bulkUnread"><i class="ti ti-mail"></i> Mark unread</button>
+        <button type="button" id="bulkClose"><i class="ti ti-check"></i> Mark closed</button>
+        <button type="button" id="bulkDelete" class="b-del"><i class="ti ti-trash"></i> Delete</button>
+        <button type="button" id="selCancel">Cancel</button>
+    </div>
+    <form id="bulkForm" method="POST" style="display:none">
+        <?= csrfField() ?>
+        <input type="hidden" name="action" id="bulkAction" value="">
+        <input type="hidden" name="filter" value="<?= e($filter) ?>">
+        <div id="bulkIds"></div>
+    </form>
 
     <div class="msgm-list" id="msgList">
         <?php msgRenderStaffList($list, $previews, $filter, $q); ?>
@@ -292,6 +337,12 @@ $base = '../admin/';   // admin and staff share the full menu
                     <input type="hidden" name="action" value="reopen">
                     <button type="submit" class="btn btn-outline btn-sm"><i class="ti ti-refresh"></i> <span class="msgm-btn-text"><?= t('ui.reopen_b824', 'Reopen') ?></span></button>
                 <?php endif; ?>
+            </form>
+            <form method="POST" style="margin:0;<?= empty($thread['id']) ? 'display:none;' : '' ?>" onsubmit="return confirm('Delete this whole conversation permanently? This cannot be undone.');">
+                <?= csrfField() ?>
+                <input type="hidden" name="message_id" value="<?= (int)$thread['id'] ?>">
+                <input type="hidden" name="action" value="delete">
+                <button type="submit" class="btn btn-sm" style="background:#991B1B;color:#fff;border:1px solid #991B1B;"><i class="ti ti-trash"></i> <span class="msgm-btn-text">Delete</span></button>
             </form>
         </div>
 
@@ -335,6 +386,23 @@ $__in  = 0; foreach ($__stu as $__s) if (!empty($__s['last_login_at'])) $__in++;
 $__out = count($__stu) - $__in;
 ?>
 <style>
+  .msgm-seltools{max-width:720px;display:flex;justify-content:flex-end;margin:0 0 8px}
+  .msgm-bulkbar{max-width:720px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;position:sticky;top:0;z-index:20;background:#fff;padding:8px 0 10px;margin:0 0 6px;border-bottom:1px solid #F3F4F6;font-size:13px;color:#374151}
+  .msgm-bulkbar[hidden]{display:none}
+  .msgm-bulkbar label{display:flex;align-items:center;gap:6px;font-size:13px;color:#374151;cursor:pointer}
+  .msgm-bulkbar #selCount{font-weight:600;color:#1F2937}
+  .msgm-bulkbar button{font-size:13px;border-radius:8px;padding:6px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;background:#fff;color:#374151;border:1px solid #D1D5DB}
+  .msgm-bulkbar button:disabled{opacity:.45;cursor:not-allowed}
+  .msgm-bulkbar button:not(:disabled):hover{background:#F3F4F6}
+  .msgm-bulkbar .b-del{color:#EF4444;border-color:#FECACA;background:#FEF2F2}
+  .msgm-bulkbar .b-del:not(:disabled):hover{background:#FEE2E2}
+  .msgm-bulkbar input,.msgm-check{width:20px;height:20px;flex-shrink:0;cursor:pointer;appearance:none;-webkit-appearance:none;border:2px solid #9CA3AF;border-radius:50%;background:#fff center/12px no-repeat;transition:background-color .12s,border-color .12s}
+  .msgm-bulkbar input:checked,.msgm-check:checked{background-color:#6B1A2A;border-color:#6B1A2A;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-7'/%3E%3C/svg%3E")}
+  .msgm-bulkbar input:hover,.msgm-check:hover{border-color:#6B1A2A}
+  .msgm-check{display:none;margin:0 10px 0 0;align-self:center}
+  .msgm-list.selecting .msgm-check{display:block}
+  .msgm-list.selecting .msgm-item{cursor:pointer;-webkit-user-select:none;user-select:none}
+  .msgm-list.selecting .msgm-item.selected{background:#F9EEF0}
   .msgm-compose{border:0;background:transparent;color:#6B1A2A;width:44px;height:44px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
   .msgm-compose:hover{background:#F6E7EA}
   .nm-overlay{position:fixed;inset:0;background:rgba(17,24,39,.55);display:none;align-items:flex-start;justify-content:center;padding:6vh 14px;z-index:1000}
@@ -406,6 +474,64 @@ $__out = count($__stu) - $__in;
     chips.forEach(function (x) { x.classList.remove('on'); }); c.classList.add('on');
     filter = c.getAttribute('data-f'); limit = STEP; apply();
   }); });
+})();
+</script>
+<script>
+// Multi-select: Select -> tick conversations -> Delete / Mark closed (same idea as the Notifications page).
+(function () {
+  var box = document.getElementById('msgList'), selBtn = document.getElementById('selBtn'), bar = document.getElementById('bulkBar');
+  if (!box || !selBtn || !bar) return;
+  var all = document.getElementById('selAll'), count = document.getElementById('selCount'),
+      form = document.getElementById('bulkForm'), act = document.getElementById('bulkAction'), idsBox = document.getElementById('bulkIds');
+  function checks() { return Array.prototype.slice.call(box.querySelectorAll('.msgm-check')); }
+  function refresh() {
+    var cs = checks(), n = 0, hasUnread = false, hasRead = false, hasOpen = false;
+    cs.forEach(function (c) {
+      var it = c.closest('.msgm-item');
+      if (c.checked) {
+        n++;
+        if (it && it.dataset.unread === '1') hasUnread = true; else hasRead = true;
+        if (it && it.dataset.status !== 'closed') hasOpen = true;
+      }
+      if (it) it.classList.toggle('selected', c.checked);
+    });
+    count.textContent = n + ' selected';
+    all.checked = cs.length > 0 && n === cs.length;
+    document.getElementById('bulkRead').disabled   = !hasUnread;   // nothing unread selected -> nothing to mark as read
+    document.getElementById('bulkUnread').disabled = !hasRead;     // nothing read selected -> nothing to mark as unread
+    document.getElementById('bulkClose').disabled  = !hasOpen;     // all selected are already closed
+    document.getElementById('bulkDelete').disabled = (n === 0);
+  }
+  function setMode(on) {
+    box.classList.toggle('selecting', on);
+    bar.hidden = !on;
+    selBtn.style.display = on ? 'none' : '';
+    if (!on) checks().forEach(function (c) { c.checked = false; });
+    refresh();
+  }
+  selBtn.addEventListener('click', function () { setMode(true); });
+  document.getElementById('selCancel').addEventListener('click', function () { setMode(false); });
+  all.addEventListener('change', function () { checks().forEach(function (c) { c.checked = all.checked; }); refresh(); });
+  box.addEventListener('click', function (e) {
+    if (!box.classList.contains('selecting')) return;
+    var it = e.target.closest('.msgm-item'); if (!it) return;
+    var c = it.querySelector('.msgm-check'); if (!c) return;
+    if (e.target !== c) { e.preventDefault(); c.checked = !c.checked; }
+    refresh();
+  });
+  new MutationObserver(refresh).observe(box, { childList: true });   // live search re-renders the rows
+  function submit(action, msg) {
+    var picked = checks().filter(function (c) { return c.checked; });
+    if (!picked.length || !confirm(msg.replace('{n}', picked.length))) return;
+    act.value = action; idsBox.innerHTML = '';
+    picked.forEach(function (c) { var i = document.createElement('input'); i.type = 'hidden'; i.name = 'ids[]'; i.value = c.dataset.id; idsBox.appendChild(i); });
+    form.submit();
+  }
+  document.getElementById('bulkDelete').addEventListener('click', function () { submit('bulk_delete', 'Delete {n} conversation(s) permanently? This cannot be undone.'); });
+  document.getElementById('bulkRead').addEventListener('click', function () { submit('bulk_read', 'Mark {n} conversation(s) as read?'); });
+  document.getElementById('bulkUnread').addEventListener('click', function () { submit('bulk_unread', 'Mark {n} conversation(s) as unread?'); });
+  document.getElementById('bulkClose').addEventListener('click', function () { submit('bulk_close', 'Mark {n} conversation(s) as closed?'); });
+  refresh();
 })();
 </script>
 <script>
