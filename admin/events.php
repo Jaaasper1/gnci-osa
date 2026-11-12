@@ -47,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $end_date    = trim($_POST['end_date'] ?? '');
     $event_time  = trim($_POST['event_time'] ?? '');
     $location    = trim($_POST['location'] ?? '');
-    $notify      = isset($_POST['notify_students']) ? 1 : 0;
+    $notify      = 0;   // "Notify all students" removed: it emailed every active student one by one
     $postToFb    = isset($_POST['post_to_facebook']) ? 1 : 0;
 
     if ($event_id && !adminOtpConsumeApproval('edit_event', $event_id)) {
@@ -380,12 +380,6 @@ foreach ($events as $ev) {
                 </div>
 
                 <div class="section-label"><i class="ti ti-bell-ringing"></i> <?= t('ui.sharing_0308', 'Sharing') ?></div>
-                <div id="notify-row">
-                    <label class="toggle-option">
-                        <span class="to-label"><i class="ti ti-users"></i> <?= t('ui.notify_all_students_about_this_eve_2a50', 'Notify all students about this event') ?></span>
-                        <span class="toggle-switch"><input type="checkbox" name="notify_students" value="1"><span class="slider"></span></span>
-                    </label>
-                </div>
                 <div id="post-fb-row">
                     <label class="toggle-option">
                         <span class="to-label"><i class="ti ti-brand-facebook" style="color:#1877F2;"></i> <?= t('ui.also_post_to_facebook_page_fd20', 'Also post to Facebook Page') ?></span>
@@ -414,7 +408,6 @@ function openAddEventModal() {
     document.getElementById('event-enddate-input').value = '';
     document.getElementById('event-time-input').value = '';
     document.getElementById('event-location-input').value = '';
-    document.getElementById('notify-row').style.display = 'block';
     document.getElementById('post-fb-row').style.display = 'block';
     document.getElementById('event-modal-overlay').style.display = 'flex';
 }
@@ -437,7 +430,6 @@ document.querySelectorAll('.edit-event-btn').forEach(function(btn) {
         document.getElementById('event-enddate-input').value = this.dataset.enddate;
         document.getElementById('event-time-input').value = this.dataset.time;
         document.getElementById('event-location-input').value = this.dataset.location;
-        document.getElementById('notify-row').style.display = 'none'; // only notify on create
         document.getElementById('post-fb-row').style.display = 'none'; // only post-to-FB on create
         document.getElementById('event-modal-overlay').style.display = 'flex';
     });
