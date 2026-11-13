@@ -57,3 +57,8 @@
 .msgm-search button:hover { background: #E5E7EB; }
 .msgm-searchnote { font-size: 12.5px; color: #6B7280; margin: 0 4px 10px; }
 .msgm-list.loading { opacity: .55; transition: opacity .15s; }
+
+/* ===== Center the conversation list (header, tabs, search, list) in the content area ===== */
+.msgm-list, .msgm-search { margin-left: auto; margin-right: auto; }
+.content > .page-header, .content > .msg-tabs, .content > .msgm-bulkbar, .content > .alert, .content > .msgm-searchnote { max-width: 720px; margin-left: auto; margin-right: auto; }
+.content > .msg-tabs, .content > .msgm-bulkbar { box-sizing: border-box; }
