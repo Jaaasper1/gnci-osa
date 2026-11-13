@@ -64,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $n++;
         }
-        $bf = in_array($_POST['filter'] ?? '', ['open', 'closed', 'unread'], true) ? $_POST['filter'] : 'open';
+        $bf = in_array($_POST['filter'] ?? '', ['open', 'unread'], true) ? $_POST['filter'] : 'open';
         header('Location: messages.php?filter=' . $bf . '&bulk=' . $n . '&did=' . ['bulk_delete' => 'deleted', 'bulk_close' => 'closed', 'bulk_read' => 'read', 'bulk_unread' => 'unread'][$action]); exit;
     } elseif (!$m) {
         $error = t('msg.message_not_found_cb53', 'Message not found.');
@@ -152,7 +152,7 @@ function msgRenderStaffList(array $list, array $previews, string $filter, string
             <span class="msgm-avatar"><?= e(msgInitials($m['first_name'], $m['last_name'])) ?></span>
             <div class="msgm-body">
                 <div class="msgm-top">
-                    <span class="msgm-name"><?= e($m['first_name'] . ' ' . $m['last_name']) ?><span class="msgm-sid"><?= e($m['student_no']) ?></span><?php if ($m['status'] === 'closed'): ?><span class="msg-pill closed"><?= t('ui.closed_03f4', 'Closed') ?></span><?php endif; ?></span>
+                    <span class="msgm-name"><?= e($m['first_name'] . ' ' . $m['last_name']) ?><span class="msgm-sid"><?= e($m['student_no']) ?></span></span>
                     <span class="msgm-time"><?= e(date('M j, g:i A', strtotime($m['last_activity']))) ?></span>
                 </div>
                 <div class="msgm-prev"><?= e($previews[(int)$m['id']] ?? '') ?></div>
@@ -163,7 +163,7 @@ function msgRenderStaffList(array $list, array $previews, string $filter, string
 }
 
 $filter = $_GET['filter'] ?? 'open';
-if (!in_array($filter, ['open', 'closed', 'unread'], true)) $filter = 'open';
+if (!in_array($filter, ['open', 'unread'], true)) $filter = 'open';
 $q = trim((string)($_GET['q'] ?? ''));
 if (mb_strlen($q) > 80) $q = mb_substr($q, 0, 80);
 $list = $q !== '' ? msgSearchForStaff($pdo, $q) : msgListForStaff($pdo, $filter);
@@ -199,7 +199,7 @@ if (!$thread && $newTo) {
 }
 $unreadTotal = msgUnreadStaffCount($pdo);
 $inConvo = (bool)$thread;   // false = conversation list (Messenger style)
-$backFilter = isset($_GET['filter']) ? $filter : (($thread['status'] ?? 'open') === 'closed' ? 'closed' : 'open');
+$backFilter = isset($_GET['filter']) ? $filter : 'open';
 $backQs = $q !== '' ? '&q=' . urlencode($q) : '';
 
 $previews = (!$inConvo && $list) ? msgStaffPreviews($pdo, $list) : [];
@@ -293,9 +293,8 @@ $base = '../admin/';   // admin and staff share the full menu
 
 
     <div class="msg-tabs" style="margin-bottom:14px;">
-        <a href="messages.php?filter=open" class="<?= $filter === 'open' ? 'on' : '' ?>"><?= t('ui.open_c3bf', 'Open') ?></a>
+        <a href="messages.php?filter=open" class="<?= $filter === 'open' ? 'on' : '' ?>"><?= t('ui.all_msgs', 'All') ?></a>
         <a href="messages.php?filter=unread" class="<?= $filter === 'unread' ? 'on' : '' ?>"><?= t('ui.unread_c5d1', 'Unread (') ?><?= $unreadTotal ?>)</a>
-        <a href="messages.php?filter=closed" class="<?= $filter === 'closed' ? 'on' : '' ?>"><?= t('ui.closed_03f4', 'Closed') ?></a>
     </div>
 
     <div class="msgm-search">
@@ -310,7 +309,6 @@ $base = '../admin/';   // admin and staff share the full menu
         <span style="flex:1"></span>
         <button type="button" id="bulkRead"><i class="ti ti-mail-opened"></i> Mark read</button>
         <button type="button" id="bulkUnread"><i class="ti ti-mail"></i> Mark unread</button>
-        <button type="button" id="bulkClose"><i class="ti ti-check"></i> Mark closed</button>
         <button type="button" id="bulkDelete" class="b-del"><i class="ti ti-trash"></i> Delete</button>
         <button type="button" id="selCancel">Cancel</button>
     </div>
@@ -335,18 +333,6 @@ $base = '../admin/';   // admin and staff share the full menu
                 <?= e($thread['first_name'] . ' ' . $thread['last_name']) ?>
                 <small>Student ID <?= e($thread['student_no']) ?></small>
             </div>
-            <span class="msg-pill <?= $thread['status'] === 'closed' ? 'closed' : 'open' ?>"><?= $thread['status'] === 'closed' ? 'Closed' : 'Open' ?></span>
-            <form method="POST" style="margin:0;<?= empty($thread['id']) ? 'display:none;' : '' ?>">
-                <?= csrfField() ?>
-                <input type="hidden" name="message_id" value="<?= (int)$thread['id'] ?>">
-                <?php if ($thread['status'] === 'open'): ?>
-                    <input type="hidden" name="action" value="close">
-                    <button type="submit" class="btn btn-outline btn-sm"><i class="ti ti-check"></i> <span class="msgm-btn-text"><?= t('ui.mark_as_closed_b938', 'Mark as closed') ?></span></button>
-                <?php else: ?>
-                    <input type="hidden" name="action" value="reopen">
-                    <button type="submit" class="btn btn-outline btn-sm"><i class="ti ti-refresh"></i> <span class="msgm-btn-text"><?= t('ui.reopen_b824', 'Reopen') ?></span></button>
-                <?php endif; ?>
-            </form>
             <form method="POST" style="margin:0;<?= empty($thread['id']) ? 'display:none;' : '' ?>" data-msgc-title="Delete Conversation" data-msgc-desc="Delete this whole conversation permanently? This cannot be undone." data-msgc-ok="Delete" data-msgc-kind="danger">
                 <?= csrfField() ?>
                 <input type="hidden" name="message_id" value="<?= (int)$thread['id'] ?>">
@@ -544,14 +530,13 @@ $__out = count($__stu) - $__in;
     var cs = cbs(), present = {};
     cs.forEach(function (c) { present[c.dataset.id] = true; });
     sel.forEach(function (id) { if (!present[id]) sel.delete(id); });   // rows that disappeared (live search)
-    var hasUnread = false, hasRead = false, hasOpen = false;
+    var hasUnread = false, hasRead = false;
     cs.forEach(function (c) {
       var on = sel.has(c.dataset.id), it = rowOf(c);
       c.checked = on;
       if (it) it.classList.toggle('selected', on);
       if (on && it) {
         if (it.dataset.unread === '1') hasUnread = true; else hasRead = true;
-        if (it.dataset.status !== 'closed') hasOpen = true;
       }
     });
     var n = sel.size;
@@ -560,7 +545,6 @@ $__out = count($__stu) - $__in;
     all.indeterminate = n > 0 && n < cs.length;
     document.getElementById('bulkRead').disabled   = !hasUnread;
     document.getElementById('bulkUnread').disabled = !hasRead;
-    document.getElementById('bulkClose').disabled  = !hasOpen;
     document.getElementById('bulkDelete').disabled = (n === 0);
   }
   function enter(auto) { selecting = true; autoExit = !!auto; box.classList.add('selecting'); bar.hidden = false; render(); }
@@ -623,7 +607,6 @@ $__out = count($__stu) - $__in;
   document.getElementById('bulkDelete').addEventListener('click', function () { submit('bulk_delete', 'Delete Conversations', 'Delete {n} conversation(s) permanently? This cannot be undone.', 'Delete', 'danger'); });
   document.getElementById('bulkRead').addEventListener('click', function () { submit('bulk_read', 'Mark as Read', 'Mark {n} conversation(s) as read?', 'Mark read', 'info'); });
   document.getElementById('bulkUnread').addEventListener('click', function () { submit('bulk_unread', 'Mark as Unread', 'Mark {n} conversation(s) as unread?', 'Mark unread', 'info'); });
-  document.getElementById('bulkClose').addEventListener('click', function () { submit('bulk_close', 'Mark as Closed', 'Mark {n} conversation(s) as closed?', 'Mark closed', 'info'); });
   render();
 })();
 </script>

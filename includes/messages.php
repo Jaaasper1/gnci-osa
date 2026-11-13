@@ -115,7 +115,7 @@ function msgListForStudent(PDO $pdo, int $studentId): array {
 }
 
 function msgListForStaff(PDO $pdo, string $filter): array {
-    $where = $filter === 'closed' ? "WHERE m.status = 'closed'" : ($filter === 'unread' ? "WHERE m.staff_unread = 1" : "WHERE m.status = 'open'");
+    $where = $filter === 'unread' ? "WHERE m.staff_unread = 1" : "WHERE 1=1";   // 'open' tab = all conversations (the Closed status is no longer used in the staff UI)
     return $pdo->query("SELECT m.*, s.first_name, s.last_name, s.student_id AS student_no
                         FROM osa_messages m JOIN students s ON s.id = m.student_id
                         $where ORDER BY m.last_activity DESC LIMIT 300")->fetchAll();
