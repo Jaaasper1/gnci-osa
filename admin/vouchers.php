@@ -12,6 +12,20 @@ require_once '../includes/pager.php';
 $admin_id = $_SESSION['user_id'];
 $msg = $err = '';
 
+// Removes earlier voucher notifications of a student for an election (avoids duplicates / dead codes).
+function clearVoucherNotifs(PDO $pdo, int $studentId, string $electionTitle): void {
+    $like = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], 'Your voting voucher for "' . $electionTitle . '"') . '%';
+    $pdo->prepare("DELETE FROM notifications WHERE student_id=? AND message LIKE ?")->execute([$studentId, $like]);
+}
+
+// In-app only notification (no email) telling a student their voting voucher code.
+function notifyVoucher(PDO $pdo, int $studentId, string $electionTitle, string $code): void {
+    clearVoucherNotifs($pdo, $studentId, $electionTitle);   // keep only ONE (the newest) per student + election
+    addNotification($pdo, $studentId,
+        'Your voting voucher for "' . $electionTitle . '" is ready. Code: ' . $code . ' — enter it on the Vote Now page to vote.',
+        'voting.php', false);   // false = do not send email
+}
+
 // ── AJAX: generate voucher for one student ──────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'generate') {
     header('Content-Type: application/json');
@@ -101,12 +115,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'gener
     exit;
 }
 
+// ── AJAX: send the in-app notification for EXISTING (unused) vouchers ───────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'notify') {
+    header('Content-Type: application/json');
+    $voucher_id = (int)($_POST['voucher_id'] ?? 0);
+    $st = $pdo->prepare("SELECT v.student_id, v.code, e.title FROM voting_vouchers v JOIN elections e ON e.id = v.election_id WHERE v.id=? AND v.is_used=0 AND NOT EXISTS (SELECT 1 FROM notifications n WHERE n.student_id = v.student_id AND n.message LIKE CONCAT('%Code: ', v.code, ' %'))");
+    $st->execute([$voucher_id]);
+    $row = $st->fetch();
+    if (!$row) { echo json_encode(['ok'=>true, 'skipped'=>true]); exit; }   // used, gone, or ALREADY notified -> nothing to do
+    notifyVoucher($pdo, (int)$row['student_id'], (string)$row['title'], (string)$row['code']);
+    auditLog($pdo, 'notify', 'voucher', $voucher_id, [], []);   // the code is never written to the log
+    echo json_encode(['ok'=>true]);
+    exit;
+}
+
+// ── AJAX: notify ALL students of an election who hold an unused voucher (in-app only) ──
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'notify_all') {
+    header('Content-Type: application/json');
+    $election_id = (int)($_POST['election_id'] ?? 0);
+    $st = $pdo->prepare("SELECT v.student_id, v.code, e.title FROM voting_vouchers v JOIN elections e ON e.id = v.election_id WHERE v.election_id=? AND v.is_used=0 AND NOT EXISTS (SELECT 1 FROM notifications n WHERE n.student_id = v.student_id AND n.message LIKE CONCAT('%Code: ', v.code, ' %'))");
+    $st->execute([$election_id]);
+    $n = 0;
+    foreach ($st->fetchAll() as $row) {
+        notifyVoucher($pdo, (int)$row['student_id'], (string)$row['title'], (string)$row['code']);
+        $n++;
+    }
+    auditLog($pdo, 'notify_all', 'voucher', $election_id, [], ['count' => $n]);   // codes are never logged
+    echo json_encode(['ok'=>true, 'count'=>$n]);
+    exit;
+}
+
 // ── AJAX: revoke voucher ────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'revoke') {
     header('Content-Type: application/json');
     $voucher_id = (int)($_POST['voucher_id'] ?? 0);
     $__before = auditRow($pdo, 'voting_vouchers', $voucher_id);
     unset($__before['code']);   // never log the code
+    $rv = $pdo->prepare("SELECT v.student_id, e.title FROM voting_vouchers v JOIN elections e ON e.id=v.election_id WHERE v.id=? AND v.is_used=0");
+    $rv->execute([$voucher_id]);
+    if ($rvRow = $rv->fetch()) clearVoucherNotifs($pdo, (int)$rvRow['student_id'], (string)$rvRow['title']);
     $pdo->prepare("DELETE FROM voting_vouchers WHERE id=? AND is_used=0")->execute([$voucher_id]);
     auditLog($pdo, 'revoke', 'voucher', $voucher_id, $__before);
     echo json_encode(['ok'=>true]);
@@ -166,6 +213,9 @@ if ($selected_election_id) {
         $n->execute([$selected_election['course'], $selected_election['course'], $selected_election_id]);
         $stat['used'] = (int)$cr['u']; $stat['unused'] = (int)$cr['a']; $stat['none'] = (int)$n->fetchColumn();
         $stat['total'] = (int)$cr['t'] + $stat['none'];
+        $pn = $pdo->prepare("SELECT COUNT(*) FROM voting_vouchers v WHERE v.election_id=? AND v.is_used=0 AND NOT EXISTS (SELECT 1 FROM notifications n WHERE n.student_id = v.student_id AND n.message LIKE CONCAT('%Code: ', v.code, ' %'))");
+        $pn->execute([$selected_election_id]);
+        $stat['pending_notify'] = (int)$pn->fetchColumn();
 
         // One paginated list: students of this course (with or without voucher) + any voucher holder
         $from = "FROM students s
@@ -187,7 +237,8 @@ if ($selected_election_id) {
         $off = ($page - 1) * $perPage;
         $vOrder = $vSortCols[$vsort] . ' ' . strtoupper($vdir) . ', s.last_name, s.first_name, s.id';
         $ls = $pdo->prepare("SELECT s.id AS stu_pk, s.first_name, s.last_name, s.student_id AS sid, s.course,
-                                    vv.id AS vid, vv.code, vv.is_used, vv.used_at, vv.generated_at
+                                    vv.id AS vid, vv.code, vv.is_used, vv.used_at, vv.generated_at,
+                                    EXISTS (SELECT 1 FROM notifications nn WHERE nn.student_id = s.id AND nn.message LIKE CONCAT('%Code: ', vv.code, ' %')) AS notified
                              $from ORDER BY $vOrder LIMIT $perPage OFFSET $off");
         $ls->execute($args);
         $rows = $ls->fetchAll();
@@ -244,7 +295,20 @@ $notifCount = getUnreadStaffNotifCount($pdo, $_SESSION['user_id']);
         .modal-actions { display:flex; gap:10px; justify-content:center; }
         .modal-actions .btn { min-width:110px; justify-content:center; }
     </style>
-<?php include __DIR__.'/../includes/pwa-head.php'; ?></head>
+<?php include __DIR__.'/../includes/pwa-head.php'; ?><style>
+/* Voucher filter: status dropdown + search sit side by side, same height */
+#voucherFilter { flex-wrap: nowrap; }
+#voucherFilter .vf-select, #voucherFilter .vf-search { height: 42px; box-sizing: border-box; margin: 0; }
+#voucherFilter .vf-select { flex: 0 0 150px; width: 150px; padding: 0 34px 0 14px; appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239A9DA2' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat; background-position: right 12px center; }
+#voucherFilter .vf-search { flex: 0 0 240px; width: 240px; padding: 0 14px; }
+@media (max-width: 600px) { #voucherFilter { flex-wrap: wrap; width: 100%; } #voucherFilter .vf-select, #voucherFilter .vf-search { flex: 1 1 100%; width: 100%; } }
+/* Selected voucher rows: keep a visible gap so neighbouring boxes do not touch */
+#voucherTable tbody tr.bs-sel { outline-offset: -4px; }
+#voucherTable tbody tr.bs-sel td { box-shadow: inset 0 4px 0 var(--white,#fff), inset 0 -4px 0 var(--white,#fff); }
+</style>
+</head>
 <body class="theme-election">
 <!-- Result Modal (shows generated code) -->
 <div class="modal-overlay" id="resultModal">
@@ -338,6 +402,7 @@ $notifCount = getUnreadStaffNotifCount($pdo, $_SESSION['user_id']);
         $usedCount     = $stat['used'];
         $unusedCount   = $stat['unused'];
         $noVoucherCount = $stat['none'];
+        $activeVoucherCount = $unusedCount;
     ?>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px;">
         <div class="stat-card"><div class="stat-num"><?= $totalStudents ?></div><div class="stat-label"><?= t('ui.total_students_44da', 'Total Students') ?></div></div>
@@ -361,6 +426,22 @@ $notifCount = getUnreadStaffNotifCount($pdo, $_SESSION['user_id']);
             <span style="font-size:13px;color:#059669;"><i class="ti ti-circle-check"></i> <?= t('ui.all_students_have_vouchers_aa5f', 'All students have vouchers') ?></span>
             <?php endif; ?>
         </div>
+        <?php $pendingNotify = (int)($stat['pending_notify'] ?? 0); ?>
+        <?php if ($activeVoucherCount > 0): ?>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid var(--gray-200,#E5E7EB);">
+            <div>
+                <div style="font-size:14px;font-weight:600;color:var(--maroon-dark);margin-bottom:2px;">Notify Students</div>
+                <div style="font-size:12px;color:#6B7280;">Send each student their voucher code as an in-app notification (no email). Students who were already notified (and used vouchers) are skipped.</div>
+            </div>
+            <?php if ($pendingNotify > 0): ?>
+            <button class="btn btn-primary" onclick="notifyAll()">
+                <i class="ti ti-bell-ringing"></i> Notify <?= $pendingNotify ?> student<?= $pendingNotify > 1 ? 's' : '' ?>
+            </button>
+            <?php else: ?>
+            <span style="font-size:13px;color:#059669;"><i class="ti ti-bell-check"></i> All students already notified</span>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
     </div>
 
     <!-- Voucher table -->
@@ -372,12 +453,12 @@ $notifCount = getUnreadStaffNotifCount($pdo, $_SESSION['user_id']);
             <form method="get" id="voucherFilter" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
                 <input type="hidden" name="election_id" value="<?= (int)$selected_election_id ?>">
                 <input type="hidden" name="pp" value="<?= (int)$perPage ?>">
-                <select name="status" class="form-control" style="max-width:150px;" onchange="this.form.submit()">
+                <select name="status" class="form-control vf-select" onchange="this.form.submit()">
                     <?php foreach (['all'=>'All','active'=>'Active','used'=>'Used (Voted)','none'=>'No voucher'] as $k=>$lb): ?>
                     <option value="<?= $k ?>" <?= $vstatus===$k?'selected':'' ?>><?= $lb ?></option>
                     <?php endforeach; ?>
                 </select>
-                <input type="text" id="searchInput" name="q" value="<?= e($q) ?>" class="form-control" style="max-width:220px;" placeholder="<?= t('ui.search_name_or_student_id_e25c', 'Search name or student ID...') ?>" autocomplete="off">
+                <input type="text" id="searchInput" name="q" value="<?= e($q) ?>" class="form-control vf-search" placeholder="<?= t('ui.search_name_or_student_id_e25c', 'Search name or student ID...') ?>" autocomplete="off">
             </form>
         </div>
 
@@ -414,6 +495,11 @@ $notifCount = getUnreadStaffNotifCount($pdo, $_SESSION['user_id']);
                         <div style="font-size:11px;color:#9CA3AF;margin-top:2px;"><?= $v['used_at'] ? date('M j, Y g:i A', strtotime($v['used_at'])) : '' ?></div>
                     <?php else: ?>
                         <span class="status-badge-unused"><i class="ti ti-circle-check"></i> <?= t('ui.active_4d3d', 'Active') ?></span>
+                        <?php if (!empty($v['notified'])): ?>
+                        <div style="font-size:11px;color:#059669;margin-top:3px;"><i class="ti ti-bell-check"></i> Notified</div>
+                        <?php else: ?>
+                        <div style="font-size:11px;color:#9CA3AF;margin-top:3px;"><i class="ti ti-bell-off"></i> Not yet notified</div>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </td>
                 <td style="font-size:12px;color:#6B7280;"><?= date('M j, Y', strtotime($v['generated_at'])) ?></td>
@@ -517,6 +603,27 @@ function generateAll() {
     });
 }
 
+function notifyAll() {
+    appConfirm({
+        title: 'Notify all students?',
+        message: 'Each student with an unused voucher gets their code as an in-app notification. No email is sent.',
+        btn: 'Yes, Notify'
+    }, function () {
+        fetch('vouchers.php', {
+            method: 'POST',
+            headers: {'Content-Type':'application/x-www-form-urlencoded'},
+            body: `action=notify_all&election_id=${electionId}`
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                appToast(`Done! Notified ${data.count} student(s).`, 'success');
+                setTimeout(function () { location.reload(); }, 1400);
+            }
+        });
+    });
+}
+
 // ── Revoke ───────────────────────────────────────────────────────────────────
 let pendingRevokeId = null;
 function askRevoke(voucherId) {
@@ -603,7 +710,15 @@ function copyText(text, btn) {
   var t = document.getElementById('voucherTable'); if (!t) return;
   BulkSelect.init({
     rows: '#voucherTable tbody tr[data-bulk-id]', before: t.closest('.table-wrap'), noun: 'voucher',
-    actions: [{ label: __t('Revoke'), icon: 'ti-trash', danger: true,
+    actions: [{ label: __t('Notify students'), icon: 'ti-bell-ringing',
+      doneText: function (ok) { return 'Done! Notified ' + ok + ' student(s).'; },
+      confirm: function (n) { return 'Send the voucher code as an in-app notification to ' + n + ' student(s)? (No email is sent.)'; },
+      run: function (id) {
+        return fetch('vouchers.php', { method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: 'action=notify&voucher_id=' + encodeURIComponent(id) })
+          .then(function (r) { return r.json(); }).then(function (d) { return !!(d && d.ok); });
+      } },
+      { label: __t('Revoke'), icon: 'ti-trash', danger: true,
+      doneText: function (ok) { return 'Done! Revoked ' + ok + ' voucher(s).'; },
       confirm: function (n) { return 'Revoke ' + n + __t(' unused voucher(s)? Used vouchers are never affected.'); },
       run: function (id) {
         return fetch('vouchers.php', { method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: 'action=revoke&voucher_id=' + encodeURIComponent(id) })

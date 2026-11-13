@@ -11,7 +11,7 @@ window.__t = window.__t || function (s) { return s; };
  *   before:  '#some-element',             // the bar is inserted before this element
  *   noun:    'candidate',                 // "3 candidates selected"
  *   mount:   function(row){ return el },  // optional: where the checkbox goes (default: start of first <td>)
- *   actions: [{ label, icon, danger,
+ *   actions: [{ label, icon, danger, doneText(okCount, total),
  *               confirm, reason, run(id, reason) -> Promise<bool>,      // one request per id
  *               batch(ids, done(okCount, failCount, message)) }],       // or: brings its own confirmation (OTP)
  *   onDone:  function(){ location.reload(); }
@@ -29,7 +29,11 @@ window.__t = window.__t || function (s) { return s; };
     '.bs-bar{display:none;align-items:center;gap:8px;flex-wrap:wrap;position:sticky;top:var(--topnav-height,56px);z-index:20;background:#fff;padding:8px 0 10px;margin-bottom:6px;border-bottom:1px solid #F3F4F6}' +
     '.bs-wrap.bs-on .bs-bar{display:flex}.bs-wrap.bs-on .bs-head{display:none}' +
     '.bs-bar label{display:flex;align-items:center;gap:6px;font-size:13px;color:#374151;cursor:pointer;margin:0}' +
-    '.bs-bar input{width:18px;height:18px;accent-color:var(--bs-acc)}' +
+    /* round check circles (select-all + rows) */
+    '.bs-bar input,.bs-rowcb{-webkit-appearance:none;appearance:none;width:20px;height:20px;border:2px solid #9CA3AF;border-radius:50%;background:#fff center/12px no-repeat;cursor:pointer;flex-shrink:0;transition:background-color .12s,border-color .12s}' +
+    '.bs-bar input:hover,.bs-rowcb:hover{border-color:var(--bs-acc)}' +
+    '.bs-bar input:checked,.bs-rowcb:checked{background-color:var(--bs-acc);border-color:var(--bs-acc);background-image:url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 16 16\' fill=\'none\' stroke=\'%23fff\' stroke-width=\'2.6\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3E%3Cpath d=\'M3.5 8.5l3 3 6-7\'/%3E%3C/svg%3E")}' +
+    '.bs-bar input:focus-visible,.bs-rowcb:focus-visible{outline:2px solid var(--bs-acc);outline-offset:2px}' +
     '.bs-count{font-size:13px;font-weight:600;color:#1F2937;margin-right:auto}' +
     '.bs-bar button{font-size:13px;border-radius:8px;padding:6px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;background:#fff;color:#374151;border:1px solid #D1D5DB}' +
     '.bs-bar button:disabled{opacity:.45;cursor:not-allowed}.bs-bar button:not(:disabled):hover{background:#F3F4F6}' +
@@ -38,8 +42,9 @@ window.__t = window.__t || function (s) { return s; };
     /* row checkbox: hidden until selecting */
     '.bs-rowcb{display:none;flex-shrink:0;width:18px;height:18px;margin:0 10px 0 0;vertical-align:middle;accent-color:var(--bs-acc,#6B1A2A);cursor:pointer}' +
     '.bs-mode .bs-rowcb{display:inline-block}' +
-    '.bs-card-cb{position:absolute;top:10px;left:10px;z-index:5;margin:0;width:22px;height:22px;background:#fff;border-radius:4px}' +
-    '.bs-sel{background:var(--maroon-pale,#F9EEF0) !important;outline:2px solid var(--maroon,#6B1A2A);outline-offset:-2px}' +
+    '.bs-card-cb{position:absolute;top:10px;left:10px;z-index:5;margin:0;width:22px;height:22px;background-color:#fff;border-radius:50%}' +
+    '.bs-sel{background:var(--maroon-pale,#F9EEF0) !important;outline:2px solid var(--maroon,#6B1A2A);outline-offset:-2px;border-radius:10px}' +
+    'div.bs-row.bs-sel,li.bs-row.bs-sel,a.bs-row.bs-sel{margin-bottom:8px}' +
     '.bs-mode{cursor:pointer;-webkit-user-select:none;user-select:none}' +
     '.bs-mode a,.bs-mode button:not(.bs-rowcb){pointer-events:none;opacity:.5}' +
     '.bs-row{-webkit-touch-callout:none}' +
@@ -103,7 +108,7 @@ window.__t = window.__t || function (s) { return s; };
       '<div class="bs-bar">' +
         '<label><input type="checkbox" class="bs-all"> <span class="bs-lbl">All</span></label>' +
         '<span class="bs-count">0 selected</span><span class="bs-actions-host"></span>' +
-        '<button type="button" class="bs-cancel" title=__t("Cancel")><i class="ti ti-x"></i><span class="bs-lbl">Cancel</span></button>' +
+        '<button type="button" class="bs-cancel" title="Cancel"><i class="ti ti-x"></i><span class="bs-lbl">Cancel</span></button>' +
       '</div>';
     anchor.parentNode.insertBefore(wrap, anchor);
 
@@ -246,8 +251,10 @@ window.__t = window.__t || function (s) { return s; };
       if (!ids.length || busy) return;
       var n = ids.length;
       function finish(okCount, failCount, message) {
-        var text = message || (okCount + ' of ' + n + ' done.');
-        if (typeof window.showToast === 'function') window.showToast(text, failCount ? 'error' : 'success');
+        var text = message || (typeof a.doneText === 'function' ? a.doneText(okCount, n) : (okCount + ' of ' + n + ' done.'));
+        if (failCount && !message) text += ' (' + failCount + ' failed)';
+        var toast = (typeof window.showToast === 'function') ? window.showToast : (typeof window.appToast === 'function' ? window.appToast : null);
+        if (toast) toast(text, failCount ? 'error' : 'success');
         else alert(text);
         setTimeout(function () { (cfg.onDone || function () { location.reload(); })(); }, 900);
       }
