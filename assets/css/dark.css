@@ -225,3 +225,42 @@ html[data-theme="dark"] form.msg-reply textarea.form-control { background: #3A3B
 html[data-theme="dark"] form.msg-reply textarea.form-control::placeholder { color: #8A8D91; }
 html[data-theme="dark"] form.msg-reply .voice-btn { background: #3A3B3C; border-color: #4E4F50; color: #E4E6EB; }
 html[data-theme="dark"] form.msg-reply .voice-btn:hover { background: #4E4F50; }
+
+/* Ask OSA floating chat widget (includes/ask-osa-widget.php) + Ask OSA page (student/assistant.php) */
+html[data-theme="dark"] #osaChatPanel { background: #242526; border-color: #3E4042; box-shadow: 0 16px 40px rgba(0,0,0,.55); }
+html[data-theme="dark"] .osa-head { background: #242526; border-bottom-color: #3E4042; }
+html[data-theme="dark"] .osa-head img { border-color: #3E4042; }
+html[data-theme="dark"] .osa-head .osa-title { color: #E4E6EB; }
+html[data-theme="dark"] .osa-head .osa-sub,
+html[data-theme="dark"] .osa-head .osa-close,
+html[data-theme="dark"] .osa-meta,
+html[data-theme="dark"] .osa-empty,
+html[data-theme="dark"] .osa-ai { color: #9A9DA2; }
+html[data-theme="dark"] .osa-head a.osa-full { color: #F0A3B2 !important; background: #3A2128; border: 1px solid #6B3A45; }
+html[data-theme="dark"] .osa-head a.osa-full:hover { background: #4A2830; color: #fff !important; }
+html[data-theme="dark"] .osa-body { background: #18191A; }
+html[data-theme="dark"] .osa-row.theirs .osa-bubble { background: #3A3B3C; border-color: #4E4F50; color: #E4E6EB; }
+html[data-theme="dark"] .osa-foot { background: #242526; border-top-color: #3E4042; }
+html[data-theme="dark"] .osa-foot textarea { background: #3A3B3C; color: #E4E6EB; border-color: #4E4F50; }
+html[data-theme="dark"] .osa-foot textarea::placeholder { color: #8A8D91; }
+html[data-theme="dark"] .osa-foot textarea:focus { border-color: #B84A60; }
+html[data-theme="dark"] .osa-err { color: #F97066; }
+html[data-theme="dark"] #osaChatHead .osa-dot { border-color: #242526; }
+html[data-theme="dark"] .ai-title, html[data-theme="dark"] .ai-hero h2, html[data-theme="dark"] .ai-bubble, html[data-theme="dark"] .ai-answer { color: #E4E6EB; }
+html[data-theme="dark"] .ai-hero p, html[data-theme="dark"] .ai-hero .ai-note { color: #9A9DA2; }
+html[data-theme="dark"] .ai-bubble { background: #3A3B3C; }
+html[data-theme="dark"] .ai-newchat { background: #242526; border-color: #4E4F50; color: #B0B3B8; }
+html[data-theme="dark"] .ai-newchat:hover { background: #3A3B3C; }
+html[data-theme="dark"] .ai-escalate { background: #2A2B2D; border-color: #4E4F50; color: #B0B3B8; }
+html[data-theme="dark"] .ai-composer { background: #242526; border-color: #4E4F50; box-shadow: none; }
+html[data-theme="dark"] .ai-composer textarea { color: #E4E6EB; }
+html[data-theme="dark"] .ai-composer textarea::placeholder { color: #8A8D91; }
+html[data-theme="dark"] .ai-hero-logo { border-color: #3E4042; }
+
+/* OSA Guide search box (student/help.php): no inner bar/box on the input */
+html[data-theme="dark"] .help-search { background: #242526; border-color: #3E4042; }
+html[data-theme="dark"] .help-search input,
+html[data-theme="dark"] .help-search input:focus { background: transparent !important; border: 0 !important; box-shadow: none !important; outline: none !important; color: #E4E6EB; -webkit-appearance: none; appearance: none; }
+html[data-theme="dark"] .help-search input::placeholder { color: #8A8D91; }
+html[data-theme="dark"] .help-search input::-webkit-search-cancel-button { filter: invert(1); }
+html[data-theme="dark"] .help-search i { color: #9A9DA2; }
