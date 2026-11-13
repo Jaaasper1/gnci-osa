@@ -41,16 +41,16 @@ function exportMenu(string $url, string $btnClass = 'btn btn-outline btn-sm', st
 @media(max-width:600px){.xm-list{left:0;right:auto}}
 .xm-list a{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;color:#374151;font-size:13px;white-space:nowrap}
 .xm-list a:hover{background:#F9EEF0;color:#6B1A2A}
-.xm-list.xm-wide{min-width:260px}
+.xm-list.xm-wide{min-width:300px}
 .xm-filters{padding:4px 4px 8px;border-bottom:1px solid #F3F4F6;margin-bottom:6px}
-.xm-fh{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:#6B1A2A;padding:4px 6px}
-.xm-fh .xm-fcount{margin-left:auto;font-weight:600;color:#6B7280;background:#F3F4F6;border-radius:10px;padding:1px 8px}
+.xm-fh{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:#6B1A2A;padding:4px 6px;white-space:nowrap}.xm-fh .xm-fclear{flex-shrink:0;white-space:nowrap}
+.xm-fh .xm-fcount{margin-left:auto;font-weight:600;color:#6B7280;background:#F3F4F6;border-radius:10px;padding:1px 8px;white-space:nowrap;flex-shrink:0}
 .xm-fh .xm-fclear{border:0;background:none;color:#6B7280;font-size:12px;cursor:pointer;text-decoration:underline;padding:0}
 .xm-fl{font-size:11px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.04em;padding:6px 6px 2px}
 .xm-fopts{max-height:150px;overflow-y:auto;padding:0 2px}
 .xm-fopts label{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;font-size:13px;color:#374151;cursor:pointer;margin:0;white-space:normal}
 .xm-fopts label:hover{background:#F9EEF0}
-.xm-fopts input{width:16px;height:16px;flex-shrink:0;accent-color:#6B1A2A;margin:0}
+.xm-fall{border-bottom:1px solid #F3F4F6;margin-bottom:2px}.xm-fopts input{width:16px;height:16px;flex-shrink:0;accent-color:#6B1A2A;margin:0}
 .xm-fnote{font-size:11px;color:#9CA3AF;padding:4px 6px 0}
 </style><script>document.addEventListener("toggle",function(e){var d=e.target;if(!d.classList||!d.classList.contains("xm")||!d.open)return;var l=d.querySelector(".xm-list");if(!l)return;l.style.left="";l.style.right="0";l.style.marginLeft="";var r=l.getBoundingClientRect();if(r.left<8){l.style.right="auto";l.style.left="0";r=l.getBoundingClientRect();}if(r.right>window.innerWidth-8){l.style.marginLeft=(window.innerWidth-8-r.right)+"px";}},true);document.addEventListener("click",function(e){document.querySelectorAll("details.xm[open]").forEach(function(d){if(!d.contains(e.target))d.removeAttribute("open")})});</script>';
     }
@@ -84,15 +84,30 @@ function exportMenu(string $url, string $btnClass = 'btn btn-outline btn-sm', st
     var b = box.querySelector(".xm-fcount");
     if (b) b.textContent = n ? n + " selected" : "All";
   }
+  function syncAll(box, key){
+    var any = box.querySelectorAll('input[data-fkey="'+key+'"]:checked').length > 0;
+    var all = box.querySelector('input[data-fall="'+key+'"]');
+    if (all) all.checked = !any;
+  }
   document.addEventListener("change", function(e){
-    var box = e.target.closest ? e.target.closest(".xm-filters") : null;
-    if (box) refresh(box);
+    var t = e.target, box = t.closest ? t.closest(".xm-filters") : null;
+    if (!box) return;
+    if (t.hasAttribute && t.hasAttribute("data-fall")) {
+      var k = t.getAttribute("data-fall");
+      // ticking "All" clears the specific choices; "All" can't be unticked on its own
+      box.querySelectorAll('input[data-fkey="'+k+'"]').forEach(function(i){ i.checked = false; });
+      t.checked = true;
+    } else if (t.hasAttribute && t.hasAttribute("data-fkey")) {
+      syncAll(box, t.getAttribute("data-fkey"));
+    }
+    refresh(box);
   });
   document.addEventListener("click", function(e){
     var c = e.target.closest ? e.target.closest(".xm-fclear") : null;
     if (!c) return;
     var box = c.closest(".xm-filters");
     box.querySelectorAll("input[data-fkey]").forEach(function(i){ i.checked = false; });
+    box.querySelectorAll("input[data-fall]").forEach(function(i){ i.checked = true; });
     refresh(box);
   });
   document.addEventListener("DOMContentLoaded", function(){
@@ -112,13 +127,15 @@ SELJS;
         foreach ($filters as $f) {
             $pre = array_map('strval', $f['selected'] ?? []);
             $h .= '<div class="xm-fl">' . htmlspecialchars($f['label'] ?? $f['key']) . '</div><div class="xm-fopts">';
+            $allLbl = 'All ' . (substr((string)($f['label'] ?? $f['key']), -1) === 's' ? ($f['label'] ?? $f['key']) : ($f['label'] ?? $f['key']) . 's');
+            $h .= '<label class="xm-fall"><input type="checkbox" data-fall="' . htmlspecialchars($f['key']) . '"' . ($pre ? '' : ' checked') . '> <b>' . htmlspecialchars($allLbl) . '</b></label>';
             foreach ($f['options'] as $val => $lbl) {
                 $h .= '<label><input type="checkbox" data-fkey="' . htmlspecialchars($f['key']) . '" value="' . htmlspecialchars((string)$val) . '"'
                     . (in_array((string)$val, $pre, true) ? ' checked' : '') . '> ' . htmlspecialchars((string)$lbl) . '</label>';
             }
             $h .= '</div>';
         }
-        $h .= '<div class="xm-fnote">Nothing ticked = export everything.</div></div>';
+        $h .= '<div class="xm-fnote">Keep “All” ticked to export everything.</div></div>';
     }
     foreach ($formats as $f) {
         if (!isset(EXPORT_FORMATS[$f])) continue;

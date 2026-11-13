@@ -287,11 +287,6 @@ function notifRenderCard(array $rows, array $counts, string $filter, int $page, 
                     <div class="notif-time"><span class="notif-type"><?= e($typeLabel) ?></span><?= e(notifTimeAgo($n['created_at'])) ?></div>
                     <?php if ($n['link']): ?><a href="<?= e(notifFixLink($n['link'])) ?>" class="notif-link"><?= t('notif.view', 'View →') ?></a><?php endif; ?>
                 </div>
-                <?php if ($unread): ?>
-                <button class="notif-read-btn" onclick="markOneRead(<?= (int)$n['id'] ?>)" title="Mark as read"><i class="ti ti-check"></i></button>
-                <?php else: ?>
-                <button class="notif-unread-btn" onclick="markOneUnread(<?= (int)$n['id'] ?>)" title="Mark as unread"><i class="ti ti-mail"></i></button>
-                <?php endif; ?>
                 <button class="notif-delete-btn" onclick="askDeleteOne(<?= (int)$n['id'] ?>)" title="<?= htmlspecialchars(t('notif.delete', 'Delete'), ENT_QUOTES) ?>"><i class="ti ti-x"></i></button>
             </div>
         <?php endforeach; ?>

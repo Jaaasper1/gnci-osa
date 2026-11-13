@@ -215,6 +215,18 @@ $previews = (!$inConvo && $list) ? msgStaffPreviews($pdo, $list) : [];
     <link rel="stylesheet" href="../assets/css/messages-staff.css?v=2">
 <?php include __DIR__.'/../includes/pwa-head.php'; ?></head>
 <body>
+<div class="msgc-overlay" id="msgcModal" aria-hidden="true">
+    <div class="msgc-box" role="dialog" aria-modal="true" aria-labelledby="msgcTitle">
+        <div class="msgc-icon" id="msgcIcon"><i class="ti ti-trash" id="msgcIconI"></i></div>
+        <div class="msgc-title" id="msgcTitle"></div>
+        <div class="msgc-desc" id="msgcDesc"></div>
+        <div class="msgc-actions">
+            <button type="button" class="btn btn-outline" id="msgcCancel"><?= t('ui.cancel_ea47', 'Cancel') ?></button>
+            <button type="button" class="btn" id="msgcOk"></button>
+        </div>
+    </div>
+</div>
+
 <?php
 $isAdmin = ($_SESSION['user_type'] ?? '') === 'admin';
 $base = '../admin/';   // admin and staff share the full menu
@@ -335,7 +347,7 @@ $base = '../admin/';   // admin and staff share the full menu
                     <button type="submit" class="btn btn-outline btn-sm"><i class="ti ti-refresh"></i> <span class="msgm-btn-text"><?= t('ui.reopen_b824', 'Reopen') ?></span></button>
                 <?php endif; ?>
             </form>
-            <form method="POST" style="margin:0;<?= empty($thread['id']) ? 'display:none;' : '' ?>" onsubmit="return confirm('Delete this whole conversation permanently? This cannot be undone.');">
+            <form method="POST" style="margin:0;<?= empty($thread['id']) ? 'display:none;' : '' ?>" data-msgc-title="Delete Conversation" data-msgc-desc="Delete this whole conversation permanently? This cannot be undone." data-msgc-ok="Delete" data-msgc-kind="danger">
                 <?= csrfField() ?>
                 <input type="hidden" name="message_id" value="<?= (int)$thread['id'] ?>">
                 <input type="hidden" name="action" value="delete">
@@ -383,6 +395,22 @@ $__in  = 0; foreach ($__stu as $__s) if (!empty($__s['last_login_at'])) $__in++;
 $__out = count($__stu) - $__in;
 ?>
 <style>
+  .msgc-overlay{position:fixed;inset:0;background:rgba(17,24,39,.55);display:none;align-items:center;justify-content:center;padding:14px;z-index:2000}
+  .msgc-overlay.open{display:flex}
+  .msgc-box{background:#fff;border-radius:16px;width:100%;max-width:380px;padding:26px 24px 22px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.25);animation:msgcIn .18s ease}
+  @keyframes msgcIn{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
+  .msgc-icon{width:52px;height:52px;border-radius:50%;background:#FEF2F2;display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+  .msgc-icon i{font-size:26px;color:#EF4444}
+  .msgc-icon.info{background:#F9EEF0}.msgc-icon.info i{color:#6B1A2A}
+  .msgc-title{font-size:16px;font-weight:600;color:#4A0F1B;margin-bottom:6px}
+  .msgc-desc{font-size:13px;color:#6B7280;margin-bottom:22px;line-height:1.5}
+  .msgc-actions{display:flex;gap:10px;justify-content:center}
+  .msgc-actions .btn{flex:1;justify-content:center}
+  .msgc-ok-danger{background:#EF4444;color:#fff;border:1px solid #EF4444}
+  .msgc-ok-info{background:#6B1A2A;color:#fff;border:1px solid #6B1A2A}
+  html[data-theme="dark"] .msgc-box{background:#242526;color:#E4E6EB}
+  html[data-theme="dark"] .msgc-title{color:#E4E6EB}
+  html[data-theme="dark"] .msgc-desc{color:#B0B3B8}
   .msgm-bulkbar{max-width:720px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;position:sticky;top:0;z-index:20;background:#fff;padding:8px 0 10px;margin:0 0 6px;border-bottom:1px solid #F3F4F6;font-size:13px;color:#374151}
   .msgm-bulkbar[hidden]{display:none}
   .msgm-bulkbar label{display:flex;align-items:center;gap:6px;font-size:13px;color:#374151;cursor:pointer}
@@ -475,6 +503,34 @@ $__out = count($__stu) - $__in;
 })();
 </script>
 <script>
+// In-system confirmation popup (replaces the browser's confirm()).
+(function () {
+  var ov = document.getElementById('msgcModal'); if (!ov) return;
+  var tEl = document.getElementById('msgcTitle'), dEl = document.getElementById('msgcDesc'),
+      ok = document.getElementById('msgcOk'), cancel = document.getElementById('msgcCancel'),
+      ic = document.getElementById('msgcIcon'), icI = document.getElementById('msgcIconI'), cb = null;
+  function close() { ov.classList.remove('open'); ov.setAttribute('aria-hidden', 'true'); cb = null; }
+  window.msgConfirm = function (title, desc, okLabel, kind, onOk) {
+    tEl.textContent = title; dEl.textContent = desc; ok.textContent = okLabel || 'OK';
+    var danger = (kind === 'danger');
+    ok.className = 'btn ' + (danger ? 'msgc-ok-danger' : 'msgc-ok-info');
+    ic.className = 'msgc-icon' + (danger ? '' : ' info');
+    icI.className = 'ti ' + (danger ? 'ti-trash' : 'ti-help-circle');
+    cb = onOk; ov.classList.add('open'); ov.setAttribute('aria-hidden', 'false'); ok.focus();
+  };
+  ok.addEventListener('click', function () { var f = cb; close(); if (f) f(); });
+  cancel.addEventListener('click', close);
+  ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && ov.classList.contains('open')) close(); });
+  // Any form with data-msgc-title asks first, then submits.
+  document.addEventListener('submit', function (e) {
+    var f = e.target; if (!f.getAttribute || !f.getAttribute('data-msgc-title')) return;
+    e.preventDefault();
+    window.msgConfirm(f.getAttribute('data-msgc-title'), f.getAttribute('data-msgc-desc') || '', f.getAttribute('data-msgc-ok') || 'OK', f.getAttribute('data-msgc-kind') || 'info', function () { f.submit(); });
+  });
+})();
+</script>
+<script>
 // Multi-select (same as Notifications): click the circle on a row (desktop) or long-press a row (phone).
 (function () {
   var box = document.getElementById('msgList'), bar = document.getElementById('bulkBar');
@@ -529,7 +585,7 @@ $__out = count($__stu) - $__in;
     if (suppressClick) { suppressClick = false; e.preventDefault(); return; }
     var it = e.target.closest('.msgm-item'); if (!it) return;
     var c = it.querySelector('.msgm-check'); if (!c) return;
-    if (e.target === c) { e.preventDefault(); toggle(c.dataset.id); return; }
+    if (e.target === c) { e.preventDefault(); toggle(c.dataset.id); setTimeout(render, 0); return; }
     if (selecting) { e.preventDefault(); toggle(c.dataset.id); }
   });
 
@@ -549,20 +605,25 @@ $__out = count($__stu) - $__in;
   });
   box.addEventListener('pointermove', function (e) { if (timer && (Math.abs(e.clientX - sx) > 8 || Math.abs(e.clientY - sy) > 8)) cancel(); });
   ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) { box.addEventListener(ev, cancel); });
+  ['pointerup', 'pointercancel'].forEach(function (ev) {
+    box.addEventListener(ev, function () { if (suppressClick) setTimeout(function () { suppressClick = false; }, 350); });
+  });
   box.addEventListener('contextmenu', function (e) { if (e.target.closest('.msgm-item') && 'ontouchstart' in window) e.preventDefault(); });
 
   new MutationObserver(render).observe(box, { childList: true });   // live search re-renders the rows
 
-  function submit(action, msg) {
-    if (!sel.size || !confirm(msg.replace('{n}', sel.size))) return;
-    act.value = action; idsBox.innerHTML = '';
-    sel.forEach(function (id) { var i = document.createElement('input'); i.type = 'hidden'; i.name = 'ids[]'; i.value = id; idsBox.appendChild(i); });
-    form.submit();
+  function submit(action, title, msg, okLabel, kind) {
+    if (!sel.size) return;
+    window.msgConfirm(title, msg.replace('{n}', sel.size), okLabel, kind, function () {
+      act.value = action; idsBox.innerHTML = '';
+      sel.forEach(function (id) { var i = document.createElement('input'); i.type = 'hidden'; i.name = 'ids[]'; i.value = id; idsBox.appendChild(i); });
+      form.submit();
+    });
   }
-  document.getElementById('bulkDelete').addEventListener('click', function () { submit('bulk_delete', 'Delete {n} conversation(s) permanently? This cannot be undone.'); });
-  document.getElementById('bulkRead').addEventListener('click', function () { submit('bulk_read', 'Mark {n} conversation(s) as read?'); });
-  document.getElementById('bulkUnread').addEventListener('click', function () { submit('bulk_unread', 'Mark {n} conversation(s) as unread?'); });
-  document.getElementById('bulkClose').addEventListener('click', function () { submit('bulk_close', 'Mark {n} conversation(s) as closed?'); });
+  document.getElementById('bulkDelete').addEventListener('click', function () { submit('bulk_delete', 'Delete Conversations', 'Delete {n} conversation(s) permanently? This cannot be undone.', 'Delete', 'danger'); });
+  document.getElementById('bulkRead').addEventListener('click', function () { submit('bulk_read', 'Mark as Read', 'Mark {n} conversation(s) as read?', 'Mark read', 'info'); });
+  document.getElementById('bulkUnread').addEventListener('click', function () { submit('bulk_unread', 'Mark as Unread', 'Mark {n} conversation(s) as unread?', 'Mark unread', 'info'); });
+  document.getElementById('bulkClose').addEventListener('click', function () { submit('bulk_close', 'Mark as Closed', 'Mark {n} conversation(s) as closed?', 'Mark closed', 'info'); });
   render();
 })();
 </script>
