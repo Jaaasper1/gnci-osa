@@ -15,3 +15,18 @@ Options -Indexes
 <IfModule mod_mime.c>
     AddType application/manifest+json .webmanifest
 </IfModule>
+
+# Allow phone photos for COR / complaint uploads (only applied when PHP runs as an Apache module;
+# harmless otherwise -- on PHP-FPM/CGI the .user.ini file does the same job).
+<IfModule mod_php.c>
+    php_value upload_max_filesize 8M
+    php_value post_max_size 10M
+</IfModule>
+<IfModule mod_php7.c>
+    php_value upload_max_filesize 8M
+    php_value post_max_size 10M
+</IfModule>
+<IfModule mod_php8.c>
+    php_value upload_max_filesize 8M
+    php_value post_max_size 10M
+</IfModule>

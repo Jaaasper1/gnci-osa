@@ -193,13 +193,33 @@ function uploadPhoto($file) {
     return ['error' => t('msg.upload_failed_make_sure_the_uploads_fold_009a', 'Upload failed. Make sure the uploads/ folder is writable.')];
 }
 
+// Converts a php.ini size string ("2M", "512K", "1G") to bytes.
+function iniBytes($v) {
+    $v = trim((string)$v);
+    if ($v === '') return 0;
+    $n = (float)$v;
+    switch (strtolower(substr($v, -1))) { case 'g': $n *= 1024; case 'm': $n *= 1024; case 'k': $n *= 1024; }
+    return (int)$n;
+}
+// Largest COR upload this server will actually accept: min(5MB, upload_max_filesize, post_max_size).
+function corServerMaxBytes() {
+    $lim = 5 * 1024 * 1024;
+    $u = iniBytes(ini_get('upload_max_filesize'));
+    $p = iniBytes(ini_get('post_max_size'));
+    if ($u > 0) $lim = min($lim, $u);
+    if ($p > 0) $lim = min($lim, $p - 262144);   // leave room for the other form fields
+    return max($lim, 262144);
+}
+
 // Upload Certificate of Registration (COR) for student self-registration
 function uploadCorFile($file) {
     $allowed = ['jpg','jpeg','png','pdf'];
     $maxSize = 5 * 1024 * 1024; // 5MB
 
     if (isset($file['error']) && in_array($file['error'], [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
-        return ['error' => t('msg.cor_file_is_too_large_max_5mb_e301', 'COR file is too large. Max 5MB.')];
+        // The SERVER's limit (php.ini) was hit, which can be lower than 5MB -- say so honestly.
+        $lim = corServerMaxBytes();
+        return ['error' => 'COR file is too large for this server (limit about ' . round($lim / 1048576, 1) . ' MB). Please upload a smaller or compressed photo.'];
     }
     if (!isset($file['error']) || $file['error'] !== UPLOAD_ERR_OK) {
         return ['error' => t('msg.please_attach_a_copy_of_your_certificate_1c59', 'Please attach a copy of your Certificate of Registration (COR).')];

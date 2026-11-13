@@ -471,8 +471,10 @@ PwPolicy.attach({
     var file = document.getElementById('cor-file');
     var box  = document.getElementById('cor-size');
     if (!form || !file || !box) return;
-    var MAX = 5 * 1024 * 1024;
-    var T_OVER = <?= json_encode(t('register.cor_over', 'is too large. Max is 5 MB.')) ?>;
+    var MAX = <?= (int)corServerMaxBytes() ?>;           // min(5MB, what the server really accepts)
+    var TARGET = Math.min(1.5 * 1024 * 1024, MAX);       // photos above this get shrunk automatically
+    var busy = false;
+    var T_OVER = (MAX === 5 * 1024 * 1024) ? <?= json_encode(t('register.cor_over', 'is too large. Max is 5 MB.')) ?> : 'is too large. Max is ' + (MAX / 1048576).toFixed(1) + ' MB.';
     var T_OVERBY = <?= json_encode(t('register.cor_over_by', 'Over by')) ?>;
     var T_BADTYPE = <?= json_encode(t('msg.cor_must_be_a_jpg_png_or_pdf_file_76ff', 'COR must be a JPG, PNG, or PDF file.')) ?>;
     function mb(b){ return (b / 1048576).toFixed(2) + ' MB'; }
@@ -482,6 +484,7 @@ PwPolicy.attach({
         file.setCustomValidity('');
         if (!f) { box.style.display = 'none'; return true; }
         box.style.display = 'block';
+        if (busy) { box.style.color = '#6B7280'; box.textContent = 'Compressing photo\u2026 please wait.'; file.setCustomValidity('Compressing'); return false; }
         if (!typeOk(f)) {
             box.style.color = '#991B1B'; box.textContent = '\u2716 ' + T_BADTYPE;
             file.setCustomValidity(T_BADTYPE); return false;
@@ -492,10 +495,44 @@ PwPolicy.attach({
             file.setCustomValidity(T_OVER); return false;
         }
         box.style.color = '#15803D';
-        box.textContent = '\u2714 ' + f.name + ' \u2014 ' + mb(f.size) + ' / 5 MB';
+        box.textContent = '\u2714 ' + f.name + ' \u2014 ' + mb(f.size) + ' / ' + mb(MAX);
         return true;
     }
-    file.addEventListener('change', state);
+    // Shrinks big phone photos (JPG/PNG) in the browser so they fit under the limit. PDFs are left as-is.
+    function compress(f){
+        return new Promise(function(resolve){
+            if (!/\.(jpe?g|png)$/i.test(f.name)) return resolve(f);
+            var img = new Image(), url = URL.createObjectURL(f);
+            img.onload = function(){
+                URL.revokeObjectURL(url);
+                var s = Math.min(1, 2200 / Math.max(img.naturalWidth, img.naturalHeight));
+                var c = document.createElement('canvas');
+                c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+                var ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+                ctx.drawImage(img, 0, 0, c.width, c.height);
+                var q = 0.85;
+                (function attempt(){
+                    c.toBlob(function(b){
+                        if (!b) return resolve(f);
+                        if (b.size > TARGET && q > 0.5) { q -= 0.1; return attempt(); }
+                        if (b.size >= f.size) return resolve(f);
+                        resolve(new File([b], f.name.replace(/\.\w+$/, '') + '.jpg', {type: 'image/jpeg'}));
+                    }, 'image/jpeg', q);
+                })();
+            };
+            img.onerror = function(){ URL.revokeObjectURL(url); resolve(f); };
+            img.src = url;
+        });
+    }
+    file.addEventListener('change', function(){
+        var f = file.files && file.files[0];
+        if (!f || f.size <= TARGET || !window.DataTransfer || !window.File) { state(); return; }
+        busy = true; state();
+        compress(f).then(function(nf){
+            try { if (nf !== f) { var dt = new DataTransfer(); dt.items.add(nf); file.files = dt.files; } } catch (e) {}
+            busy = false; state();
+        }).catch(function(){ busy = false; state(); });
+    });
 
     function showError(msg){
         var el = document.getElementById('reg-ajax-alert');
