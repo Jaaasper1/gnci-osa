@@ -642,7 +642,14 @@ document.getElementById('revokeConfirmBtn').onclick = function() {
         body: `action=revoke&voucher_id=${pendingRevokeId}`
     })
     .then(r => r.json())
-    .then(data => { if (data.ok) location.reload(); });
+    .then(data => {
+        if (data.ok) {
+            appToast('Done! Voucher revoked.', 'success');
+            setTimeout(function () { location.reload(); }, 1200);
+        } else {
+            appToast('Could not revoke the voucher.', 'error');
+        }
+    });
     closeRevokeModal();
 };
 
