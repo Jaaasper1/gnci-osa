@@ -415,6 +415,19 @@ $__out = count($__stu) - $__in;
   .msgm-item{-webkit-touch-callout:none}
   .msgm-list.selecting .msgm-item{cursor:pointer;-webkit-user-select:none;user-select:none}
   .msgm-list.selecting .msgm-item.selected{background:#F9EEF0}
+  /* Dark mode: selection bar + selected row */
+  html[data-theme="dark"] .msgm-bulkbar{background:#242526;border-bottom-color:#3E4042;color:#E4E6EB}
+  html[data-theme="dark"] .msgm-bulkbar label,html[data-theme="dark"] .msgm-bulkbar #selCount{color:#E4E6EB}
+  html[data-theme="dark"] .msgm-bulkbar button{background:#3A3B3C;color:#E4E6EB;border-color:#4E4F50}
+  html[data-theme="dark"] .msgm-bulkbar button:not(:disabled):hover{background:#4E4F50}
+  html[data-theme="dark"] .msgm-bulkbar .b-del{background:#3B1F22;color:#F87171;border-color:#7F1D1D}
+  html[data-theme="dark"] .msgm-bulkbar .b-del:not(:disabled):hover{background:#4A2428}
+  html[data-theme="dark"] .msgm-bulkbar input,html[data-theme="dark"] .msgm-check{background-color:#242526;border-color:#8A8D91}
+  html[data-theme="dark"] .msgm-bulkbar input:checked,html[data-theme="dark"] .msgm-check:checked{background-color:#B84A60;border-color:#B84A60}
+  html[data-theme="dark"] .msgm-bulkbar input:hover,html[data-theme="dark"] .msgm-check:hover{border-color:#B84A60}
+  html[data-theme="dark"] .msgm-list.selecting .msgm-item.selected{background:#3A2128;border-color:#B84A60}
+  html[data-theme="dark"] .msgm-list.selecting .msgm-item.selected .msgm-name{color:#F0F2F5}
+  html[data-theme="dark"] .msgm-list.selecting .msgm-item.selected .msgm-prev{color:#C9CCD1}
   .msgm-compose{border:0;background:transparent;color:#6B1A2A;width:44px;height:44px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
   .msgm-compose:hover{background:#F6E7EA}
   .nm-overlay{position:fixed;inset:0;background:rgba(17,24,39,.55);display:none;align-items:flex-start;justify-content:center;padding:6vh 14px;z-index:1000}
@@ -437,6 +450,20 @@ $__out = count($__stu) - $__in;
   .nm-sub{font-size:12px;color:#6B7280}
   .nm-more,.nm-empty{display:block;text-align:center;font-size:13px;color:#6B7280;padding:10px}
   .nm-more{border:0;background:transparent;color:#6B1A2A;font-weight:600;cursor:pointer;width:100%}
+  /* Dark mode: "New message" popup */
+  html[data-theme="dark"] .nm-panel{background:#242526;box-shadow:0 20px 50px rgba(0,0,0,.6)}
+  html[data-theme="dark"] .nm-top h3{color:#E4E6EB}
+  html[data-theme="dark"] .nm-x{background:#3A3B3C;color:#E4E6EB}
+  html[data-theme="dark"] .nm-x:hover{background:#4E4F50}
+  html[data-theme="dark"] .nm-search input{background:#3A3B3C;border-color:#4E4F50;color:#E4E6EB}
+  html[data-theme="dark"] .nm-search input::placeholder{color:#8A8D91}
+  html[data-theme="dark"] .nm-chip{background:#3A3B3C;border-color:#4E4F50;color:#E4E6EB}
+  html[data-theme="dark"] .nm-chip.on{background:#B84A60;border-color:#B84A60;color:#fff}
+  html[data-theme="dark"] .nm-item:hover{background:#3A3B3C}
+  html[data-theme="dark"] .nm-nm{color:#E4E6EB}
+  html[data-theme="dark"] .nm-sub,html[data-theme="dark"] .nm-more,html[data-theme="dark"] .nm-empty{color:#B0B3B8}
+  html[data-theme="dark"] .nm-more{color:#E58BA0}
+  html[data-theme="dark"] .nm-av.on::after{border-color:#242526}
 </style>
 <div class="nm-overlay" id="nmOverlay" aria-hidden="true">
   <div class="nm-panel" role="dialog" aria-label="New message">
