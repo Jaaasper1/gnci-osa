@@ -29,12 +29,12 @@ function createMailer(): PHPMailer {
     $mail = new PHPMailer(true);
 
     $mail->isSMTP();
-    $mail->Host       = 'smtp.gmail.com';
+    $mail->Host       = defined('MAILER_HOST') ? MAILER_HOST : 'smtp.gmail.com';
     $mail->SMTPAuth   = true;
     $mail->Username   = MAILER_FROM_EMAIL;
     $mail->Password   = MAILER_APP_PASSWORD;
-    $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-    $mail->Port       = 587;
+    $mail->SMTPSecure = (defined('MAILER_ENCRYPTION') && MAILER_ENCRYPTION === 'ssl') ? PHPMailer::ENCRYPTION_SMTPS : PHPMailer::ENCRYPTION_STARTTLS;
+    $mail->Port       = defined('MAILER_PORT') ? (int)MAILER_PORT : 587;
     $mail->Timeout    = 10;   // fail fast if SMTP is unreachable (default is 300s and freezes the page)
 
     // ── Fix SSL certificate error sa XAMPP ──
