@@ -211,8 +211,8 @@ $previews = (!$inConvo && $list) ? msgStaffPreviews($pdo, $list) : [];
     <title><?= t('title.messages', 'Messages') ?> — GNC-OSA Portal</title>
     <link rel="stylesheet" href="../assets/css/style.css?v=27">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
-    <link rel="stylesheet" href="../assets/css/messages.css?v=2">
-    <link rel="stylesheet" href="../assets/css/messages-staff.css?v=2">
+    <link rel="stylesheet" href="../assets/css/messages.css?v=3">
+    <link rel="stylesheet" href="../assets/css/messages-staff.css?v=3">
 <?php include __DIR__.'/../includes/pwa-head.php'; ?></head>
 <body>
 <div class="msgc-overlay" id="msgcModal" aria-hidden="true">

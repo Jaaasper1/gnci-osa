@@ -1,7 +1,7 @@
 // GNC-OSA Portal service worker.
 // Pages (login, voting, complaints) are NEVER cached - they are private and must always be live.
 // Only static assets are cached, plus an offline fallback page.
-const VERSION = 'osa-pwa-v24';
+const VERSION = 'osa-pwa-v25';
 const PRECACHE = ['offline.html', 'assets/css/style.css', 'assets/img/osa-logo.jpg'];
 
 // Built-in English fallback: used if offline.html is missing from the server or was not cached, so users never fall back to the browser's own (localized) offline page.
