@@ -464,6 +464,7 @@ $__out = count($__stu) - $__in;
   html[data-theme="dark"] .nm-sub,html[data-theme="dark"] .nm-more,html[data-theme="dark"] .nm-empty{color:#B0B3B8}
   html[data-theme="dark"] .nm-more{color:#E58BA0}
   html[data-theme="dark"] .nm-av.on::after{border-color:#242526}
+  html[data-theme="dark"] .msgm-compose:hover{background:#3A2128}
 </style>
 <div class="nm-overlay" id="nmOverlay" aria-hidden="true">
   <div class="nm-panel" role="dialog" aria-label="New message">

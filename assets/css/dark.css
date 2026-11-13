@@ -216,3 +216,12 @@ input[type=file].form-control::file-selector-button { margin-right: 12px; paddin
 input[type=file].form-control::file-selector-button:hover { background: #561421; }
 html[data-theme="dark"] input[type=file].form-control::file-selector-button { background: #3A3B3C; color: #F0A3B2; border: 1px solid #4e4f50; }
 html[data-theme="dark"] input[type=file].form-control::file-selector-button:hover { background: #4a4b4d; }
+
+/* Reply box (staff + student): the dark theme draws a full border around .msg-reply, but the base
+   style only has top padding, so the label/textarea/buttons touched the edges. Give it real padding. */
+html[data-theme="dark"] form.msg-reply { padding: 14px 16px; border: 1px solid #3E4042; border-radius: 12px; }
+html[data-theme="dark"] .msgm-convo form.msg-reply { padding: 12px 14px; margin-top: 10px; }
+html[data-theme="dark"] form.msg-reply textarea.form-control { background: #3A3B3C; color: #E4E6EB; border-color: #4E4F50; }
+html[data-theme="dark"] form.msg-reply textarea.form-control::placeholder { color: #8A8D91; }
+html[data-theme="dark"] form.msg-reply .voice-btn { background: #3A3B3C; border-color: #4E4F50; color: #E4E6EB; }
+html[data-theme="dark"] form.msg-reply .voice-btn:hover { background: #4E4F50; }
