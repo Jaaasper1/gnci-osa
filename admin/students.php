@@ -384,7 +384,7 @@ function stuMenuData(array $rows, string $dateField): array {
 [$disabledCourses, $disabledMonths] = stuMenuData($disabled, 'disabled_at');
 
 // Tab that opens first: Pending Approvals if anyone is waiting, otherwise Active Students
-$startTab = count($pending) > 0 ? 'pending' : 'active';
+$startTab = (($_GET['tab'] ?? '') === 'active') ? 'active' : (count($pending) > 0 ? 'pending' : 'active');
 
 // Get the currently active election (if any) so we can show each student's voting status
 $activeElection = getActiveElection($pdo);
@@ -450,6 +450,13 @@ foreach ($pdo->query("SELECT YEAR(approved_at) y, MONTH(approved_at) m FROM stud
     $dateMonths[(string)$r['y']][] = (int)$r['m'];
 }
 $anyActive = ($totalRows > 0) || $hasFilter;
+
+// Students per program: boxes above the table (click one = filter the table by that course)
+$progRows = [];
+try {
+    $progRows = $pdo->query("SELECT s.course AS course, COUNT(*) AS total, SUM(" . $votedExpr . ") AS voted FROM students s WHERE s.is_active = 1 AND s.course IS NOT NULL AND s.course <> '' GROUP BY s.course ORDER BY s.course")->fetchAll();
+} catch (Throwable $e) { $progRows = []; }
+$progBase = $_GET; unset($progBase['course'], $progBase['page'], $progBase['p']); $progBase['tab'] = 'active';
 
 function stuUrl($overrides = []) {
     $p = array_merge([
@@ -557,6 +564,32 @@ function stuUrl($overrides = []) {
             </div>
         </div>
     </div>
+
+    <?php if (count($progRows) > 0): ?>
+<style>
+.prg-strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:10px;margin:0 0 14px;}
+.prg-box{display:block;text-decoration:none;color:inherit;background:var(--white,#fff);border:1px solid var(--gray-200,#E5E7EB);border-radius:10px;padding:10px 12px;transition:border-color .15s,background .15s;}
+a.prg-box:hover{border-color:var(--maroon,#6B1A2A);}
+.prg-box.sel{border-color:var(--maroon,#6B1A2A);background:var(--maroon-pale,#F9EEF0);}
+.prg-name{font-size:12px;font-weight:600;color:var(--gray-600,#6B7280);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.prg-num{font-size:22px;font-weight:700;line-height:1.2;margin:2px 0 6px;color:var(--maroon,#6B1A2A);}
+.prg-bar{height:5px;border-radius:3px;background:var(--gray-200,#E5E7EB);overflow:hidden;}
+.prg-bar i{display:block;height:100%;background:var(--maroon,#6B1A2A);}
+.prg-sub{font-size:11px;color:var(--gray-600,#6B7280);margin-top:5px;}
+</style>
+<div class="prg-strip">
+<?php foreach ($progRows as $pr):
+    $pc = trim((string)($pr['course'] ?? ''));
+    $pt = (int)$pr['total']; $pv = (int)$pr['voted'];
+    $pct = $pt > 0 ? (int)round($pv / $pt * 100) : 0;
+    $inner = '<div class="prg-name">' . e($pc) . '</div><div class="prg-num">' . $pt . '</div>'
+           . ($activeElection ? '<div class="prg-bar"><i style="width:' . $pct . '%"></i></div><div class="prg-sub">' . $pv . ' voted · ' . $pct . '%</div>' : '');
+    $isSel = ($courseSel !== '' && $courseSel === (string)$pr['course']);
+    $q = $isSel ? $progBase : ($progBase + ['course' => $pr['course']]); ?>
+    <a class="prg-box<?= $isSel ? ' sel' : '' ?>" href="?<?= e(http_build_query($q)) ?>" title="<?= $isSel ? 'Click to show all programs' : 'Show only ' . e($pc) ?>"><?= $inner ?></a>
+<?php endforeach; ?>
+</div>
+<?php endif; ?>
 
     <div class="stu-tabs">
         <button type="button" class="stu-tab <?= $startTab === 'pending' ? 'active' : '' ?>" id="stu-tab-btn-pending" onclick="switchStuTab('pending')">
