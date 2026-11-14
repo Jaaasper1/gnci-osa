@@ -433,7 +433,7 @@ $error   = $error ?? '';
             return !empty($partyTickets[$p['id']]);
         });
     ?>
-    <div class="alert alert-info"><i class="ti ti-info-circle"></i> <?= t('ui.select_e062', 'Select') ?> <strong><?= t('ui.one_candidate_aa9d', 'one candidate') ?></strong> <?= t('ui.for_each_position_or_click_f5ea', 'for each position, or click') ?> <strong><?= tx('Abstain') ?></strong> <?= t('ui.if_you_wish_to_skip_a_position_thi_7649', 'if you wish to skip a position. This cannot be changed after submitting.') ?></div>
+    <div class="alert alert-info"><i class="ti ti-info-circle" style="flex-shrink:0;margin-top:2px;"></i><span style="flex:1;min-width:0;"><?= t('ui.select_e062', 'Select') ?> <strong><?= t('ui.one_candidate_aa9d', 'one candidate') ?></strong> <?= t('ui.for_each_position_or_click_f5ea', 'for each position, or click') ?> <strong><?= tx('Abstain') ?></strong> <?= t('ui.if_you_wish_to_skip_a_position_thi_7649', 'if you wish to skip a position. This cannot be changed after submitting.') ?></span></div>
 
     <?php if (!empty($partiesWithCandidates)): ?>
     <div class="card" style="margin-bottom:18px;">
