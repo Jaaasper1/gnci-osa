@@ -22,7 +22,7 @@ window.__t = window.__t || function (s) { return s; };
  */
 (function () {
   var css = '' +
-    '.bs-wrap{--bs-acc:var(--maroon,#6B1A2A);--bs-pale:var(--maroon-pale,#F9EEF0);margin:0 0 8px}' +
+    '.bs-wrap,.bs-row{--bs-acc:var(--maroon,#6B1A2A);--bs-pale:var(--maroon-pale,#F9EEF0)}.bs-wrap{margin:0 0 8px}' +
     '.bs-head{display:flex;justify-content:flex-end;margin-bottom:8px}' +
     '.bs-select{font-size:13px;color:#4B5563;background:#fff;border:1px solid #D1D5DB;border-radius:8px;padding:6px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:5px}' +
     '.bs-select:hover{background:#F3F4F6}' +
