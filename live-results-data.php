@@ -60,8 +60,12 @@ $tv = $pdo->prepare("SELECT COUNT(DISTINCT student_id) FROM votes WHERE election
 $tv->execute([$eid]);
 $totalVoters = (int)$tv->fetchColumn();
 
-$tsStmt = $pdo->prepare("SELECT COUNT(*) FROM students WHERE is_active = 1 AND course = ?");
-$tsStmt->execute([$election['course']]);
+if (!empty($election['course'])) {
+    $tsStmt = $pdo->prepare("SELECT COUNT(*) FROM students WHERE is_active = 1 AND course = ?");
+    $tsStmt->execute([$election['course']]);
+} else {
+    $tsStmt = $pdo->query("SELECT COUNT(*) FROM students WHERE is_active = 1");
+}
 $totalStudents = (int)$tsStmt->fetchColumn();
 
 $turnout = $totalStudents > 0 ? round($totalVoters / $totalStudents * 100) : 0;

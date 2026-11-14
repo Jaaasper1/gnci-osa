@@ -57,8 +57,12 @@ if ($election) {
     $tv->execute([$eid]);
     $totalVoters = (int)$tv->fetchColumn();
 
-    $tsStmt = $pdo->prepare("SELECT COUNT(*) FROM students WHERE is_active = 1 AND course = ?");
-    $tsStmt->execute([$election['course']]);
+    if (!empty($election['course'])) {
+        $tsStmt = $pdo->prepare("SELECT COUNT(*) FROM students WHERE is_active = 1 AND course = ?");
+        $tsStmt->execute([$election['course']]);
+    } else {
+        $tsStmt = $pdo->query("SELECT COUNT(*) FROM students WHERE is_active = 1");
+    }
     $totalStudents = (int)$tsStmt->fetchColumn();
 
     $totalAbstainPct = 0; $positionsWithVotes = 0;
@@ -72,9 +76,9 @@ $turnout = $totalStudents > 0 ? round($totalVoters / $totalStudents * 100) : 0;
 
 // Group elections by status for the Active / Closed / Completed tabs
 $statusTabs = [
-    'active'    => ['Active',    'ti-player-play',  []],
-    'closed'    => ['Closed',    'ti-lock',         []],
-    'completed' => ['Completed', 'ti-circle-check', []],
+    'active'    => [t('ui.active_4d3d', 'Active'),    'ti-player-play',  []],
+    'closed'    => [t('ui.closed_03f4', 'Closed'),    'ti-lock',         []],
+    'completed' => [t('ui.completed_07ca', 'Completed'), 'ti-circle-check', []],
 ];
 foreach ($elections as $e) { $statusTabs[electionStatusKey($e)][2][] = $e; }
 $curStatus = $election ? electionStatusKey($election) : 'active';
@@ -84,30 +88,30 @@ $isLive    = ($curStatus === 'active');
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Election Results — GNC-OSA Portal</title>
+    <title><?= t('title.live_election_results', 'Live Election Results') ?> — GNC-OSA Portal</title>
     <link rel="stylesheet" href="assets/css/style.css?v=27">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <?php include __DIR__.'/includes/pwa-head.php'; ?></head>
 <body class="theme-election">
 <nav class="topnav">
-    <div class="brand"><img src="assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);"><div class="brand-text"><div class="name">GNC-OSA Portal</div><div class="sub">Live Election Results</div></div></div>
+    <div class="brand"><img src="assets/img/osa-logo.jpg" alt="OSA Logo" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);"><div class="brand-text"><div class="name">GNC-OSA Portal</div><div class="sub"><?= t('auto.live_election_results_9de3', 'Live Election Results') ?></div></div></div>
     <div class="nav-right">
         <?php renderLangSwitcher(); ?>
-        <a href="index.php" class="btn btn-sm" data-loading-text="Back to login..." style="background:rgba(255,255,255,0.15);color:#fff;"><i class="ti ti-arrow-left"></i> Back to Login</a>
+        <a href="index.php" class="btn btn-sm" data-loading-text="<?= htmlspecialchars(t('msg.back_to_login_6c85', 'Back to login...'), ENT_QUOTES) ?>" style="background:rgba(255,255,255,0.15);color:#fff;"><i class="ti ti-arrow-left"></i> <?= t('auto.back_to_login_95e6', 'Back to Login') ?></a>
     </div>
 </nav>
 
 <div style="margin-left:0;padding-top:var(--topnav-height);min-height:100vh;background:var(--gray-100);">
 <div class="content" style="max-width:1080px;margin:0 auto;padding:24px 20px;">
     <div class="page-header">
-        <h1><i class="ti ti-chart-pie"></i> Live Election Results</h1>
-        <p>Real-time results, per department — no login needed to view</p>
+        <h1><i class="ti ti-chart-pie"></i> <?= t('auto.live_election_results_9de3', 'Live Election Results') ?></h1>
+        <p><?= t('auto.real_time_results_per_department_no_logi_90a0', 'Real-time results, per department — no login needed to view') ?></p>
     </div>
 
     <?php if (empty($elections)): ?>
         <div class="card" style="text-align:center;padding:40px 20px;color:#9CA3AF;">
             <i class="ti ti-chart-pie-off" style="font-size:32px;display:block;margin-bottom:10px;"></i>
-            No live results are published yet. Please check back later.
+            <?= t('auto.no_live_results_are_published_yet_please_fdbb', 'No live results are published yet. Please check back later.') ?>
         </div>
     <?php else: ?>
 
@@ -122,20 +126,20 @@ $isLive    = ($curStatus === 'active');
             <span style="width:7px;height:7px;border-radius:50%;background:#059669;display:inline-block;animation:liveBlink 1.5s infinite;"></span> Live
         </span>
         <?php elseif ($curStatus === 'completed'): ?>
-        <span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#1D4ED8;background:#DBEAFE;padding:4px 10px;border-radius:20px;"><i class="ti ti-circle-check"></i> Final Results</span>
+        <span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#1D4ED8;background:#DBEAFE;padding:4px 10px;border-radius:20px;"><i class="ti ti-circle-check"></i> <?= t('auto.final_results_7ae2', 'Final Results') ?></span>
         <?php else: ?>
-        <span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#6B7280;background:#F3F4F6;padding:4px 10px;border-radius:20px;"><i class="ti ti-lock"></i> Voting Closed</span>
+        <span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#6B7280;background:#F3F4F6;padding:4px 10px;border-radius:20px;"><i class="ti ti-lock"></i> <?= t('auto.voting_closed_dc17', 'Voting Closed') ?></span>
         <?php endif; ?>
     </div>
 
     <div class="stat-grid" id="live-stats" data-election-id="<?= $eid ?>" data-live="<?= $isLive ? 1 : 0 ?>" style="margin-bottom:16px;">
-        <div class="stat-card"><div class="stat-num" id="stat-voted"><?= $totalVoters ?></div><div class="stat-label">Voted</div></div>
-        <div class="stat-card"><div class="stat-num" id="stat-not-voted"><?= max(0, $totalStudents - $totalVoters) ?></div><div class="stat-label">Not yet voted</div></div>
-        <div class="stat-card"><div class="stat-num" id="stat-turnout"><?= $turnout ?>%</div><div class="stat-label">Voter Turnout</div></div>
-        <div class="stat-card abstain-stat"><div class="stat-num" id="stat-abstain"><?= $overallAbstainPct ?>%</div><div class="stat-label">Overall Abstain Rate</div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-voted"><?= $totalVoters ?></div><div class="stat-label"><?= t('auto.voted_ca78', 'Voted') ?></div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-not-voted"><?= max(0, $totalStudents - $totalVoters) ?></div><div class="stat-label"><?= t('auto.not_yet_voted_c6aa', 'Not yet voted') ?></div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-turnout"><?= $turnout ?>%</div><div class="stat-label"><?= t('auto.voter_turnout_1376', 'Voter Turnout') ?></div></div>
+        <div class="stat-card abstain-stat"><div class="stat-num" id="stat-abstain"><?= $overallAbstainPct ?>%</div><div class="stat-label"><?= t('auto.overall_abstain_rate_fd17', 'Overall Abstain Rate') ?></div></div>
     </div>
 
-    <div class="res-acc-tools"><button type="button" class="btn btn-sm btn-outline" id="res-acc-toggle" data-state="expand"><i class="ti ti-chevrons-down"></i> <span>Expand all</span></button></div>
+    <div class="res-acc-tools"><button type="button" class="btn btn-sm btn-outline" id="res-acc-toggle" data-state="expand"><i class="ti ti-chevrons-down"></i> <span><?= t('auto.expand_all_d0aa', 'Expand all') ?></span></button></div>
 <script>
 (function(){
     var btn = document.getElementById('res-acc-toggle');
@@ -145,7 +149,7 @@ $isLive    = ($curStatus === 'active');
     function sync(){
         var open = allOpen();
         btn.dataset.state = open ? 'collapse' : 'expand';
-        btn.querySelector('span').textContent = open ? 'Collapse all' : 'Expand all';
+        btn.querySelector('span').textContent = open ? 'Collapse all' : __t('Expand all');
         btn.querySelector('i').className = 'ti ' + (open ? 'ti-chevrons-up' : 'ti-chevrons-down');
     }
     btn.addEventListener('click', function(){
@@ -167,7 +171,7 @@ $isLive    = ($curStatus === 'active');
         </summary>
         <div class="res-acc-body">
         <?php if (empty($pos['candidates'])): ?>
-            <div class="alert alert-info" style="margin:0;"><i class="ti ti-info-circle"></i> No candidates for this position.</div>
+            <div class="alert alert-info" style="margin:0;"><i class="ti ti-info-circle"></i> <?= t('auto.no_candidates_for_this_position_641e', 'No candidates for this position.') ?></div>
         <?php else: ?>
         <?php foreach ($pos['candidates'] as $i => $cand): ?>
         <?php $pct = $pos['total'] > 0 ? round($cand['votes'] / $pos['total'] * 100) : 0; ?>

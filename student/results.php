@@ -58,9 +58,14 @@ foreach ($pos->fetchAll() as $p) {
 $totalVoters   = $pdo->prepare("SELECT COUNT(DISTINCT student_id) FROM votes WHERE election_id = ?");
 $totalVoters->execute([$eid]);
 $totalVoters   = $totalVoters->fetchColumn();
-$totalStudents = $pdo->prepare("SELECT COUNT(*) FROM students WHERE is_active = 1 AND course = ?");
-$totalStudents->execute([$election['course']]);
-$totalStudents  = $totalStudents->fetchColumn();
+// Eligible voters: active students of the election's course (all active students if the election has no course)
+if (!empty($election['course'])) {
+    $totalStudents = $pdo->prepare("SELECT COUNT(*) FROM students WHERE is_active = 1 AND course = ?");
+    $totalStudents->execute([$election['course']]);
+} else {
+    $totalStudents = $pdo->query("SELECT COUNT(*) FROM students WHERE is_active = 1");
+}
+$totalStudents  = (int)$totalStudents->fetchColumn();
 $turnout       = $totalStudents > 0 ? round($totalVoters / $totalStudents * 100) : 0;
 
 // Overall abstain % — average across all positions that have voters
@@ -123,7 +128,7 @@ $unread = getUnreadNotifCount($pdo, $student_id);
 
     <div class="stat-grid" id="live-stats" data-election-id="<?= $eid ?>" style="margin-bottom:20px;">
         <div class="stat-card"><div class="stat-num" id="stat-voted"><?= $totalVoters ?></div><div class="stat-label"><?= t('ui.voted_ca78', 'Voted') ?></div></div>
-        <div class="stat-card"><div class="stat-num" id="stat-not-voted"><?= $totalStudents - $totalVoters ?></div><div class="stat-label"><?= t('ui.not_yet_voted_c6aa', 'Not yet voted') ?></div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-not-voted"><?= max(0, $totalStudents - $totalVoters) ?></div><div class="stat-label"><?= t('ui.not_yet_voted_c6aa', 'Not yet voted') ?></div></div>
         <div class="stat-card"><div class="stat-num" id="stat-turnout"><?= $turnout ?>%</div><div class="stat-label"><?= t('ui.voter_turnout_1376', 'Voter Turnout') ?></div></div>
         <div class="stat-card abstain-stat"><div class="stat-num" id="stat-abstain"><?= $overallAbstainPct ?>%</div><div class="stat-label"><?= t('ui.overall_abstain_rate_fd17', 'Overall Abstain Rate') ?></div></div>
     </div>
