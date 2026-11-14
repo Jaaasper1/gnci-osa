@@ -142,6 +142,12 @@ function notifUrl(string $filter, int $page, ?int $pp = null): string {
     return 'notifications.php' . ($q ? '?' . http_build_query($q) : '');
 }
 
+/** Returns the voucher code (XXXX-XXXX-XXXX) if this notification is a voting-voucher notice, else null. */
+function notifVoucherCode(string $msg): ?string {
+    if (stripos($msg, 'voting voucher') === false) return null;
+    return preg_match('/Code:\s*([A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4})/', $msg, $m) ? $m[1] : null;
+}
+
 /** Page styles. $accent = CSS colour for tabs/unread highlight. */
 function notifCss(string $accent = 'var(--maroon)', string $accentPale = 'var(--maroon-pale)'): void { ?>
         /* ── Notification tabs / groups / pager (includes/notif-ui.php) ── */
@@ -218,6 +224,20 @@ function notifCss(string $accent = 'var(--maroon)', string $accentPale = 'var(--
             .notif-bulkbar .b-lbl { display:none; }
             .notif-bulkbar button { padding:8px 11px; }
         }
+        /* ── Voucher code chip with one-tap copy ── */
+        .vcode-box { display:inline-flex; align-items:center; gap:4px; margin:6px 0 2px; padding:3px 3px 3px 10px; background:var(--nacc-pale); border:1px solid rgba(0,0,0,.08); border-radius:999px; max-width:100%; }
+        .vcode-text { min-width:0; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12.5px; font-weight:700; letter-spacing:.06em; color:#1F2937; user-select:all; -webkit-user-select:all; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .vcode-copy { flex-shrink:0; display:inline-flex; align-items:center; gap:4px; height:28px; padding:0 11px; font-size:12px; font-weight:600; color:#fff; background:var(--nacc); border:none; border-radius:999px; cursor:pointer; -webkit-tap-highlight-color:transparent; transition:background .15s, transform .1s; }
+        .vcode-copy i { font-size:14px; }
+        .vcode-copy:active { transform:scale(.96); }
+        .vcode-copy.done { background:#059669; }
+        .notif-wrap.selecting .vcode-copy { display:none; }
+        @media (max-width:560px) { .vcode-text { font-size:13px; } .vcode-copy { height:34px; padding:0 14px; font-size:12.5px; } .vcode-box { padding-left:12px; } }
+        /* ── "View →" as a small pill button ── */
+        .notif-wrap .notif-link { display:inline-flex; align-items:center; gap:4px; margin-top:7px; padding:4px 13px; font-size:12px; font-weight:600; line-height:1.4; color:var(--nacc); background:transparent; border:1px solid var(--nacc); border-radius:999px; text-decoration:none; transition:background .15s, color .15s, transform .1s; }
+        .notif-wrap .notif-link:hover { background:var(--nacc); color:#fff; }
+        .notif-wrap .notif-link:active { transform:scale(.96); }
+        @media (max-width:560px) { .notif-wrap .notif-link { padding:6px 16px; font-size:12.5px; } }
         /* ── Empty state ── */
         .notif-empty { flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:36px 16px; color:#6B7280; font-size:13.5px; text-align:center; }
         .notif-empty .ne-ic { width:54px; height:54px; border-radius:50%; background:var(--nacc-pale); color:var(--nacc); display:flex; align-items:center; justify-content:center; font-size:26px; }
@@ -283,7 +303,13 @@ function notifRenderCard(array $rows, array $counts, string $filter, int $page, 
                 <input type="checkbox" class="notif-check" aria-label="<?= htmlspecialchars(t('notif.select_notification', 'Select notification'), ENT_QUOTES) ?>" onclick="event.stopPropagation(); notifToggle(<?= (int)$n['id'] ?>, this.checked)">
                 <div class="notif-icon"><i class="ti <?= $icon ?>" style="color:var(--nacc);font-size:17px;"></i></div>
                 <div class="notif-body">
-                    <div class="notif-msg"><?= $unread ? '<span class="notif-dot"></span>' : '' ?><?= e(tlNotifMsg($n['message'])) ?></div>
+                    <div class="notif-msg"><?= $unread ? '<span class="notif-dot"></span>' : '' ?><?php $vc = notifVoucherCode((string)$n['message']); $shown = tlNotifMsg($n['message']); if ($vc) $shown = preg_replace('/Code:\s*' . preg_quote($vc, '/') . '\s*—\s*enter/u', 'Enter', $shown); ?><?= e($shown) ?></div>
+                    <?php if ($vc): ?>
+                        <div class="vcode-box">
+                            <span class="vcode-text"><?= e($vc) ?></span>
+                            <button type="button" class="vcode-copy" data-code="<?= e($vc) ?>" data-copy="<?= htmlspecialchars(t('notif.copy_code', 'Copy code'), ENT_QUOTES) ?>" data-copied="<?= htmlspecialchars(t('notif.copied', 'Copied!'), ENT_QUOTES) ?>"><i class="ti ti-copy"></i><span class="vc-lbl"><?= t('notif.copy_code', 'Copy code') ?></span></button>
+                        </div>
+                    <?php endif; ?>
                     <div class="notif-time"><span class="notif-type"><?= e($typeLabel) ?></span><?= e(notifTimeAgo($n['created_at'])) ?></div>
                     <?php if ($n['link']): ?><a href="<?= e(notifFixLink($n['link'])) ?>" class="notif-link"><?= t('notif.view', 'View →') ?></a><?php endif; ?>
                 </div>
@@ -340,6 +366,34 @@ document.addEventListener('click', function (e) {
     // Clicking elsewhere on the row does nothing; use the check button to mark it manually.
     const link = e.target.closest('.notif-link');
     if (link) markOneRead(row.dataset.id);   // link navigates normally; request is keepalive
+}, true);
+
+/* ── Voucher code: one-tap copy (works on mobile + older browsers) ── */
+function vcodeCopyText(text) {
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+    return new Promise(function (res, rej) {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.setAttribute('readonly', '');
+        ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;font-size:16px;';
+        document.body.appendChild(ta); ta.focus(); ta.select(); ta.setSelectionRange(0, text.length);
+        let ok = false; try { ok = document.execCommand('copy'); } catch (_) {}
+        document.body.removeChild(ta); ok ? res() : rej();
+    });
+}
+document.addEventListener('click', function (e) {
+    const btn = e.target.closest('.vcode-copy');
+    if (!btn || notifSelecting) return;
+    e.preventDefault(); e.stopPropagation();
+    vcodeCopyText(btn.dataset.code).then(function () {
+        const lbl = btn.querySelector('.vc-lbl'), ic = btn.querySelector('i');
+        btn.classList.add('done'); if (lbl) lbl.textContent = btn.dataset.copied; if (ic) ic.className = 'ti ti-check';
+        if (navigator.vibrate) { try { navigator.vibrate(20); } catch (_) {} }
+        setTimeout(function () { btn.classList.remove('done'); if (lbl) lbl.textContent = btn.dataset.copy; if (ic) ic.className = 'ti ti-copy'; }, 1800);
+    }).catch(function () {
+        // last resort: select the code so the user can long-press > Copy
+        const t = btn.parentNode.querySelector('.vcode-text');
+        if (t && window.getSelection) { const r = document.createRange(); r.selectNodeContents(t); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); }
+    });
 }, true);
 
 /* ── Mark as unread (single) ── */

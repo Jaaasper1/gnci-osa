@@ -174,6 +174,8 @@ return [
     'notif.count_label'            => 'abiso',
     'notif.delete_all'             => 'Burahin Lahat',
     'notif.view'                   => 'Tingnan',
+    'notif.copy_code'              => 'Kopyahin ang code',
+    'notif.copied'                 => 'Nakopya!',
     'notif.delete_one_title'       => 'Burahin ang Abiso',
     'notif.delete_one_desc'        => 'Sigurado ka bang gusto mong burahin ang abisong ito? Hindi na ito mababawi.',
     'notif.delete_all_title'       => 'Burahin Lahat ng Abiso',
