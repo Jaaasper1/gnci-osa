@@ -104,6 +104,10 @@ if (empty($_FILES['excel_file']['name'])) {
 }
 
 $file = $_FILES['excel_file'];
+if (strpos(basename($file['name']), '~$') === 0) {
+    echo json_encode(['success' => false, 'message' => 'That is Excel\'s temporary lock file (~$...), not your real file. Close Excel, then choose the actual .xlsx file.']);
+    exit;
+}
 $ext  = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
 if (!in_array($ext, ['xlsx', 'xls'])) {
     echo json_encode(['success' => false, 'message' => t('msg.invalid_file_type_please_upload_xlsx_or__334c', 'Invalid file type. Please upload .xlsx or .xls only.')]);
@@ -135,8 +139,8 @@ try {
     if ($rows === null) {   // no header anywhere: fall back to the first sheet so the normal error message shows
         $rows = $spreadsheet->getSheet(0)->toArray(null, true, true, false);
     }
-} catch (Exception $e) {
-    echo json_encode(['success' => false, 'message' => 'Could not read file: ' . $e->getMessage()]);
+} catch (\Throwable $e) {
+    echo json_encode(['success' => false, 'message' => 'Could not read this file. Make sure it is a valid, closed .xlsx file (not a ~$ temp file) and try again.']);
     exit;
 }
 

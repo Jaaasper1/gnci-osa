@@ -76,7 +76,7 @@ if ($type === 'candidates') {
     $elStmt = $pdo->prepare("SELECT * FROM elections WHERE id=?"); $elStmt->execute([$eid]);
     $election = $elStmt->fetch();
 
-    $rows = $pdo->prepare("SELECT c.id as cid, p.title as position, s.student_id as sid, s.first_name, s.last_name, s.course, pl.name as party_name, c.party_list_id AS plid, c.position_id AS posid FROM candidates c JOIN positions p ON c.position_id=p.id JOIN students s ON c.student_id=s.id LEFT JOIN party_lists pl ON c.party_list_id=pl.id WHERE c.election_id=? ORDER BY p.sort_order, s.last_name");
+    $rows = $pdo->prepare("SELECT c.id as cid, p.title as position, s.student_id as sid, s.first_name, s.last_name, s.course, pl.name as party_name, c.credentials AS credentials, c.party_list_id AS plid, c.position_id AS posid FROM candidates c JOIN positions p ON c.position_id=p.id JOIN students s ON c.student_id=s.id LEFT JOIN party_lists pl ON c.party_list_id=pl.id WHERE c.election_id=? ORDER BY p.sort_order, s.last_name");
     $rows->execute([$eid]); $candidates = $rows->fetchAll();
     if ($hasSel) $candidates = keepSelected($candidates, 'cid', $selIds);
 
@@ -97,12 +97,12 @@ if ($type === 'candidates') {
     }
 
     $sheet->setTitle('Candidates');
-    titleBlock($sheet, 'GUAGUA NATIONAL COLLEGE', 'Office of Student Affairs — Candidates List', $election['title'].' · Exported: '.date('F j, Y').exportFilterNote($note), 7);
+    titleBlock($sheet, 'GUAGUA NATIONAL COLLEGE', 'Office of Student Affairs — Candidates List', $election['title'].' · Exported: '.date('F j, Y').exportFilterNote($note), 8);
 
-    foreach (['#','Position','Student ID','Last Name','First Name','Course','Party List'] as $i=>$h) {
+    foreach (['#','Position','Student ID','Last Name','First Name','Course','Party List','Credentials'] as $i=>$h) {
         $sheet->setCellValue(chr(65+$i).'5', $h);
     }
-    $sheet->getStyle('A5:G5')->applyFromArray(hStyle($MAROON));
+    $sheet->getStyle('A5:H5')->applyFromArray(hStyle($MAROON));
     $sheet->getRowDimension(5)->setRowHeight(22);
 
     $row = 6;
@@ -111,13 +111,14 @@ if ($type === 'candidates') {
         $sheet->setCellValueExplicit("C$row", (string)$c['sid'], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING); $sheet->setCellValue("D$row", $c['last_name']);
         $sheet->setCellValue("E$row", $c['first_name']); $sheet->setCellValue("F$row", $c['course']);
         $sheet->setCellValue("G$row", $c['party_name'] ?: 'Independent');
-        
-        zebraRow($sheet, $row, 'G', $row%2===0); $row++;
+        $sheet->setCellValue("H$row", (string)($c['credentials'] ?? ''));
+        $sheet->getStyle("H$row")->getAlignment()->setWrapText(true);
+        zebraRow($sheet, $row, 'H', $row%2===0); $row++;
     }
     $sheet->mergeCells("A{$row}:F{$row}"); $sheet->setCellValue("A{$row}",'Total Candidates'); $sheet->setCellValue("G{$row}", $row > 6 ? "=COUNTA(C6:C".($row-1).")" : 0);
-    $sheet->getStyle("A{$row}:G{$row}")->applyFromArray(['font'=>['bold'=>true,'color'=>['rgb'=>$MAROON]],'fill'=>['fillType'=>Fill::FILL_SOLID,'startColor'=>['rgb'=>'F9EEF0']]]);
+    $sheet->getStyle("A{$row}:H{$row}")->applyFromArray(['font'=>['bold'=>true,'color'=>['rgb'=>$MAROON]],'fill'=>['fillType'=>Fill::FILL_SOLID,'startColor'=>['rgb'=>'F9EEF0']]]);
 
-    foreach ([5,22,16,18,18,14,26] as $i=>$w) $sheet->getColumnDimension(chr(65+$i))->setWidth($w);
+    foreach ([5,22,16,18,18,14,26,45] as $i=>$w) $sheet->getColumnDimension(chr(65+$i))->setWidth($w);
     $filename = 'candidates_'.preg_replace('/[^a-z0-9]/i','_',$election['title']).'_'.date('Ymd').'.xlsx';
 }
 

@@ -858,6 +858,7 @@ function resetImportModal() {
 
 function handleFileSelect(file) {
     if (!file) return;
+    if (file.name.indexOf('~$') === 0) { alert('That is Excel\'s temporary lock file (~$...), not your real file. Close Excel and choose the actual .xlsx file.'); return; }
     _importFile = file;
     document.getElementById('drop-label').innerHTML =
         '<strong style="color:#1F2937;">' + file.name + '</strong>' +
@@ -957,9 +958,9 @@ function submitImport() {
                     '<span style="color:#1E40AF;font-size:12px;">Nothing is saved yet — review below, then click Confirm Import.</span></div>' +
                     '<div style="max-height:220px;overflow:auto;border:1px solid #E5E7EB;border-radius:8px;">' +
                     '<table style="width:100%;border-collapse:collapse;font-size:12px;">' +
-                    '<thead><tr style="background:#F9FAFB;text-align:left;"><th style="padding:8px 10px;">Row</th><th style="padding:8px 10px;">Student ID</th><th style="padding:8px 10px;">Name</th><th style="padding:8px 10px;">Position</th><th style="padding:8px 10px;">Party List</th></tr></thead><tbody>' +
+                    '<thead><tr style="background:#F9FAFB;text-align:left;"><th style="padding:8px 10px;">Row</th><th style="padding:8px 10px;">Student ID</th><th style="padding:8px 10px;">Name</th><th style="padding:8px 10px;">Position</th><th style="padding:8px 10px;">Party List</th><th style="padding:8px 10px;">Credentials</th></tr></thead><tbody>' +
                     data.rows.map(function(r) {
-                        return '<tr style="border-top:1px solid #F3F4F6;"><td style="padding:8px 10px;">' + _impEsc(r.row) + '</td><td style="padding:8px 10px;">' + _impEsc(r.student_id) + '</td><td style="padding:8px 10px;">' + _impEsc(r.name) + '</td><td style="padding:8px 10px;">' + _impEsc(r.position) + '</td><td style="padding:8px 10px;">' + _impEsc(r.party || 'Independent') + '</td></tr>';
+                        return '<tr style="border-top:1px solid #F3F4F6;"><td style="padding:8px 10px;">' + _impEsc(r.row) + '</td><td style="padding:8px 10px;">' + _impEsc(r.student_id) + '</td><td style="padding:8px 10px;">' + _impEsc(r.name) + '</td><td style="padding:8px 10px;">' + _impEsc(r.position) + '</td><td style="padding:8px 10px;">' + _impEsc(r.party || 'Independent') + '</td><td style="padding:8px 10px;max-width:220px;white-space:pre-line;">' + _impEsc(r.credentials || '—') + '</td></tr>';
                     }).join('') + '</tbody></table></div>';
                 if (data.truncated) html += '<div style="font-size:11px;color:#6B7280;margin-top:6px;">Showing the first ' + data.rows.length + ' rows only. All ' + data.new + ' will be imported.</div>';
                 html += _impSkippedHTML(data.skipped);

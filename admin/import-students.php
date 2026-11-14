@@ -118,6 +118,10 @@ if (empty($_FILES['excel_file']['name'])) {
 }
 
 $file = $_FILES['excel_file'];
+if (strpos(basename($file['name']), '~$') === 0) {
+    echo json_encode(['success' => false, 'message' => 'That is Excel\'s temporary lock file (~$...), not your real file. Close Excel, then choose the actual .xlsx file.']);
+    exit;
+}
 $ext  = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
 if (!in_array($ext, ['xlsx', 'xls'])) {
     echo json_encode(['success' => false, 'message' => t('msg.invalid_file_type_upload_xlsx_or_xls_onl_e08e', 'Invalid file type. Upload .xlsx or .xls only.')]); exit;
@@ -130,8 +134,8 @@ try {
     $spreadsheet = IOFactory::load($file['tmp_name']);
     $sheet = $spreadsheet->getSheetByName('Students') ?? $spreadsheet->getActiveSheet();
     $rows  = $sheet->toArray(null, true, true, false);
-} catch (Exception $e) {
-    echo json_encode(['success' => false, 'message' => 'Could not read file: ' . $e->getMessage()]); exit;
+} catch (\Throwable $e) {
+    echo json_encode(['success' => false, 'message' => 'Could not read this file. Make sure it is a valid, closed .xlsx file (not a ~$ temp file) and try again.']); exit;
 }
 
 if (count($rows) < 2) {

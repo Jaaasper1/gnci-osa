@@ -22,7 +22,7 @@ if (isset($_GET['template'])) {
     $sheet = $spreadsheet->getActiveSheet();
     $sheet->setTitle('Candidates');
 
-    $headers = ['student_id', 'position'];
+    $headers = ['student_id', 'position', 'party_list', 'credentials'];
     foreach ($headers as $i => $h) {
         $col = chr(65 + $i);
         $sheet->setCellValue($col . '1', strtoupper($h));
@@ -32,22 +32,25 @@ if (isset($_GET['template'])) {
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
             'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'FFFFFF']]],
         ]);
-        $sheet->getColumnDimension($col)->setWidth($h === 'student_id' ? 20 : 30);
+        $sheet->getColumnDimension($col)->setWidth($h === 'student_id' ? 20 : ($h === 'credentials' ? 50 : 30));
     }
     $sheet->getRowDimension(1)->setRowHeight(22);
 
     // Sample rows
     $samples = [
-        ['2021-00123', 'President'],
-        ['2021-00456', 'Vice President'],
-        ['2022-00789', 'Secretary'],
-        ['2022-00321', 'Treasurer'],
-        ['2023-00654', 'Auditor'],
+        ['2021-00123', 'President', 'Independent', "SHS With Honors\nPresident's Lister"],
+        ['2021-00456', 'Vice President', '', "Dean's Lister"],
+        ['2022-00789', 'Secretary', '', ''],
+        ['2022-00321', 'Treasurer', '', ''],
+        ['2023-00654', 'Auditor', '', ''],
     ];
     foreach ($samples as $r => $row) {
         $sheet->setCellValue('A' . ($r + 2), $row[0]);
         $sheet->setCellValue('B' . ($r + 2), $row[1]);
-        $sheet->getStyle('A' . ($r + 2) . ':B' . ($r + 2))->applyFromArray([
+        $sheet->setCellValue('C' . ($r + 2), $row[2]);
+        $sheet->setCellValue('D' . ($r + 2), $row[3]);
+        $sheet->getStyle('D' . ($r + 2))->getAlignment()->setWrapText(true);
+        $sheet->getStyle('A' . ($r + 2) . ':D' . ($r + 2))->applyFromArray([
             'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $r % 2 === 0 ? 'FDF2F4' : 'FFFFFF']],
             'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'E5E7EB']]],
         ]);
@@ -66,7 +69,8 @@ if (isset($_GET['template'])) {
         '4. Do NOT edit or delete the header row.',
         '5. Remove the sample rows before importing.',
         '6. Save as .xlsx format before uploading.',
-        '7. OPTIONAL: add a PARTY_LIST column (exact party list name). Empty or "Independent" = no party.',
+        '7. PARTY_LIST (optional) — exact party list name. Empty or "Independent" = no party.',
+        '8. CREDENTIALS (optional) — honors / achievements. For several lines, press Alt+Enter inside the cell.',
     ];
     foreach ($instructions as $i => $line) {
         $info->setCellValue('A' . ($i + 2), $line);
@@ -103,6 +107,10 @@ if (empty($_FILES['excel_file']['name'])) {
 }
 
 $file = $_FILES['excel_file'];
+if (strpos(basename($file['name']), '~$') === 0) {
+    echo json_encode(['success' => false, 'message' => 'That is Excel\'s temporary lock file (~$...), not your real file. Close Excel, then choose the actual .xlsx file.']);
+    exit;
+}
 $ext  = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
 if (!in_array($ext, ['xlsx', 'xls'])) {
     echo json_encode(['success' => false, 'message' => t('msg.invalid_file_type_please_upload_xlsx_or__334c', 'Invalid file type. Please upload .xlsx or .xls only.')]);
@@ -117,8 +125,8 @@ try {
     $spreadsheet = IOFactory::load($file['tmp_name']);
     $sheet = $spreadsheet->getSheetByName('Candidates') ?? $spreadsheet->getActiveSheet();
     $rows  = $sheet->toArray(null, true, true, false);
-} catch (Exception $e) {
-    echo json_encode(['success' => false, 'message' => 'Could not read file: ' . $e->getMessage()]);
+} catch (\Throwable $e) {
+    echo json_encode(['success' => false, 'message' => 'Could not read this file. Make sure it is a valid, closed .xlsx file (not a ~$ temp file) and try again.']);
     exit;
 }
 
@@ -163,6 +171,10 @@ if ($sidCol === false || $posCol === false) {
     echo json_encode(['success' => false, 'message' => t('msg.header_row_must_have_student_id_and_posi_b637', 'Header row must have "student_id" and "position" columns.')]);
     exit;
 }
+
+// Optional credentials column (also present in an exported Candidates list)
+$credCol = array_search('credentials', $header);
+if ($credCol === false) $credCol = array_search('credentials_honors', $header);
 
 // Pre-load party lists for this election (name => id, case-insensitive)
 $partyStmt = $pdo->prepare("SELECT id, name FROM party_lists WHERE election_id = ?");
@@ -229,8 +241,12 @@ for ($i = $headerRowIdx + 1; $i < count($rows); $i++) {
         }
     }
 
+    $credentials = $credCol !== false ? trim((string)($row[$credCol] ?? '')) : '';
+    if (mb_strlen($credentials) > 2000) $credentials = mb_substr($credentials, 0, 2000);
+
     $seen[$student['id']] = true;
     $plan[] = [
+        'credentials' => $credentials,
         'row'         => $rowNum,
         'student_pk'  => (int)$student['id'],
         'student_id'  => $sid,
@@ -249,7 +265,8 @@ if ($previewOnly) {
     foreach ($plan as $p) {
         if (count($list) >= $LIST_CAP) break;
         $list[] = ['row' => $p['row'], 'student_id' => $p['student_id'],
-                   'name' => $p['name'], 'position' => $p['position'], 'party' => $p['party']];
+                   'name' => $p['name'], 'position' => $p['position'], 'party' => $p['party'],
+                   'credentials' => $p['credentials']];
     }
     echo json_encode([
         'success'   => true,
@@ -265,9 +282,9 @@ if ($previewOnly) {
 // ── REAL IMPORT: same plan as the preview, saved in one transaction ─
 try {
     $pdo->beginTransaction();
-    $ins = $pdo->prepare("INSERT INTO candidates (election_id, position_id, student_id, party_list_id, bio, photo) VALUES (?,?,?,?,?,?)");
+    $ins = $pdo->prepare("INSERT INTO candidates (election_id, position_id, student_id, party_list_id, bio, credentials, photo) VALUES (?,?,?,?,?,?,?)");
     foreach ($plan as $p) {
-        $ins->execute([$election_id, $p['position_id'], $p['student_pk'], $p['party_list_id'], '', null]);
+        $ins->execute([$election_id, $p['position_id'], $p['student_pk'], $p['party_list_id'], '', $p['credentials'], null]);
         $added++;
     }
     $pdo->commit();
