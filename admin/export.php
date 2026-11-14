@@ -374,27 +374,43 @@ elseif ($type === 'students') {
         $note[] = 'Status: '.($wantActive ? 'Active' : 'Inactive');
     }
 
-    $sheet->setTitle('Students');
-    titleBlock($sheet, 'GUAGUA NATIONAL COLLEGE', 'Office of Student Affairs — Student Masterlist', 'Exported: '.date('F j, Y \a\t g:i A').' · Total: '.count($students).' student(s)'.exportFilterNote($note), 9);
+    // Voting status (voted / not voted) - election from ?election=, else the active election
+    $vEl = null;
+    if ($eid) { $q = $pdo->prepare("SELECT * FROM elections WHERE id=?"); $q->execute([$eid]); $vEl = $q->fetch() ?: null; }
+    if (!$vEl) $vEl = getActiveElection($pdo);
+    $votedIds = [];
+    if ($vEl) {
+        $q = $pdo->prepare("SELECT DISTINCT student_id FROM votes WHERE election_id=?"); $q->execute([$vEl['id']]);
+        $votedIds = array_flip(array_map('intval', $q->fetchAll(PDO::FETCH_COLUMN)));
+    }
+    $fVoted = exportFilter('voted');
+    if ($vEl && $fVoted && count(array_intersect($fVoted, ['voted','not_voted'])) === 1) {
+        $wantVoted = in_array('voted', $fVoted, true);
+        $students = array_values(array_filter($students, fn($s) => isset($votedIds[(int)$s['id']]) === $wantVoted));
+        $note[] = 'Voting: '.($wantVoted ? 'Voted' : 'Not voted').' ('.$vEl['title'].')';
+    }
 
-    foreach (['#','Student ID','Last Name','First Name','Course','Email','Status'] as $i=>$h) $sheet->setCellValue(chr(65+$i).'5',$h);
-    $sheet->getStyle('A5:G5')->applyFromArray(hStyle($MAROON)); $sheet->getRowDimension(5)->setRowHeight(22);
+    $sheet->setTitle('Students');
+    titleBlock($sheet, 'GUAGUA NATIONAL COLLEGE', 'Office of Student Affairs — Student Masterlist', 'Exported: '.date('F j, Y \a\t g:i A').' · Total: '.count($students).' student(s)'.exportFilterNote($note), 6);
+
+    foreach (['#','Student ID','Last Name','First Name','Course','Voting'] as $i=>$h) $sheet->setCellValue(chr(65+$i).'5',$h);
+    $sheet->getStyle('A5:F5')->applyFromArray(hStyle($MAROON)); $sheet->getRowDimension(5)->setRowHeight(22);
 
     $row = 6;
     foreach ($students as $n=>$s) {
         $sheet->setCellValue("A$row",$n+1); $sheet->setCellValue("B$row",$s['student_id']);
         $sheet->setCellValue("C$row",$s['last_name']); $sheet->setCellValue("D$row",$s['first_name']);
-        $sheet->setCellValue("E$row",$s['course']??''); $sheet->setCellValue("F$row",$s['email']??'');
-        $sheet->setCellValue("G$row",$s['is_active']?'Active':'Inactive');
-        if (!$s['is_active']) $sheet->getStyle("G$row")->getFont()->getColor()->setRGB('9CA3AF');
-        else $sheet->getStyle("G$row")->getFont()->setBold(true)->getColor()->setRGB($GREEN);
-        zebraRow($sheet, $row, 'G', $row%2===0); $row++;
+        $sheet->setCellValue("E$row",$s['course']??'');
+        if (!$vEl) { $sheet->setCellValue("F$row",'-'); }
+        elseif (isset($votedIds[(int)$s['id']])) { $sheet->setCellValue("F$row",'Voted'); $sheet->getStyle("F$row")->getFont()->setBold(true)->getColor()->setRGB($GREEN); }
+        else { $sheet->setCellValue("F$row",'Not voted'); $sheet->getStyle("F$row")->getFont()->getColor()->setRGB('9CA3AF'); }
+        zebraRow($sheet, $row, 'F', $row%2===0); $row++;
     }
-    $sheet->mergeCells("A{$row}:F{$row}"); $sheet->setCellValue("A{$row}",'Total Students');
-    $sheet->setCellValue("G{$row}", $row > 6 ? "=COUNTA(B6:B".($row-1).")" : 0);
-    $sheet->getStyle("A{$row}:G{$row}")->applyFromArray(['font'=>['bold'=>true,'color'=>['rgb'=>$MAROON]],'fill'=>['fillType'=>Fill::FILL_SOLID,'startColor'=>['rgb'=>'F9EEF0']]]);
+    $sheet->mergeCells("A{$row}:E{$row}"); $sheet->setCellValue("A{$row}",'Total Students');
+    $sheet->setCellValue("F{$row}", $row > 6 ? "=COUNTA(B6:B".($row-1).")" : 0);
+    $sheet->getStyle("A{$row}:F{$row}")->applyFromArray(['font'=>['bold'=>true,'color'=>['rgb'=>$MAROON]],'fill'=>['fillType'=>Fill::FILL_SOLID,'startColor'=>['rgb'=>'F9EEF0']]]);
 
-    foreach ([5,16,18,18,12,28,12] as $i=>$w) $sheet->getColumnDimension(chr(65+$i))->setWidth($w);
+    foreach ([5,16,18,18,14,14] as $i=>$w) $sheet->getColumnDimension(chr(65+$i))->setWidth($w);
     $filename = 'students_masterlist_'.date('Ymd').'.xlsx';
 }
 

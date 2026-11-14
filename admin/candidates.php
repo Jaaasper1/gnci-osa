@@ -33,12 +33,15 @@ if (isset($_GET['lookup'])) {
         $stmt->execute([$like, $like, $like]);
     }
     $rows = $stmt->fetchAll();
+    $lookupEid = (int)($_GET['eid'] ?? 0);
+    $takenStmt = $pdo->prepare("SELECT p.title FROM candidates c JOIN positions p ON c.position_id = p.id JOIN students st ON c.student_id = st.id WHERE st.student_id = ? AND c.election_id = ? LIMIT 1");
     $results = [];
     foreach ($rows as $s) {
         $results[] = [
             'student_id' => $s['student_id'],
             'name'       => $s['first_name'] . ' ' . $s['last_name'],
             'info'       => $s['course'],
+            'taken'      => (function () use ($takenStmt, $s, $lookupEid) { $takenStmt->execute([$s['student_id'], $lookupEid]); return $takenStmt->fetchColumn() ?: null; })(),
         ];
     }
     echo json_encode(['results' => $results]);
@@ -117,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $dupCheck->execute([$s['id'], $election_id]);
         $existing = $dupCheck->fetch();
         if ($existing) {
-            $_SESSION['flash_error'] = 'This student is already running as a candidate in this election. A student may only run for one position per election.';
+            $_SESSION['flash_error'] = 'NOT added: this student is already a candidate for "' . $existing['title'] . '" in this election. A student may only run for one position per election.';
         } else {
             $photo = null;
             if (!empty($_FILES['photo']['name'])) {
@@ -465,10 +468,22 @@ sidWrap.appendChild(suggestBox);
 
 function closeSuggestions() { suggestBox.style.display = 'none'; }
 
-function selectSuggestion(student_id, name, info) {
+function candEsc(t) { var d = document.createElement('div'); d.textContent = t == null ? '' : t; return d.innerHTML; }
+function setAddBtn(ok) {
+    var b = document.querySelector('#cand-form button[type="submit"]');
+    if (b) { b.disabled = !ok; b.style.opacity = ok ? '' : '0.5'; b.style.cursor = ok ? '' : 'not-allowed'; }
+}
+
+function selectSuggestion(student_id, name, info, taken) {
     sidInput.value = student_id;
     closeSuggestions();
-    feedback.innerHTML = '<span style="color:#059669;"><i class="ti ti-circle-check" style="vertical-align:-2px;"></i> Found!</span>';
+    if (taken) {
+        feedback.innerHTML = '<span style="color:#991B1B;font-weight:600;"><i class="ti ti-alert-triangle" style="vertical-align:-2px;"></i> Already a candidate for &quot;' + candEsc(taken) + '&quot; in this election. A student can only run for one position.</span>';
+        setAddBtn(false);
+    } else {
+        feedback.innerHTML = '<span style="color:#059669;"><i class="ti ti-circle-check" style="vertical-align:-2px;"></i> Found!</span>';
+        setAddBtn(true);
+    }
     var parts = name.trim().split(' ');
     var initials = (parts[0][0] + (parts[parts.length-1][0] || '')).toUpperCase();
     document.getElementById('preview-initials').textContent = initials;
@@ -482,6 +497,7 @@ if (sidInput) {
         var val = this.value.trim();
         clearTimeout(lookupTimer);
         feedback.innerHTML = '';
+        setAddBtn(true);
         preview.style.display = 'none';
         suggestBox.style.display = 'none';
         if (val.length < 2) return;
@@ -500,7 +516,7 @@ if (sidInput) {
                     feedback.innerHTML = '';
                     // If exact match, auto-select
                     if (d.results.length === 1 && d.results[0].student_id === val) {
-                        selectSuggestion(d.results[0].student_id, d.results[0].name, d.results[0].info);
+                        selectSuggestion(d.results[0].student_id, d.results[0].name, d.results[0].info, d.results[0].taken);
                         return;
                     }
                     // Build dropdown
@@ -515,10 +531,11 @@ if (sidInput) {
                         item.innerHTML =
                             '<div style="width:34px;height:34px;border-radius:50%;background:#7C1D2E;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;">' + initials + '</div>' +
                             '<div><div style="font-size:13px;font-weight:600;color:#1F2937;">' + s.name + '</div>' +
-                            '<div style="font-size:11px;color:#9CA3AF;">' + s.student_id + ' · ' + s.info + '</div></div>';
+                            '<div style="font-size:11px;color:#9CA3AF;">' + s.student_id + ' · ' + s.info + '</div>' +
+                            (s.taken ? '<div style="font-size:11px;color:#991B1B;font-weight:600;">Already running: ' + candEsc(s.taken) + '</div>' : '') + '</div>';
                         item.addEventListener('mousedown', function(e) {
                             e.preventDefault();
-                            selectSuggestion(s.student_id, s.name, s.info);
+                            selectSuggestion(s.student_id, s.name, s.info, s.taken);
                         });
                         suggestBox.appendChild(item);
                     });

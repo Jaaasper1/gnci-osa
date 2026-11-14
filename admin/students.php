@@ -1047,6 +1047,7 @@ function switchStuTab(tab) {
                     <?= exportMenu('export.php?type=students', 'btn btn-outline btn-sm', 'color:#059669;border-color:#059669;gap:5px;white-space:nowrap;', 'Export', null, [
                         exportCourseFilter($pdo, false, $courseSel !== '' ? [$courseSel] : []),
                         ['key' => 'status', 'label' => 'Status', 'options' => ['active' => 'Active', 'inactive' => 'Inactive']],
+                        ['key' => 'voted', 'label' => 'Voting', 'options' => ['voted' => 'Voted', 'not_voted' => 'Not voted']],
                     ]) ?>
                     <?php endif; ?>
                     </div>
