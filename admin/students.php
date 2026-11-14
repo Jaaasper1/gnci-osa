@@ -577,6 +577,22 @@ a.prg-box:hover{border-color:var(--maroon,#6B1A2A);}
 .prg-bar i{display:block;height:100%;background:var(--maroon,#6B1A2A);}
 .prg-sub{font-size:11px;color:var(--gray-600,#6B7280);margin-top:5px;}
 </style>
+<style>
+.prg-acc{margin:0 0 14px;background:var(--white,#fff);border:1px solid var(--gray-200,#E5E7EB);border-radius:10px;}
+.prg-acc>summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 14px;font-size:14px;font-weight:600;}
+.prg-acc>summary::-webkit-details-marker{display:none;}
+.prg-acc>summary .prg-acc-sub{font-weight:500;font-size:12px;color:var(--gray-600,#6B7280);}
+.prg-acc>summary .prg-chev{transition:transform .2s;}
+.prg-acc[open]>summary .prg-chev{transform:rotate(180deg);}
+.prg-acc .prg-strip{padding:0 12px 12px;margin:0;}
+</style>
+<?php $progSum = 0; foreach ($progRows as $__pr) { $progSum += (int)$__pr['total']; } ?>
+<details class="prg-acc" id="prg-acc"<?= $courseSel !== '' ? ' open' : '' ?>>
+<summary>
+    <span><i class="ti ti-school" style="margin-right:6px;"></i><?= tx('Students per program') ?>
+        <span class="prg-acc-sub">· <?= count($progRows) ?> <?= tx('programs') ?> · <?= $progSum ?> <?= tx('students') ?><?= $courseSel !== '' ? ' · ' . e($courseSel) : '' ?></span></span>
+    <i class="ti ti-chevron-down prg-chev"></i>
+</summary>
 <div class="prg-strip">
 <?php foreach ($progRows as $pr):
     $pc = trim((string)($pr['course'] ?? ''));
@@ -589,6 +605,15 @@ a.prg-box:hover{border-color:var(--maroon,#6B1A2A);}
     <a class="prg-box<?= $isSel ? ' sel' : '' ?>" href="?<?= e(http_build_query($q)) ?>" title="<?= $isSel ? 'Click to show all programs' : 'Show only ' . e($pc) ?>"><?= $inner ?></a>
 <?php endforeach; ?>
 </div>
+</details>
+<script>
+(function(){
+    var d=document.getElementById('prg-acc'); if(!d) return;
+    var forced = <?= $courseSel !== '' ? 'true' : 'false' ?>;
+    try{ if(!forced && localStorage.getItem('prgAccOpen')==='1') d.open=true; }catch(e){}
+    d.addEventListener('toggle',function(){ try{ localStorage.setItem('prgAccOpen', d.open?'1':'0'); }catch(e){} });
+})();
+</script>
 <?php endif; ?>
 
     <div class="stu-tabs">
