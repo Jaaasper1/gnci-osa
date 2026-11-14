@@ -132,12 +132,35 @@ $isLive    = ($curStatus === 'active');
         <?php endif; ?>
     </div>
 
-    <div class="stat-grid" id="live-stats" data-election-id="<?= $eid ?>" data-live="<?= $isLive ? 1 : 0 ?>" style="margin-bottom:16px;">
+    <style>
+    .stats-acc{margin-bottom:16px;background:#fff;border:1px solid #E5E7EB;border-radius:12px;}
+    .stats-acc>summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;font-size:14px;font-weight:600;}
+    .stats-acc>summary::-webkit-details-marker{display:none;}
+    .stats-acc>summary .sa-sub{font-weight:500;font-size:12px;color:#6B7280;}
+    .stats-acc>summary .sa-chev{transition:transform .2s;}
+    .stats-acc[open]>summary .sa-chev{transform:rotate(180deg);}
+    .stats-acc .stat-grid{padding:0 14px 14px;margin-bottom:0;}
+    </style>
+    <details class="stats-acc" id="stats-acc">
+        <summary>
+            <span><i class="ti ti-chart-bar" style="margin-right:6px;"></i><?= tx('Election stats') ?> <span class="sa-sub">· <span id="sum-turnout"><?= $turnout ?>%</span> <?= tx('turnout') ?></span></span>
+            <i class="ti ti-chevron-down sa-chev"></i>
+        </summary>
+    <div class="stat-grid" id="live-stats" data-election-id="<?= $eid ?>" data-live="<?= $isLive ? 1 : 0 ?>">
+        <div class="stat-card"><div class="stat-num" id="stat-total"><?= $totalStudents ?></div><div class="stat-label"><?= tx('All students in program') ?></div></div>
         <div class="stat-card"><div class="stat-num" id="stat-voted"><?= $totalVoters ?></div><div class="stat-label"><?= t('auto.voted_ca78', 'Voted') ?></div></div>
         <div class="stat-card"><div class="stat-num" id="stat-not-voted"><?= max(0, $totalStudents - $totalVoters) ?></div><div class="stat-label"><?= t('auto.not_yet_voted_c6aa', 'Not yet voted') ?></div></div>
         <div class="stat-card"><div class="stat-num" id="stat-turnout"><?= $turnout ?>%</div><div class="stat-label"><?= t('auto.voter_turnout_1376', 'Voter Turnout') ?></div></div>
         <div class="stat-card abstain-stat"><div class="stat-num" id="stat-abstain"><?= $overallAbstainPct ?>%</div><div class="stat-label"><?= t('auto.overall_abstain_rate_fd17', 'Overall Abstain Rate') ?></div></div>
     </div>
+    </details>
+    <script>
+    (function(){
+        var d=document.getElementById('stats-acc'); if(!d) return;
+        try{ if(localStorage.getItem('statsAccOpen')==='1') d.open=true; }catch(e){}
+        d.addEventListener('toggle',function(){ try{ localStorage.setItem('statsAccOpen', d.open?'1':'0'); }catch(e){} });
+    })();
+    </script>
 
     <div class="res-acc-tools"><button type="button" class="btn btn-sm btn-outline" id="res-acc-toggle" data-state="expand"><i class="ti ti-chevrons-down"></i> <span><?= t('auto.expand_all_d0aa', 'Expand all') ?></span></button></div>
 <script>
@@ -306,6 +329,8 @@ $isLive    = ($curStatus === 'active');
                 animateStatNum('stat-voted', data.voted);
                 animateStatNum('stat-not-voted', data.not_voted);
                 animateStatNum('stat-turnout', data.turnout, '%');
+                var st=document.getElementById('stat-total'); if(st) st.textContent = data.total_students;
+                var sm=document.getElementById('sum-turnout'); if(sm) sm.textContent = data.turnout + '%';
                 animateStatNum('stat-abstain', data.abstain_rate, '%');
 
                 data.positions.forEach(function(pos) {

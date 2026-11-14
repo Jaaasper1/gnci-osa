@@ -81,6 +81,7 @@ $overallAbstainPct = $positionsWithVotes > 0 ? round($totalAbstainPct / $positio
 
 echo json_encode([
     'voted'          => $totalVoters,
+    'total_students' => $totalStudents,
     'not_voted'      => max(0, $totalStudents - $totalVoters),
     'turnout'        => $turnout,
     'abstain_rate'   => $overallAbstainPct,
