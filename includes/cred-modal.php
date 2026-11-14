@@ -4,6 +4,7 @@
 // followed by  <button class="cred-open" data-name="…">…</button>.
 ?>
 <style>
+.cred-src, .cred-body { overflow-wrap: anywhere; word-break: break-word; }
 .cred-src.cred-collapsed { max-height: 5.2em; overflow: hidden; -webkit-mask-image: linear-gradient(#000 60%, transparent); mask-image: linear-gradient(#000 60%, transparent); }
 .cred-open { display: inline-flex; align-items: center; justify-content: center; gap: 5px; margin: 4px 0 8px; padding: 4px 12px; font-size: 11.5px; font-weight: 600; font-family: inherit; line-height: 1.3; white-space: nowrap; color: var(--maroon, #6B1A2A); background: var(--maroon-pale, #F9EEF0); border: 0; border-radius: 999px; cursor: pointer; }
 .cred-open i { font-size: 13px; }
@@ -17,7 +18,7 @@
 .cred-head .cred-title { font-size: 15px; font-weight: 700; }
 .cred-x { background: none; border: 0; font-size: 20px; line-height: 1; cursor: pointer; color: var(--gray-400, #9CA3AF); padding: 4px 8px; border-radius: 8px; }
 .cred-x:hover { background: var(--gray-100, #F3F4F6); }
-.cred-body { padding: 16px 20px; overflow-y: auto; font-size: 13px; line-height: 1.55; color: var(--gray-800, #1F2937); }
+.cred-body { padding: 16px 20px; overflow-y: auto; overflow-x: hidden; font-size: 13px; line-height: 1.55; color: var(--gray-800, #1F2937); }
 </style>
 <div class="cred-overlay" id="cred-overlay" role="dialog" aria-modal="true" aria-labelledby="cred-title">
     <div class="cred-dialog">
