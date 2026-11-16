@@ -103,6 +103,37 @@ function msgReplies(PDO $pdo, int $messageId): array {
     return $st->fetchAll();
 }
 
+// ---- Live updates (polling) ----
+// HTML for one reply row (same markup as the thread pages). $viewer = 'student' | 'staff'.
+function msgReplyRowHtml(array $r, string $viewer, callable $fmtDate): string {
+    $mine = $r['sender_role'] === $viewer;
+    $who  = $r['sender_role'] === 'staff' ? e($r['sender_name']) . ' (OSA)' : e($r['sender_name']);
+    $h  = '<div class="msg-row ' . ($mine ? 'mine' : 'theirs') . '" data-rid="' . (int)$r['id'] . '">';
+    $h .= '<div class="msg-meta">' . $who . ' · ' . e($fmtDate(strtotime($r['created_at']))) . '</div>';
+    if (!empty($r['audio_file'])) $h .= '<audio class="msg-audio" controls preload="none" src="../voice.php?id=' . (int)$r['id'] . '"></audio>';
+    if ($r['body'] !== '') $h .= '<div class="msg-bubble">' . e($r['body']) . '</div>';
+    return $h . '</div>';
+}
+
+// Replies newer than $afterId in a thread. Returns ['html' => string, 'last' => int, 'n' => int].
+function msgPollReplies(PDO $pdo, int $messageId, int $afterId, string $viewer, callable $fmtDate): array {
+    $st = $pdo->prepare("SELECT * FROM osa_message_replies WHERE message_id = ? AND id > ? ORDER BY id ASC LIMIT 50");
+    $st->execute([$messageId, $afterId]);
+    $html = ''; $last = $afterId; $n = 0;
+    foreach ($st->fetchAll() as $r) { $html .= msgReplyRowHtml($r, $viewer, $fmtDate); $last = max($last, (int)$r['id']); $n++; }
+    return ['html' => $html, 'last' => $last, 'n' => $n];
+}
+
+function msgLastReplyId(array $replies): int {
+    $m = 0; foreach ($replies as $r) $m = max($m, (int)$r['id']); return $m;
+}
+
+function msgJson(array $data): void {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    echo json_encode($data); exit;
+}
+
 function msgMarkRead(PDO $pdo, int $messageId, string $role): void {
     $col = $role === 'student' ? 'student_unread' : 'staff_unread';
     $pdo->prepare("UPDATE osa_messages SET $col = 0 WHERE id = ?")->execute([$messageId]);

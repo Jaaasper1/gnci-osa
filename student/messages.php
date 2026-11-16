@@ -13,6 +13,16 @@ $notifCount = getUnreadNotifCount($pdo, $student_id);
 $election   = getAnyActiveOrRecentElection($pdo);
 $error = '';
 
+// Live updates: JSON with replies newer than ?after= (read-only, session released right away).
+if (isset($_GET['poll'])) {
+    session_write_close();
+    $tid = (int)($_GET['id'] ?? 0);
+    if (!$tid || !msgGetOwned($pdo, $tid, $student_id)) msgJson(['ok' => false]);
+    $res = msgPollReplies($pdo, $tid, (int)($_GET['after'] ?? 0), 'student', function ($t) { return tlDate('M j, Y g:i A', $t); });
+    if ($res['n'] > 0) msgMarkRead($pdo, $tid, 'student');
+    msgJson(['ok' => true, 'html' => $res['html'], 'last' => $res['last'], 'n' => $res['n']]);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     requireCsrf();
     $action = $_POST['action'] ?? '';
@@ -215,6 +225,10 @@ foreach ($replies as $r) {
     </div>
 </div></div>
 
+<?php if ($thread): ?>
+<script>window.LIVE_MSG = { role: 'student', id: <?= (int)$thread['id'] ?>, after: <?= msgLastReplyId($replies) ?>, interval: 5000 };</script>
+<script src="../assets/js/live-messages.js?v=1"></script>
+<?php endif; ?>
 <script src="../assets/js/sidebar.js?v=5"></script>
 <script src="../assets/js/message-tts.js?v=1"></script>
 <script src="../assets/js/voice-record.js?v=1"></script>

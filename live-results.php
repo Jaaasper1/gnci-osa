@@ -226,8 +226,7 @@ $isLive    = ($curStatus === 'active');
         </div>
         <?php endforeach; ?>
 
-        <?php if ($pos['total'] > 0): ?>
-        <?php $abstainPct = round($pos['abstains'] / $pos['total'] * 100); ?>
+        <?php $abstainPct = $pos['total'] > 0 ? round($pos['abstains'] / $pos['total'] * 100) : 0; ?>
         <div class="abstain-results-row" data-position-id="<?= $pos['id'] ?>">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
                 <span style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#92400E;"><i class="ti ti-ban"></i> Abstain</span>
@@ -235,7 +234,6 @@ $isLive    = ($curStatus === 'active');
             </div>
             <div class="progress"><div class="progress-fill abstain-fill live-abstain-bar" style="width:<?= $abstainPct ?>%;"></div></div>
         </div>
-        <?php endif; ?>
         <?php endif; ?>
         </div>
     </details>
@@ -321,7 +319,8 @@ $isLive    = ($curStatus === 'active');
     playEntrance();
 
     function refreshResults() {
-        fetch('live-results-data.php?id=' + encodeURIComponent(electionId))
+        if (document.hidden) return;
+        fetch('live-results-data.php?id=' + encodeURIComponent(electionId), { cache: 'no-store' })
             .then(function(res) { return res.ok ? res.json() : null; })
             .then(function(data) {
                 if (!data) return;
@@ -352,6 +351,29 @@ $isLive    = ($curStatus === 'active');
                             }
                         }
                     });
+
+                    // Re-rank: highest votes first, and move the gold medal / border to the leader.
+                    (function () {
+                        var abRow = document.querySelector('.abstain-results-row[data-position-id="' + pos.id + '"]');
+                        var rows = pos.candidates.map(function (cd, idx) {
+                            return { el: document.querySelector('.live-cand-row[data-candidate-id="' + cd.id + '"]'), votes: cd.votes, idx: idx };
+                        }).filter(function (r) { return r.el; });
+                        if (!rows.length) return;
+                        rows.sort(function (a, b) { return b.votes - a.votes || a.idx - b.idx; });
+                        var parent = rows[0].el.parentNode;
+                        rows.forEach(function (r, i) {
+                            parent.insertBefore(r.el, abRow && abRow.parentNode === parent ? abRow : null);
+                            var wrap = r.el.firstElementChild, ring = wrap && wrap.querySelector('img, div');
+                            var lead = i === 0 && r.votes > 0;
+                            if (ring) ring.style.borderColor = lead ? '#C9943A' : '#E5E7EB';
+                            var medal = wrap && wrap.querySelector('.live-medal');
+                            if (lead && !medal && wrap) {
+                                medal = document.createElement('span'); medal.className = 'live-medal'; medal.textContent = '\uD83E\uDD47';
+                                medal.style.cssText = 'position:absolute;bottom:-4px;right:-4px;font-size:14px;line-height:1;';
+                                wrap.appendChild(medal);
+                            } else if (!lead && medal) { medal.remove(); }
+                        });
+                    })();
 
                     var abstainRow = document.querySelector('.abstain-results-row[data-position-id="' + pos.id + '"]');
                     if (abstainRow) {

@@ -13,6 +13,22 @@ $staff_id   = (int)$_SESSION['user_id'];
 $notifCount = getUnreadStaffNotifCount($pdo, $staff_id);
 $error = '';
 
+// Live updates: JSON with new replies (?id=&after=) plus a signature of the conversation list.
+if (isset($_GET['poll'])) {
+    session_write_close();
+    $tid = (int)($_GET['id'] ?? 0);
+    $out = ['ok' => true, 'html' => '', 'last' => (int)($_GET['after'] ?? 0), 'n' => 0];
+    if ($tid && msgGet($pdo, $tid)) {
+        $res = msgPollReplies($pdo, $tid, (int)($_GET['after'] ?? 0), 'staff', function ($t) { return date('M j, Y g:i A', $t); });
+        if ($res['n'] > 0) msgMarkRead($pdo, $tid, 'staff');
+        $out = ['ok' => true] + $res;
+    }
+    $sg = $pdo->query("SELECT COUNT(*), COALESCE(MAX(last_activity),''), COALESCE(SUM(staff_unread),0) FROM osa_messages")->fetch(PDO::FETCH_NUM);
+    $out['sig'] = implode('|', $sg);
+    $out['unread'] = (int)$sg[2];
+    msgJson($out);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     requireCsrf();
     $action = $_POST['action'] ?? '';
@@ -673,6 +689,8 @@ $__out = count($__stu) - $__in;
 // Open the conversation scrolled to the newest message.
 (function(){ var t=document.getElementById('msgThread'); if(t) t.scrollTop=t.scrollHeight; })();
 </script>
+<script>window.LIVE_MSG = { role: 'staff', id: <?= (int)($thread['id'] ?? 0) ?>, after: <?= msgLastReplyId($replies) ?>, interval: <?= !empty($thread['id']) ? 5000 : 20000 ?>, filter: <?= json_encode($filter) ?> };</script>
+<script src="../assets/js/live-messages.js?v=1"></script>
 <script src="../assets/js/sidebar.js?v=5"></script>
 <script src="../assets/js/message-tts.js?v=1"></script>
 <script src="../assets/js/voice-record.js?v=1"></script>
