@@ -1,7 +1,7 @@
 // GNC-OSA Portal service worker.
 // Pages (login, voting, complaints) are NEVER cached - they are private and must always be live.
 // Only static assets are cached, plus an offline fallback page.
-const VERSION = 'osa-pwa-v27';
+const VERSION = 'osa-pwa-v28';
 const PRECACHE = ['offline.html', 'assets/css/style.css', 'assets/img/osa-logo.jpg'];
 
 // Built-in English fallback: used if offline.html is missing from the server or was not cached, so users never fall back to the browser's own (localized) offline page.
@@ -36,7 +36,15 @@ self.addEventListener('fetch', e => {
   if (/\.(mp4|webm|php)$/i.test(url.pathname)) return;     // big video and dynamic endpoints stay live
   if (/\/assets\/icons\//.test(url.pathname) || /manifest\.webmanifest$/.test(url.pathname)) return; // icons + manifest always fresh
 
-  // Static assets: stale-while-revalidate.
+  // JS / CSS: network first (so updates show right away), cached copy only when offline.
+  if (/\/assets\/.*\.(js|css)$/i.test(url.pathname)) {
+    e.respondWith(caches.open(VERSION).then(cache =>
+      fetch(req).then(res => { if (res.ok) cache.put(req, res.clone()); return res; })
+        .catch(() => cache.match(req))));
+    return;
+  }
+
+  // Other static assets (images, fonts): stale-while-revalidate.
   if (/\/assets\//.test(url.pathname)) {
     e.respondWith(caches.open(VERSION).then(cache =>
       cache.match(req).then(hit => {

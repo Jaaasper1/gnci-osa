@@ -1766,7 +1766,7 @@ html[data-theme="dark"] .cor-body{background:#111827}
 <script src="../assets/js/alerts.js"></script>
 <script src="../assets/js/sidebar.js?v=5"></script>
 <?php if (($_SESSION['user_type'] ?? '') !== 'admin'): ?><style>.admin-only{display:none!important}</style><?php endif; ?>
-<script src="../assets/js/bulk-select.js?v=7"></script>
+<script src="../assets/js/bulk-select.js?v=8"></script>
 <script>
 (function () {
   // Bulk actions reuse the same per-student server handlers (same permission + CSRF checks).
