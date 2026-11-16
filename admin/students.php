@@ -602,7 +602,7 @@ function stuUrl($overrides = []) {
                 <td><?= e($p['student_id']) ?></td>
                 <td><?= e($p['last_name'].', '.$p['first_name']) ?></td>
                 <td><?= e($p['course'] ?: '—') ?></td>
-                <td><?= e(maskEmail($p['email']) ?: '—') ?></td>
+                <td><?= e((($_SESSION['user_type'] ?? '') === 'admin' ? trim((string)$p['email']) : maskEmail($p['email'])) ?: '—') ?></td>
                 <td style="white-space:nowrap;">
                     <?php if (!empty($p['cor_file'])): ?>
                         <a href="../uploads/<?= e($p['cor_file']) ?>" target="_blank" rel="noopener" class="btn btn-sm btn-outline cor-view">
