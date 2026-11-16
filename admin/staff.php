@@ -497,7 +497,7 @@ function closeEditStaffModal() {
 }
 
 document.getElementById('edit-staff-overlay').addEventListener('click', function(e) {
-    if (e.target === this) closeEditStaffModal();
+    /* click outside no longer closes this popup (use X / Cancel) */
 });
 
 function openAddModal() {
@@ -511,7 +511,7 @@ function closeAddModal() {
 }
 
 document.getElementById('add-modal-overlay').addEventListener('click', function(e) {
-    if (e.target === this) closeAddModal();
+    /* click outside no longer closes this popup (use X / Cancel) */
 });
 
 document.addEventListener('keydown', function(e) {
@@ -674,7 +674,7 @@ function closeConfirmModal() {
 }
 
 document.getElementById('confirm-modal-overlay').addEventListener('click', function(e) {
-    if (e.target === this) closeConfirmModal();
+    /* click outside no longer closes this popup (use X / Cancel) */
 });
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') closeConfirmModal();

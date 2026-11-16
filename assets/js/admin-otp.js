@@ -109,7 +109,7 @@ window.__t = window.__t || function (s) { return s; };
             if (e.key === 'Enter') onPrimary();
         });
         overlay.addEventListener('click', function (e) {
-            if (e.target === overlay) close();
+    /* click outside no longer closes this popup (use X / Cancel) */
         });
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape' && overlay.style.display === 'flex') close();

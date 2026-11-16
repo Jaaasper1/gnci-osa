@@ -247,7 +247,7 @@ function closePartyModal() {
     document.getElementById('party-modal-overlay').style.display = 'none';
 }
 document.getElementById('party-modal-overlay').addEventListener('click', function(e) {
-    if (e.target === this) closePartyModal();
+    /* click outside no longer closes this popup (use X / Cancel) */
 });
 document.querySelectorAll('.edit-party-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
@@ -331,7 +331,7 @@ function closeImportModal() {
     document.getElementById('import-modal-overlay').style.display = 'none';
 }
 document.getElementById('import-modal-overlay').addEventListener('click', function(e) {
-    if (e.target === this) closeImportModal();
+    /* click outside no longer closes this popup (use X / Cancel) */
 });
 
 function resetImportModal() {
@@ -528,7 +528,7 @@ document.getElementById('gnc-modal-confirm-btn').addEventListener('click', funct
     if (cb) cb();
 });
 document.getElementById('gnc-modal-overlay').addEventListener('click', function(e) {
-    if (e.target === this) gncCloseModal();
+    /* click outside no longer closes this popup (use X / Cancel) */
 });
 document.addEventListener('keydown', function(e) { if (e.key === 'Escape') gncCloseModal(); });
 

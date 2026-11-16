@@ -415,7 +415,7 @@ function closeEventModal() {
     document.getElementById('event-modal-overlay').style.display = 'none';
 }
 document.getElementById('event-modal-overlay').addEventListener('click', function(e) {
-    if (e.target === this) closeEventModal();
+    /* click outside no longer closes this popup (use X / Cancel) */
 });
 document.querySelectorAll('.edit-event-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
@@ -497,7 +497,7 @@ document.getElementById('gnc-modal-confirm-btn').addEventListener('click', funct
     if (cb) cb();
 });
 document.getElementById('gnc-modal-overlay').addEventListener('click', function(e) {
-    if (e.target === this) gncCloseModal();
+    /* click outside no longer closes this popup (use X / Cancel) */
 });
 document.addEventListener('keydown', function(e) { if (e.key === 'Escape') gncCloseModal(); });
 

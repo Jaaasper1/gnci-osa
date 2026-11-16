@@ -784,7 +784,7 @@ function closeNewElectionModal() {
     document.getElementById('new-election-modal').style.display = 'none';
 }
 document.getElementById('new-election-modal').addEventListener('click', function(e) {
-    if (e.target === this) closeNewElectionModal();
+    /* click outside no longer closes this popup (use X / Cancel) */
 });
 </script>
 <script>
@@ -817,7 +817,7 @@ document.getElementById('gnc-modal-confirm-btn').addEventListener('click', funct
     if (cb) cb();
 });
 document.getElementById('gnc-modal-overlay').addEventListener('click', function(e) {
-    if (e.target === this) gncCloseModal();
+    /* click outside no longer closes this popup (use X / Cancel) */
 });
 document.addEventListener('keydown', function(e) { if (e.key === 'Escape') gncCloseModal(); });
 

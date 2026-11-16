@@ -384,7 +384,7 @@ function stuMenuData(array $rows, string $dateField): array {
 [$disabledCourses, $disabledMonths] = stuMenuData($disabled, 'disabled_at');
 
 // Tab that opens first: Pending Approvals if anyone is waiting, otherwise Active Students
-$startTab = (($_GET['tab'] ?? '') === 'active') ? 'active' : (count($pending) > 0 ? 'pending' : 'active');
+$startTab = count($pending) > 0 ? 'pending' : 'active';
 
 // Get the currently active election (if any) so we can show each student's voting status
 $activeElection = getActiveElection($pdo);
@@ -450,13 +450,6 @@ foreach ($pdo->query("SELECT YEAR(approved_at) y, MONTH(approved_at) m FROM stud
     $dateMonths[(string)$r['y']][] = (int)$r['m'];
 }
 $anyActive = ($totalRows > 0) || $hasFilter;
-
-// Students per program: boxes above the table (click one = filter the table by that course)
-$progRows = [];
-try {
-    $progRows = $pdo->query("SELECT s.course AS course, COUNT(*) AS total, SUM(" . $votedExpr . ") AS voted FROM students s WHERE s.is_active = 1 AND s.course IS NOT NULL AND s.course <> '' GROUP BY s.course ORDER BY s.course")->fetchAll();
-} catch (Throwable $e) { $progRows = []; }
-$progBase = $_GET; unset($progBase['course'], $progBase['page'], $progBase['p']); $progBase['tab'] = 'active';
 
 function stuUrl($overrides = []) {
     $p = array_merge([
@@ -564,57 +557,6 @@ function stuUrl($overrides = []) {
             </div>
         </div>
     </div>
-
-    <?php if (count($progRows) > 0): ?>
-<style>
-.prg-strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:10px;margin:0 0 14px;}
-.prg-box{display:block;text-decoration:none;color:inherit;background:var(--white,#fff);border:1px solid var(--gray-200,#E5E7EB);border-radius:10px;padding:10px 12px;transition:border-color .15s,background .15s;}
-a.prg-box:hover{border-color:var(--maroon,#6B1A2A);}
-.prg-box.sel{border-color:var(--maroon,#6B1A2A);background:var(--maroon-pale,#F9EEF0);}
-.prg-name{font-size:12px;font-weight:600;color:var(--gray-600,#6B7280);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.prg-num{font-size:22px;font-weight:700;line-height:1.2;margin:2px 0 6px;color:var(--maroon,#6B1A2A);}
-.prg-bar{height:5px;border-radius:3px;background:var(--gray-200,#E5E7EB);overflow:hidden;}
-.prg-bar i{display:block;height:100%;background:var(--maroon,#6B1A2A);}
-.prg-sub{font-size:11px;color:var(--gray-600,#6B7280);margin-top:5px;}
-</style>
-<style>
-.prg-acc{margin:0 0 14px;background:var(--white,#fff);border:1px solid var(--gray-200,#E5E7EB);border-radius:10px;}
-.prg-acc>summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 14px;font-size:14px;font-weight:600;}
-.prg-acc>summary::-webkit-details-marker{display:none;}
-.prg-acc>summary .prg-acc-sub{font-weight:500;font-size:12px;color:var(--gray-600,#6B7280);}
-.prg-acc>summary .prg-chev{transition:transform .2s;}
-.prg-acc[open]>summary .prg-chev{transform:rotate(180deg);}
-.prg-acc .prg-strip{padding:0 12px 12px;margin:0;}
-</style>
-<?php $progSum = 0; foreach ($progRows as $__pr) { $progSum += (int)$__pr['total']; } ?>
-<details class="prg-acc" id="prg-acc"<?= $courseSel !== '' ? ' open' : '' ?>>
-<summary>
-    <span><i class="ti ti-school" style="margin-right:6px;"></i><?= tx('Students per program') ?>
-        <span class="prg-acc-sub">· <?= count($progRows) ?> <?= tx('programs') ?> · <?= $progSum ?> <?= tx('students') ?><?= $courseSel !== '' ? ' · ' . e($courseSel) : '' ?></span></span>
-    <i class="ti ti-chevron-down prg-chev"></i>
-</summary>
-<div class="prg-strip">
-<?php foreach ($progRows as $pr):
-    $pc = trim((string)($pr['course'] ?? ''));
-    $pt = (int)$pr['total']; $pv = (int)$pr['voted'];
-    $pct = $pt > 0 ? (int)round($pv / $pt * 100) : 0;
-    $inner = '<div class="prg-name">' . e($pc) . '</div><div class="prg-num">' . $pt . '</div>'
-           . ($activeElection ? '<div class="prg-bar"><i style="width:' . $pct . '%"></i></div><div class="prg-sub">' . $pv . ' voted · ' . $pct . '%</div>' : '');
-    $isSel = ($courseSel !== '' && $courseSel === (string)$pr['course']);
-    $q = $isSel ? $progBase : ($progBase + ['course' => $pr['course']]); ?>
-    <a class="prg-box<?= $isSel ? ' sel' : '' ?>" href="?<?= e(http_build_query($q)) ?>" title="<?= $isSel ? 'Click to show all programs' : 'Show only ' . e($pc) ?>"><?= $inner ?></a>
-<?php endforeach; ?>
-</div>
-</details>
-<script>
-(function(){
-    var d=document.getElementById('prg-acc'); if(!d) return;
-    var forced = <?= $courseSel !== '' ? 'true' : 'false' ?>;
-    try{ if(!forced && localStorage.getItem('prgAccOpen')==='1') d.open=true; }catch(e){}
-    d.addEventListener('toggle',function(){ try{ localStorage.setItem('prgAccOpen', d.open?'1':'0'); }catch(e){} });
-})();
-</script>
-<?php endif; ?>
 
     <div class="stu-tabs">
         <button type="button" class="stu-tab <?= $startTab === 'pending' ? 'active' : '' ?>" id="stu-tab-btn-pending" onclick="switchStuTab('pending')">
@@ -815,7 +757,7 @@ if (_confirmBtn) {
 
 if (_overlay) {
     _overlay.addEventListener('click', function(e) {
-        if (e.target === this) closeModal();
+        /* click outside no longer closes this popup */
     });
 }
 
@@ -1398,7 +1340,7 @@ function closeEditModal() {
 }
 
 document.getElementById('edit-modal-overlay').addEventListener('click', function(e){
-    if (e.target === this) closeEditModal();
+    /* click outside no longer closes this popup */
 });
 
 function submitEdit() {
@@ -1569,7 +1511,7 @@ function closeStudentImportModal() {
     document.getElementById('student-import-overlay').style.display = 'none';
 }
 document.getElementById('student-import-overlay').addEventListener('click', function(e) {
-    if (e.target === this) closeStudentImportModal();
+    /* click outside no longer closes this popup */
 });
 function handleStuFile(file) {
     if (!file) return;
