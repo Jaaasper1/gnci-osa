@@ -400,7 +400,7 @@ $isLive    = ($curStatus === 'active');
     }
 
     // Only keep polling while voting is still open; closed/completed results are static.
-    if (statGrid.dataset.live === '1') setInterval(refreshResults, 5000);
+    if (statGrid.dataset.live === '1') setInterval(refreshResults, 20000);
 })();
 </script>
 
