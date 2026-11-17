@@ -100,16 +100,31 @@ if (isset($_POST['del_election'])) {
     $eid = (int)$_POST['del_election'];
     $hasVotes = $pdo->prepare("SELECT COUNT(*) FROM votes WHERE election_id=?");
     $hasVotes->execute([$eid]);
+    $voteCount = (int)$hasVotes->fetchColumn();
+    $isCompletedRow = $pdo->prepare("SELECT is_completed FROM elections WHERE id=?");
+    $isCompletedRow->execute([$eid]);
+    $isCompleted = (bool)$isCompletedRow->fetchColumn();
     if (!adminOtpConsumeApproval('delete_election', $eid)) {
         $error = t('msg.please_confirm_the_deletion_with_your_admin_password', 'Please confirm the deletion with your admin password or emailed code first.');
-    } elseif ($hasVotes->fetchColumn() > 0) {
+    } elseif ($voteCount > 0 && !$isCompleted) {
+        // Running or closed elections with votes stay protected. Only Completed ones can be removed with their votes.
         $error = t('msg.cannot_delete_votes_have_already_been_ca_e259', 'Cannot delete — votes have already been cast in this election.');
     } else {
-        // CASCADE will handle positions and candidates
         $__before = auditRow($pdo, 'elections', $eid);
-        $pdo->prepare("DELETE FROM elections WHERE id=?")->execute([$eid]);
-        auditLog($pdo, 'delete', 'election', $eid, $__before);
-        $success = t('msg.election_deleted_5267', 'Election deleted.');
+        $pdo->beginTransaction();
+        try {
+            if ($voteCount > 0) {
+                $pdo->prepare("DELETE FROM votes WHERE election_id=?")->execute([$eid]);
+            }
+            // CASCADE will handle positions and candidates
+            $pdo->prepare("DELETE FROM elections WHERE id=?")->execute([$eid]);
+            $pdo->commit();
+            auditLog($pdo, 'delete', 'election', $eid, $__before, ['votes_removed' => $voteCount, 'was_completed' => $isCompleted]);
+            $success = t('msg.election_deleted_5267', 'Election deleted.');
+        } catch (Throwable $ex) {
+            $pdo->rollBack();
+            $error = 'The election could not be deleted. Please try again.';
+        }
     }
     header('Location: elections.php?success='.urlencode($success).'&error='.urlencode($error)); exit;
 }
@@ -206,6 +221,150 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $success = $count . ' position' . ($count > 1 ? 's' : '') . ' added successfully!';
     }
     header('Location: elections.php?edit='.$eid.'&success='.urlencode($success).'&error='.urlencode($error)); exit;
+}
+
+// ---- Add candidates in bulk from the Elections tab ----
+if (isset($_GET['ajax']) && in_array($_GET['ajax'], ['setup', 'students'], true)) {
+    header('Content-Type: application/json; charset=utf-8');
+    $eid = (int)($_GET['election'] ?? 0);
+    $elq = $pdo->prepare("SELECT id, course, is_completed FROM elections WHERE id = ?");
+    $elq->execute([$eid]);
+    $elRow = $elq->fetch();
+    if (!$elRow) { echo json_encode(['ok' => false, 'message' => 'Election not found.']); exit; }
+
+    if ($_GET['ajax'] === 'setup') {
+        $ps = $pdo->prepare("SELECT id, title FROM positions WHERE election_id = ? ORDER BY sort_order");
+        $ps->execute([$eid]);
+        $cs = $pdo->query("SELECT DISTINCT course FROM students WHERE is_active = 1 AND course IS NOT NULL AND course <> '' ORDER BY course")->fetchAll(PDO::FETCH_COLUMN);
+        $pls = $pdo->prepare("SELECT id, name FROM party_lists WHERE election_id = ? ORDER BY name");
+        $pls->execute([$eid]);
+        echo json_encode(['ok' => true, 'positions' => $ps->fetchAll(), 'courses' => $cs, 'parties' => $pls->fetchAll(),
+                          'electionCourse' => (string)($elRow['course'] ?? ''), 'completed' => (bool)$elRow['is_completed']]);
+        exit;
+    }
+
+    // Students for the picker: active, optional course and search, and whether each is already a candidate here
+    $course = trim((string)($_GET['course'] ?? ''));
+    $q      = trim((string)($_GET['q'] ?? ''));
+    $sql = "SELECT s.id, s.student_id, s.first_name, s.last_name, s.course,
+                   (SELECT p.title FROM candidates c JOIN positions p ON p.id = c.position_id
+                    WHERE c.election_id = ? AND c.student_id = s.id LIMIT 1) AS cand_title
+            FROM students s WHERE s.is_active = 1";
+    $args = [$eid];
+    if ($course !== '') { $sql .= " AND s.course = ?"; $args[] = $course; }
+    if ($q !== '') {
+        $like = '%' . $q . '%';
+        $sql .= " AND (s.student_id LIKE ? OR s.first_name LIKE ? OR s.last_name LIKE ? OR CONCAT(s.first_name, ' ', s.last_name) LIKE ?)";
+        array_push($args, $like, $like, $like, $like);
+    }
+    $sql .= " ORDER BY s.last_name, s.first_name LIMIT 300";
+    $st = $pdo->prepare($sql);
+    $st->execute($args);
+    echo json_encode(['ok' => true, 'students' => $st->fetchAll()]);
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['ajax_action'] ?? '') === 'add_candidate_full') {
+    header('Content-Type: application/json; charset=utf-8');
+    $tok = $_POST['csrf_token'] ?? '';
+    if (!$tok || !hash_equals(csrfToken(), $tok)) { echo json_encode(['ok' => false, 'message' => 'Your session expired. Refresh and try again.']); exit; }
+
+    $eid = (int)($_POST['election_id'] ?? 0);
+    $pid = (int)($_POST['position_id'] ?? 0);
+    $plid = !empty($_POST['party_list_id']) ? (int)$_POST['party_list_id'] : null;
+    $sno = trim((string)($_POST['student_id'] ?? ''));
+    $bio = mb_substr(trim((string)($_POST['bio'] ?? '')), 0, 1000);
+    $cred = mb_substr(trim((string)($_POST['credentials'] ?? '')), 0, 2000);
+
+    $elq = $pdo->prepare("SELECT is_completed FROM elections WHERE id = ?");
+    $elq->execute([$eid]);
+    $elRow = $elq->fetch();
+    if (!$elRow) { echo json_encode(['ok' => false, 'message' => 'Election not found.']); exit; }
+    if (!empty($elRow['is_completed'])) { echo json_encode(['ok' => false, 'message' => 'This election is Completed. Reopen it first.']); exit; }
+
+    $pq = $pdo->prepare("SELECT title FROM positions WHERE id = ? AND election_id = ?");
+    $pq->execute([$pid, $eid]);
+    $posRow = $pq->fetch();
+    if (!$posRow) { echo json_encode(['ok' => false, 'message' => 'Choose a valid position.']); exit; }
+
+    $stq = $pdo->prepare("SELECT id, first_name, last_name FROM students WHERE student_id = ? AND is_active = 1");
+    $stq->execute([$sno]);
+    $stu = $stq->fetch();
+    if (!$stu) { echo json_encode(['ok' => false, 'message' => 'Student ID not found or not active.']); exit; }
+
+    if ($plid !== null) {
+        $pl = $pdo->prepare("SELECT id FROM party_lists WHERE id = ? AND election_id = ?");
+        $pl->execute([$plid, $eid]);
+        if (!$pl->fetch()) { echo json_encode(['ok' => false, 'message' => 'That party list is not in this election.']); exit; }
+    }
+
+    $dup = $pdo->prepare("SELECT p.title FROM candidates c JOIN positions p ON p.id = c.position_id WHERE c.election_id = ? AND c.student_id = ? LIMIT 1");
+    $dup->execute([$eid, $stu['id']]);
+    if ($other = $dup->fetchColumn()) {
+        echo json_encode(['ok' => false, 'message' => $stu['first_name'] . ' ' . $stu['last_name'] . ' is already a candidate for ' . $other . ' in this election.']); exit;
+    }
+
+    $photo = null;
+    if (!empty($_FILES['photo']['name'])) {
+        $up = uploadPhoto($_FILES['photo']);
+        if (isset($up['error'])) { echo json_encode(['ok' => false, 'message' => $up['error']]); exit; }
+        $photo = $up['filename'];
+    }
+
+    $pdo->prepare("INSERT INTO candidates (election_id, position_id, student_id, party_list_id, bio, credentials, photo) VALUES (?,?,?,?,?,?,?)")
+        ->execute([$eid, $pid, $stu['id'], $plid, $bio, $cred, $photo]);
+    $newId = (int)$pdo->lastInsertId();
+    auditLog($pdo, 'create', 'candidate', $newId, [], ['position' => $posRow['title'], 'election_id' => $eid, 'student_id' => $sno]);
+    echo json_encode(['ok' => true, 'message' => $stu['first_name'] . ' ' . $stu['last_name'] . ' added as a candidate for ' . $posRow['title'] . '.']);
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['ajax_action'] ?? '') === 'add_candidates') {
+    header('Content-Type: application/json; charset=utf-8');
+    $tok = $_POST['csrf_token'] ?? '';
+    if (!$tok || !hash_equals(csrfToken(), $tok)) { echo json_encode(['ok' => false, 'message' => 'Your session expired. Refresh and try again.']); exit; }
+
+    $eid = (int)($_POST['election_id'] ?? 0);
+    $pid = (int)($_POST['position_id'] ?? 0);
+    $ids = array_values(array_unique(array_filter(array_map('intval', (array)($_POST['student_ids'] ?? [])))));
+
+    $elq = $pdo->prepare("SELECT is_completed FROM elections WHERE id = ?");
+    $elq->execute([$eid]);
+    $elRow = $elq->fetch();
+    if (!$elRow) { echo json_encode(['ok' => false, 'message' => 'Election not found.']); exit; }
+    if (!empty($elRow['is_completed'])) { echo json_encode(['ok' => false, 'message' => 'This election is Completed. Reopen it first to change candidates.']); exit; }
+
+    $pq = $pdo->prepare("SELECT title FROM positions WHERE id = ? AND election_id = ?");
+    $pq->execute([$pid, $eid]);
+    $posRow = $pq->fetch();
+    if (!$posRow) { echo json_encode(['ok' => false, 'message' => 'Choose a valid position.']); exit; }
+    if (!$ids) { echo json_encode(['ok' => false, 'message' => 'Select at least one student.']); exit; }
+
+    $chk = $pdo->prepare("SELECT p.title FROM candidates c JOIN positions p ON p.id = c.position_id WHERE c.election_id = ? AND c.student_id = ? LIMIT 1");
+    $ins = $pdo->prepare("INSERT INTO candidates (election_id, position_id, student_id) VALUES (?, ?, ?)");
+    $stuOk = $pdo->prepare("SELECT first_name, last_name FROM students WHERE id = ? AND is_active = 1");
+
+    $added = 0; $skipped = [];
+    $pdo->beginTransaction();
+    try {
+        foreach ($ids as $sid) {
+            $stuOk->execute([$sid]);
+            $stu = $stuOk->fetch();
+            if (!$stu) { $skipped[] = "Student #$sid is not active."; continue; }
+            $name = $stu['first_name'] . ' ' . $stu['last_name'];
+            $chk->execute([$eid, $sid]);
+            if ($other = $chk->fetchColumn()) { $skipped[] = "$name is already a candidate for $other."; continue; }
+            $ins->execute([$eid, $pid, $sid]);
+            $added++;
+        }
+        $pdo->commit();
+    } catch (Throwable $ex) {
+        $pdo->rollBack();
+        echo json_encode(['ok' => false, 'message' => 'Could not add the candidates. Please try again.']); exit;
+    }
+    if ($added > 0) auditLog($pdo, 'create', 'candidate', $eid, [], ['position' => $posRow['title'], 'added' => $added]);
+    echo json_encode(['ok' => true, 'added' => $added, 'skipped' => $skipped]);
+    exit;
 }
 
 // Redirect messages from actions above
@@ -505,15 +664,18 @@ $allCourses = getCourseOptions();
                     <i class="ti ti-eye"></i> <?= $el['show_results']?'Hide':'Show' ?> <?= t('ui.results_fd69', 'Results') ?>
                 </a>
                 <a href="results.php?id=<?= $el['id'] ?>" class="btn btn-outline btn-sm"><i class="ti ti-chart-pie"></i> <?= t('ui.results_fd69', 'Results') ?></a>
+                <?php if (empty($el['is_completed'])): ?>
+                <button type="button" class="btn btn-outline btn-sm" onclick="openCandForm(<?= (int)$el['id'] ?>)"><i class="ti ti-user-plus"></i> Add Candidate</button>
+                <?php endif; ?>
                 <?php if (!$el['is_active'] && empty($el['is_completed'])): ?>
                     <?= exportMenu('export.php?type=winners&election='.(int)$el['id'], 'btn btn-outline btn-sm', 'border-color:#059669;color:#059669;white-space:nowrap;', 'Winners', ['xlsx','pdf','docx']) ?>
                 <?php endif; ?>
                 <?php if (empty($el['is_completed'])): ?>
                 <a href="?edit=<?= $el['id'] ?>" class="btn btn-outline btn-sm"><i class="ti ti-edit"></i> <?= t('ui.edit_7dce', 'Edit') ?></a>
                 <?php endif; ?>
-                <?php if ($el['vote_count'] == 0): ?>
+                <?php if ($el['vote_count'] == 0 || !empty($el['is_completed'])): ?>
                 <button type="button" class="btn btn-danger btn-sm"
-                   onclick="confirmDeleteElection(<?= $el['id'] ?>, '<?= e($el['title']) ?>')">
+                   onclick="confirmDeleteElection(<?= $el['id'] ?>, '<?= e($el['title']) ?>', <?= !empty($el['is_completed']) ? 'true' : 'false' ?>)">
                     <i class="ti ti-trash"></i> <?= t('ui.delete_f2a6', 'Delete') ?>
                 </button>
                 <?php else: ?>
@@ -844,17 +1006,22 @@ function confirmReopenElection(eid, etitle) {
         { icon: 'ti-arrow-back-up', iconColor: '#92400E', iconBg: '#FEF3C7', confirmText: __t('Reopen'), confirmStyle: 'background:#F59E0B;color:#fff;' }
     );
 }
-function confirmDeleteElection(eid, etitle) {
+function confirmDeleteElection(eid, etitle, completed) {
+    var msg = completed
+        ? __t('Delete "') + etitle + __t('" permanently? Its votes, positions, and candidates will be removed. Export the results first if you need a record.')
+        : __t('Delete "') + etitle + __t('"? All positions and candidates will also be removed.');
     gncOpenModal(
         __t('Delete Election'),
-        __t('Delete "') + etitle + __t('"? All positions and candidates will also be removed.'),
+        msg,
         function() {
             AdminOtp.confirmThen({
                 op: 'delete_election',
                 targetId: eid,
                 title: __t('Delete Election'),
                 subtitle: etitle,
-                body: __t('Confirm with your admin password or emailed code. All positions and candidates will also be removed.'),
+                body: completed
+                    ? __t('This Completed election and all its votes will be permanently deleted. Confirm with your admin password or emailed code.')
+                    : __t('Confirm with your admin password or emailed code. All positions and candidates will also be removed.'),
                 confirmLabel: __t('Delete')
             }, function () { postAction({ del_election: eid }); });
         }
@@ -884,4 +1051,341 @@ document.getElementById('edit-election-form').addEventListener('submit', functio
 </script>
 <script>window.CSRF_TOKEN = <?= json_encode(csrfToken()) ?>;</script>
 <script src="../assets/js/post-action.js"></script>
+<style>
+  .cf-overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; z-index:110; padding:16px; }
+  .cf-overlay.open { display:flex; }
+  .cf-card { background:#fff; border-radius:14px; width:100%; max-width:440px; max-height:92vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 40px rgba(0,0,0,.2); font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  .cf-head { padding:16px 20px 8px; display:flex; align-items:center; justify-content:space-between; }
+  .cf-title { font-weight:700; font-size:16px; color:#7F1D1D; display:flex; align-items:center; gap:8px; }
+  .cf-x { background:none; border:none; font-size:20px; color:#9CA3AF; cursor:pointer; }
+  .cf-tabs { display:flex; gap:6px; padding:0 20px 10px; }
+  .cf-tab { border:1px solid #E5E7EB; background:#fff; border-radius:8px; padding:6px 12px; font-size:12px; font-weight:600; color:#374151; cursor:pointer; }
+  .cf-tab.on { background:#7F1D1D; border-color:#7F1D1D; color:#fff; }
+  .cf-body { padding:4px 20px 14px; overflow-y:auto; }
+  .cf-field { margin-bottom:12px; }
+  .cf-field label { display:block; font-size:12px; font-weight:600; color:#374151; margin-bottom:4px; }
+  .cf-field .hint { font-size:11px; color:#9CA3AF; margin-top:3px; }
+  .cf-input { width:100%; border:1px solid #E5E7EB; border-radius:8px; padding:8px 10px; font-size:14px; background:#fff; }
+  .cf-foot { padding:12px 20px; border-top:1px solid #F0EEE8; display:flex; justify-content:flex-end; gap:8px; align-items:center; flex-wrap:wrap; }
+  .cf-err { color:#B42318; font-size:12px; margin-right:auto; }
+  .cf-list { font-size:12px; color:#374151; background:#F9FAFB; border:1px solid #E5E7EB; border-radius:8px; padding:8px 10px; margin-top:8px; max-height:180px; overflow-y:auto; }
+  .cf-btn-main { background:#D4A03A; border:1px solid #D4A03A; color:#fff; border-radius:8px; padding:8px 14px; font-size:13px; font-weight:600; cursor:pointer; }
+  .cf-btn-main:disabled { opacity:.5; cursor:default; }
+  .cf-lbl { display:block; font-size:12px; font-weight:600; color:#374151; margin-bottom:4px; }
+  .cf-btn-cancel { background:#fff; border:1px solid #7F1D1D; color:#7F1D1D; border-radius:8px; padding:8px 14px; font-size:13px; font-weight:600; cursor:pointer; }
+</style>
+
+<div class="cf-overlay" id="cfOverlay">
+  <div class="cf-card" role="dialog" aria-labelledby="cfTitle">
+    <div class="cf-head">
+      <div class="cf-title" id="cfTitle"><i class="ti ti-circle-plus"></i> Add Candidate</div>
+      <button type="button" class="cf-x" onclick="closeCandForm()" aria-label="Close">&times;</button>
+    </div>
+    <div class="cf-tabs">
+      <button type="button" class="cf-tab on" id="cfTabOne" onclick="showCandTab('one')">Add one</button>
+      <button type="button" class="cf-tab" id="cfTabBulk" onclick="showCandTab('bulk')">Pick by course</button>
+      <button type="button" class="cf-tab" id="cfTabImp" onclick="showCandTab('import')">Import from Excel</button>
+    </div>
+
+    <div class="cf-body" id="cfPaneOne">
+      <div class="cf-field"><label for="cfElec">Election *</label><select class="cf-input" id="cfElec"></select></div>
+      <div class="cf-field"><label for="cfPos">Position *</label><select class="cf-input" id="cfPos"></select></div>
+      <div class="cf-field"><label for="cfParty">Party List <span style="color:#9CA3AF;font-weight:400;">(optional)</span></label><select class="cf-input" id="cfParty"></select><div class="hint" id="cfPartyHint"></div></div>
+      <div class="cf-field"><label for="cfSid">Student ID ng Candidate *</label><input class="cf-input" id="cfSid" type="text" inputmode="numeric" placeholder="ex. 20193372"></div>
+      <div class="cf-field"><label for="cfBio">Short Bio <span style="color:#9CA3AF;font-weight:400;">(optional)</span></label><textarea class="cf-input" id="cfBio" rows="3" placeholder="Short bio..."></textarea></div>
+      <div class="cf-field"><label for="cfCred">Credentials / Honors <span style="color:#9CA3AF;font-weight:400;">(optional)</span></label><textarea class="cf-input" id="cfCred" rows="2" placeholder="ex. SHS With Honors, President's Lister, Dean's Lister"></textarea><div class="hint">Enter the candidate's honors or achievements here. These will be shown to voters.</div></div>
+      <div class="cf-field"><label for="cfPhoto">Photo <span style="color:#9CA3AF;font-weight:400;">(optional)</span></label><input class="cf-input" id="cfPhoto" type="file" accept=".jpg,.jpeg,.png"><div class="hint">JPG o PNG · max 2MB</div></div>
+    </div>
+
+    <div class="cf-body" id="cfPaneImp" style="display:none;">
+      <div class="cf-field"><label for="cfElec2">Election *</label><select class="cf-input" id="cfElec2"></select></div>
+      <div class="cf-field">
+        <label for="ciFile">Excel or CSV file</label>
+        <input class="cf-input" id="ciFile" type="file" accept=".xlsx,.xls,.csv">
+        <div class="hint">Columns: student_id (or name), position, party_list, credentials, bio. Each row is placed in the position named in its position column. <a href="import-candidates.php?template=1" download style="color:#7F1D1D;font-weight:600;">Download example</a></div>
+      </div>
+      <div id="ciResult"></div>
+    </div>
+
+    <div class="cf-body" id="cfPaneBulk" style="display:none;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div><label class="cf-lbl" for="bkPos">Position</label><select class="cf-input" id="bkPos"></select></div>
+        <div><label class="cf-lbl" for="bkCourse">Course</label><select class="cf-input" id="bkCourse"></select></div>
+      </div>
+      <div class="cf-field"><input class="cf-input" id="bkQ" type="text" placeholder="Search name or ID, e.g. Juan or 20195531" autocomplete="off"></div>
+      <div id="bkList" style="border:1px solid #E5E7EB;border-radius:8px;max-height:260px;overflow-y:auto;"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:12px;color:#374151;">
+        <span><span id="bkCount">0</span> selected</span>
+        <span><button type="button" class="cf-tab" id="bkAll">Select all shown</button> <button type="button" class="cf-tab" id="bkNone">Clear</button></span>
+      </div>
+    </div>
+
+    <div class="cf-foot">
+      <span class="cf-err" id="cfErr"></span>
+      <button type="button" class="cf-btn-cancel" onclick="closeCandForm()">Cancel</button>
+      <button type="button" class="cf-btn-main" id="cfSave">Add Candidate</button>
+      <button type="button" class="cf-btn-main" id="ciCheck" style="display:none;">Check file</button>
+      <button type="button" class="cf-btn-main" id="ciGo" style="display:none;" disabled>Import</button>
+      <button type="button" class="cf-btn-main" id="bkAdd" style="display:none;">Add selected</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var ELECTIONS = <?= json_encode(array_map(function ($e) {
+      return ['id' => (int)$e['id'], 'title' => (string)$e['title'], 'completed' => !empty($e['is_completed']) ? 1 : 0];
+  }, $elections ?? []), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+  var PREVIEWED = false, EID = 0;
+  function $(id) { return document.getElementById(id); }
+
+  // Fill the election pickers (both tabs) with the elections that are not Completed
+  function fillElections(selectedId) {
+    ['cfElec', 'cfElec2'].forEach(function (id) {
+      var sel = $(id); sel.innerHTML = '';
+      ELECTIONS.forEach(function (e) {
+        if (e.completed) return;
+        var o = document.createElement('option'); o.value = e.id; o.textContent = e.title; sel.appendChild(o);
+      });
+      if (selectedId) sel.value = selectedId;
+    });
+  }
+
+  function loadForElection(eid) {
+    EID = parseInt(eid, 10) || 0;
+    $('cfErr').textContent = '';
+    if (!EID) return;
+    fetch('elections.php?ajax=setup&election=' + encodeURIComponent(EID), { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) { $('cfErr').textContent = d.message || 'Could not load.'; return; }
+        var pos = $('cfPos'); pos.innerHTML = '';
+        var first = document.createElement('option'); first.value = ''; first.textContent = '— Select —'; pos.appendChild(first);
+        d.positions.forEach(function (p) { var o = document.createElement('option'); o.value = p.id; o.textContent = p.title; pos.appendChild(o); });
+        var pl = $('cfParty'); pl.innerHTML = '';
+        var ind = document.createElement('option'); ind.value = ''; ind.textContent = '— Independent (no party) —'; pl.appendChild(ind);
+        (d.parties || []).forEach(function (p) { var o = document.createElement('option'); o.value = p.id; o.textContent = p.name; pl.appendChild(o); });
+        $('cfPartyHint').textContent = (d.parties && d.parties.length) ? '' : 'No party lists yet for this election.';
+      })
+      .catch(function () { $('cfErr').textContent = 'Could not load. Check your connection.'; });
+  }
+
+  window.showCandTab = function (which) {
+    var tabs = { one: 'cfPaneOne', bulk: 'cfPaneBulk', import: 'cfPaneImp' };
+    Object.keys(tabs).forEach(function (k) { $(tabs[k]).style.display = (k === which) ? '' : 'none'; });
+    $('cfTabOne').classList.toggle('on', which === 'one');
+    $('cfTabBulk').classList.toggle('on', which === 'bulk');
+    $('cfTabImp').classList.toggle('on', which === 'import');
+    $('cfSave').style.display = which === 'one' ? '' : 'none';
+    $('bkAdd').style.display = which === 'bulk' ? '' : 'none';
+    $('ciCheck').style.display = which === 'import' ? '' : 'none';
+    $('ciGo').style.display = which === 'import' ? '' : 'none';
+    $('cfErr').textContent = '';
+    if (which === 'bulk') loadBulkSetup();
+  };
+
+  window.openCandForm = function (eid) {
+    fillElections(eid);
+    $('cfSid').value = ''; $('cfBio').value = ''; $('cfCred').value = ''; $('cfPhoto').value = '';
+    $('ciFile').value = ''; $('ciResult').innerHTML = ''; PREVIEWED = false; $('ciGo').disabled = true;
+    showCandTab('one');
+    loadForElection(eid);
+    $('cfOverlay').classList.add('open');
+  };
+  window.closeCandForm = function () { $('cfOverlay').classList.remove('open'); };
+
+  $('cfElec').addEventListener('change', function () { loadForElection(this.value); if ($('cfPaneBulk').style.display !== 'none') loadBulkSetup(); });
+  $('cfElec2').addEventListener('change', function () { EID = parseInt(this.value, 10) || 0; PREVIEWED = false; $('ciGo').disabled = true; $('ciResult').innerHTML = ''; });
+
+  // ---- Add one ----
+  $('cfSave').addEventListener('click', function () {
+    $('cfErr').textContent = '';
+    var sid = $('cfSid').value.trim();
+    if (!EID) { $('cfErr').textContent = 'Choose an election.'; return; }
+    if (!$('cfPos').value) { $('cfErr').textContent = 'Choose a position.'; return; }
+    if (!sid) { $('cfErr').textContent = 'Enter the Student ID.'; return; }
+    var fd = new FormData();
+    fd.append('ajax_action', 'add_candidate_full');
+    fd.append('csrf_token', window.CSRF_TOKEN || '');
+    fd.append('election_id', EID);
+    fd.append('position_id', $('cfPos').value);
+    fd.append('party_list_id', $('cfParty').value);
+    fd.append('student_id', sid);
+    fd.append('bio', $('cfBio').value);
+    fd.append('credentials', $('cfCred').value);
+    if ($('cfPhoto').files[0]) fd.append('photo', $('cfPhoto').files[0]);
+    $('cfSave').disabled = true;
+    fetch('elections.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        $('cfSave').disabled = false;
+        if (!d.ok) { $('cfErr').textContent = d.message || 'Could not add.'; return; }
+        alert(d.message);
+        window.location.reload();
+      })
+      .catch(function () { $('cfSave').disabled = false; $('cfErr').textContent = 'Could not add. Try again.'; });
+  });
+
+  // ---- Pick by course (bulk) ----
+  var bkTimer = null;
+  function bkCount() { $('bkCount').textContent = document.querySelectorAll('#bkList input[type=checkbox]:checked').length; }
+
+  function loadBulkSetup() {
+    var eid = parseInt($('cfElec').value, 10) || 0;
+    if (!eid) return;
+    fetch('elections.php?ajax=setup&election=' + encodeURIComponent(eid), { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) { $('cfErr').textContent = d.message || 'Could not load.'; return; }
+        var pos = $('bkPos'); pos.innerHTML = '';
+        d.positions.forEach(function (p) { var o = document.createElement('option'); o.value = p.id; o.textContent = p.title; pos.appendChild(o); });
+        var cs = $('bkCourse'); cs.innerHTML = '';
+        var all = document.createElement('option'); all.value = ''; all.textContent = 'All courses'; cs.appendChild(all);
+        d.courses.forEach(function (c) { var o = document.createElement('option'); o.value = c; o.textContent = c; cs.appendChild(o); });
+        if (d.electionCourse) cs.value = d.electionCourse;
+        loadBulkStudents();
+      })
+      .catch(function () { $('cfErr').textContent = 'Could not load. Check your connection.'; });
+  }
+
+  function loadBulkStudents() {
+    var eid = parseInt($('cfElec').value, 10) || 0;
+    var list = $('bkList'); list.innerHTML = '';
+    if (!eid) return;
+    var url = 'elections.php?ajax=students&election=' + encodeURIComponent(eid)
+            + '&course=' + encodeURIComponent($('bkCourse').value)
+            + '&q=' + encodeURIComponent($('bkQ').value.trim());
+    fetch(url, { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        list.innerHTML = '';
+        if (!d.ok) { $('cfErr').textContent = d.message || 'Could not load.'; return; }
+        if (!d.students.length) {
+          var e = document.createElement('div'); e.style.padding = '16px'; e.style.textAlign = 'center'; e.style.color = '#9CA3AF'; e.style.fontSize = '13px';
+          e.textContent = 'No students found.'; list.appendChild(e); bkCount(); return;
+        }
+        d.students.forEach(function (st) {
+          var row = document.createElement('label');
+          row.style.display = 'flex'; row.style.alignItems = 'center'; row.style.gap = '10px';
+          row.style.padding = '8px 12px'; row.style.borderBottom = '1px solid #F3F4F6'; row.style.fontSize = '13px';
+          if (st.cand_title) row.style.color = '#9CA3AF';
+          var cb = document.createElement('input');
+          cb.type = 'checkbox'; cb.value = st.id; cb.disabled = !!st.cand_title;
+          cb.addEventListener('change', bkCount);
+          var txt = document.createElement('div'); txt.style.flex = '1';
+          var nm = document.createElement('div'); nm.textContent = st.last_name + ', ' + st.first_name;
+          var sub = document.createElement('small'); sub.style.color = '#6B7280';
+          sub.textContent = st.student_id + ' · ' + (st.course || '') + (st.cand_title ? ' · already a candidate for ' + st.cand_title : '');
+          txt.appendChild(nm); txt.appendChild(sub);
+          row.appendChild(cb); row.appendChild(txt);
+          list.appendChild(row);
+        });
+        bkCount();
+      })
+      .catch(function () { list.innerHTML = ''; $('cfErr').textContent = 'Could not load students.'; });
+  }
+
+  $('bkCourse').addEventListener('change', loadBulkStudents);
+  $('bkPos').addEventListener('change', function () { $('cfErr').textContent = ''; });
+  $('bkQ').addEventListener('input', function () { clearTimeout(bkTimer); bkTimer = setTimeout(loadBulkStudents, 250); });
+  $('bkAll').addEventListener('click', function () {
+    document.querySelectorAll('#bkList input[type=checkbox]:not(:disabled)').forEach(function (c) { c.checked = true; });
+    bkCount();
+  });
+  $('bkNone').addEventListener('click', function () {
+    document.querySelectorAll('#bkList input[type=checkbox]').forEach(function (c) { c.checked = false; });
+    bkCount();
+  });
+  $('bkAdd').addEventListener('click', function () {
+    $('cfErr').textContent = '';
+    var eid = parseInt($('cfElec').value, 10) || 0;
+    var ids = Array.prototype.map.call(document.querySelectorAll('#bkList input[type=checkbox]:checked'), function (c) { return c.value; });
+    if (!eid) { $('cfErr').textContent = 'Choose an election.'; return; }
+    if (!$('bkPos').value) { $('cfErr').textContent = 'Choose a position first.'; return; }
+    if (!ids.length) { $('cfErr').textContent = 'Select at least one student.'; return; }
+    var fd = new FormData();
+    fd.append('ajax_action', 'add_candidates');
+    fd.append('csrf_token', window.CSRF_TOKEN || '');
+    fd.append('election_id', eid);
+    fd.append('position_id', $('bkPos').value);
+    ids.forEach(function (id) { fd.append('student_ids[]', id); });
+    $('bkAdd').disabled = true;
+    fetch('elections.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        $('bkAdd').disabled = false;
+        if (!d.ok) { $('cfErr').textContent = d.message || 'Could not add.'; return; }
+        var msg = d.added + ' candidate' + (d.added === 1 ? '' : 's') + ' added.';
+        if (d.skipped && d.skipped.length) msg += '\n\nSkipped:\n' + d.skipped.join('\n');
+        alert(msg);
+        if (d.added > 0) window.location.reload(); else loadBulkStudents();
+      })
+      .catch(function () { $('bkAdd').disabled = false; $('cfErr').textContent = 'Could not add. Try again.'; });
+  });
+
+  // ---- Import ----
+  function importBody(preview) {
+    var fd = new FormData();
+    fd.append('election_id', EID);
+    fd.append('excel_file', $('ciFile').files[0]);
+    if (preview) fd.append('preview', '1');
+    return fd;
+  }
+
+  $('ciCheck').addEventListener('click', function () {
+    $('cfErr').textContent = '';
+    if (!EID) { $('cfErr').textContent = 'Choose an election.'; return; }
+    if (!$('ciFile').files[0]) { $('cfErr').textContent = 'Choose a file first.'; return; }
+    PREVIEWED = false; $('ciGo').disabled = true;
+    fetch('import-candidates.php', { method: 'POST', body: importBody(true), credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.success) { $('cfErr').textContent = d.message || 'Could not read the file.'; return; }
+        var box = $('ciResult'); box.innerHTML = '';
+        var summary = document.createElement('div'); summary.style.fontSize = '13px';
+        summary.textContent = d.new + ' candidate(s) will be added. ' + (d.skipped ? d.skipped.length : 0) + ' row(s) will be skipped.';
+        box.appendChild(summary);
+        if (d.skipped && d.skipped.length) {
+          var sk = document.createElement('div'); sk.className = 'cf-list';
+          d.skipped.slice(0, 50).forEach(function (t) { var l = document.createElement('div'); l.textContent = t; sk.appendChild(l); });
+          box.appendChild(sk);
+        }
+        if (d.rows && d.rows.length) {
+          var ls = document.createElement('div'); ls.className = 'cf-list';
+          d.rows.slice(0, 50).forEach(function (r) {
+            var l = document.createElement('div');
+            l.textContent = r.name + ' · ' + r.position + ' · ' + (r.party || 'Independent') + (r.credentials ? ' · ' + r.credentials.split('\n')[0] : '');
+            ls.appendChild(l);
+          });
+          box.appendChild(ls);
+        }
+        PREVIEWED = d.new > 0;
+        $('ciGo').disabled = !PREVIEWED;
+      })
+      .catch(function () { $('cfErr').textContent = 'Could not check the file. Check your connection.'; });
+  });
+
+  $('ciGo').addEventListener('click', function () {
+    if (!PREVIEWED) return;
+    AdminOtp.gate({
+      op: 'import_candidates',
+      title: 'Import candidates',
+      subtitle: 'Import from Excel',
+      body: 'The candidates in this file will be added to their positions after you confirm.',
+      confirmLabel: 'Import',
+      proceed: function () {
+        $('ciGo').disabled = true;
+        fetch('import-candidates.php', { method: 'POST', body: importBody(false), credentials: 'same-origin' })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (!d.success) { $('cfErr').textContent = d.message || 'Import failed.'; $('ciGo').disabled = false; return; }
+            alert((d.added || 0) + ' candidate(s) imported.' + (d.skipped && d.skipped.length ? '\n\nSkipped:\n' + d.skipped.slice(0, 30).join('\n') : ''));
+            window.location.reload();
+          })
+          .catch(function () { $('cfErr').textContent = 'Import failed. Nothing was saved, try again.'; $('ciGo').disabled = false; });
+      }
+    });
+  });
+})();
+</script>
 </body></html>

@@ -22,7 +22,7 @@ if (isset($_GET['template'])) {
     $sheet = $spreadsheet->getActiveSheet();
     $sheet->setTitle('Candidates');
 
-    $headers = ['student_id', 'position', 'party_list', 'credentials'];
+    $headers = ['student_id', 'position', 'party_list', 'credentials', 'bio'];
     foreach ($headers as $i => $h) {
         $col = chr(65 + $i);
         $sheet->setCellValue($col . '1', strtoupper($h));
@@ -38,19 +38,20 @@ if (isset($_GET['template'])) {
 
     // Sample rows
     $samples = [
-        ['2021-00123', 'President', 'Independent', "SHS With Honors\nPresident's Lister"],
-        ['2021-00456', 'Vice President', '', "Dean's Lister"],
-        ['2022-00789', 'Secretary', '', ''],
-        ['2022-00321', 'Treasurer', '', ''],
-        ['2023-00654', 'Auditor', '', ''],
+        ['2021-00123', 'President', 'Independent', "SHS With Honors\nPresident's Lister", 'Third-year student, active in student council.'],
+        ['2021-00456', 'Vice President', '', "Dean's Lister", ''],
+        ['2022-00789', 'Secretary', '', '', ''],
+        ['2022-00321', 'Treasurer', '', '', ''],
+        ['2023-00654', 'Auditor', '', '', ''],
     ];
     foreach ($samples as $r => $row) {
         $sheet->setCellValue('A' . ($r + 2), $row[0]);
         $sheet->setCellValue('B' . ($r + 2), $row[1]);
         $sheet->setCellValue('C' . ($r + 2), $row[2]);
         $sheet->setCellValue('D' . ($r + 2), $row[3]);
-        $sheet->getStyle('D' . ($r + 2))->getAlignment()->setWrapText(true);
-        $sheet->getStyle('A' . ($r + 2) . ':D' . ($r + 2))->applyFromArray([
+        $sheet->setCellValue('E' . ($r + 2), $row[4]);
+        $sheet->getStyle('D' . ($r + 2) . ':E' . ($r + 2))->getAlignment()->setWrapText(true);
+        $sheet->getStyle('A' . ($r + 2) . ':E' . ($r + 2))->applyFromArray([
             'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $r % 2 === 0 ? 'FDF2F4' : 'FFFFFF']],
             'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'E5E7EB']]],
         ]);
@@ -143,7 +144,9 @@ $normalize = fn($v) => strtolower(trim(preg_replace('/[\s_]+/', '_', (string)$v)
 $headerRowIdx = null;
 for ($i = 0; $i < min(10, count($rows)); $i++) {
     $norm = array_map($normalize, $rows[$i]);
-    if ((in_array('student_id', $norm) || in_array('id', $norm)) && in_array('position', $norm)) {
+    $hasWho = in_array('student_id', $norm) || in_array('id', $norm) || in_array('name', $norm) || in_array('full_name', $norm)
+           || in_array('student_name', $norm) || (in_array('first_name', $norm) && in_array('last_name', $norm));
+    if ($hasWho && in_array('position', $norm)) {
         $headerRowIdx = $i;
         break;
     }
@@ -159,6 +162,14 @@ if ($headerRowIdx === null) {
 $header = array_map($normalize, $rows[$headerRowIdx]);
 $sidCol = array_search('student_id', $header);
 if ($sidCol === false) $sidCol = array_search('id', $header);
+// Name columns: a single full name, or separate first/last name columns
+$nameCol = false;
+foreach (['name', 'full_name', 'student_name'] as $__k) {
+    $__i = array_search($__k, $header);
+    if ($__i !== false) { $nameCol = $__i; break; }
+}
+$firstCol = array_search('first_name', $header);
+$lastCol  = array_search('last_name', $header);
 $posCol = array_search('position', $header);
 // Optional party column (present in an exported Candidates list). Accepts a few spellings.
 $partyCol = false;
@@ -167,7 +178,8 @@ foreach (['party_list', 'party', 'partylist', 'party_list_name'] as $__k) {
     if ($__i !== false) { $partyCol = $__i; break; }
 }
 
-if ($sidCol === false || $posCol === false) {
+$hasName = ($nameCol !== false) || ($firstCol !== false && $lastCol !== false);
+if (($sidCol === false && !$hasName) || $posCol === false) {
     echo json_encode(['success' => false, 'message' => t('msg.header_row_must_have_student_id_and_posi_b637', 'Header row must have "student_id" and "position" columns.')]);
     exit;
 }
@@ -175,6 +187,12 @@ if ($sidCol === false || $posCol === false) {
 // Optional credentials column (also present in an exported Candidates list)
 $credCol = array_search('credentials', $header);
 if ($credCol === false) $credCol = array_search('credentials_honors', $header);
+// Optional short bio column
+$bioCol = false;
+foreach (['bio', 'short_bio', 'shortbio'] as $__k) {
+    $__i = array_search($__k, $header);
+    if ($__i !== false) { $bioCol = $__i; break; }
+}
 
 // Pre-load party lists for this election (name => id, case-insensitive)
 $partyStmt = $pdo->prepare("SELECT id, name FROM party_lists WHERE election_id = ?");
@@ -208,12 +226,32 @@ for ($i = $headerRowIdx + 1; $i < count($rows); $i++) {
     if ($sid === '' && $pos === '') continue;
 
     $rowNum = $i + 1;
-    if ($sid === '') { $skipped[] = "Row $rowNum: Missing student_id."; continue; }
+    // Who: Student ID if given, otherwise the name on the row
+    $nameText = '';
+    if ($nameCol !== false) $nameText = trim((string)($row[$nameCol] ?? ''));
+    elseif ($firstCol !== false && $lastCol !== false) $nameText = trim((string)($row[$firstCol] ?? '') . ' ' . (string)($row[$lastCol] ?? ''));
+    if ($sid === '' && $nameText === '') { $skipped[] = "Row $rowNum: Missing student_id or name."; continue; }
     if ($pos === '') { $skipped[] = "Row $rowNum: Missing position."; continue; }
 
-    $stuStmt->execute([$sid]);
-    $student = $stuStmt->fetch();
-    if (!$student) { $skipped[] = "Row $rowNum: Student ID \"$sid\" not found."; continue; }
+    if ($sid !== '') {
+        $stuStmt->execute([$sid]);
+        $student = $stuStmt->fetch();
+        if (!$student) { $skipped[] = "Row $rowNum: Student ID \"$sid\" not found."; continue; }
+    } else {
+        // Match by name. Accepts "First Last", "Last First", and "Last, First". Must match exactly one student.
+        $nm = preg_replace('/\s+/', ' ', str_replace(',', ' ', $nameText));
+        $nm = trim(preg_replace('/\s+/', ' ', $nm));
+        $byName = $pdo->prepare("SELECT id, first_name, last_name, student_id FROM students
+                                 WHERE is_active = 1 AND (
+                                     LOWER(CONCAT(first_name, ' ', last_name)) = LOWER(?) OR
+                                     LOWER(CONCAT(last_name, ' ', first_name)) = LOWER(?))");
+        $byName->execute([$nm, $nm]);
+        $matches = $byName->fetchAll();
+        if (count($matches) === 0) { $skipped[] = "Row $rowNum: No active student named \"$nameText\"."; continue; }
+        if (count($matches) > 1)  { $skipped[] = "Row $rowNum: More than one student is named \"$nameText\". Use the Student ID instead."; continue; }
+        $student = $matches[0];
+        $sid = $student['student_id'];
+    }
 
     $posKey = strtolower($pos);
     if (!isset($positionMap[$posKey])) {
@@ -243,10 +281,13 @@ for ($i = $headerRowIdx + 1; $i < count($rows); $i++) {
 
     $credentials = $credCol !== false ? trim((string)($row[$credCol] ?? '')) : '';
     if (mb_strlen($credentials) > 2000) $credentials = mb_substr($credentials, 0, 2000);
+    $bio = $bioCol !== false ? trim((string)($row[$bioCol] ?? '')) : '';
+    if (mb_strlen($bio) > 1000) $bio = mb_substr($bio, 0, 1000);
 
     $seen[$student['id']] = true;
     $plan[] = [
         'credentials' => $credentials,
+        'bio'         => $bio,
         'row'         => $rowNum,
         'student_pk'  => (int)$student['id'],
         'student_id'  => $sid,
@@ -284,7 +325,7 @@ try {
     $pdo->beginTransaction();
     $ins = $pdo->prepare("INSERT INTO candidates (election_id, position_id, student_id, party_list_id, bio, credentials, photo) VALUES (?,?,?,?,?,?,?)");
     foreach ($plan as $p) {
-        $ins->execute([$election_id, $p['position_id'], $p['student_pk'], $p['party_list_id'], '', $p['credentials'], null]);
+        $ins->execute([$election_id, $p['position_id'], $p['student_pk'], $p['party_list_id'], $p['bio'], $p['credentials'], null]);
         $added++;
     }
     $pdo->commit();
