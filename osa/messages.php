@@ -8,6 +8,8 @@ require_once '../includes/messages.php';
 require_once '../includes/audit.php';
 requireStaff();
 ensureMessageTables($pdo);
+require_once '../includes/admin-otp.php';
+adminOtpHandleAjax($pdo);   // answers the password / email-code confirmation for admin edits
 
 $staff_id   = (int)$_SESSION['user_id'];
 $notifCount = getUnreadStaffNotifCount($pdo, $staff_id);
@@ -32,6 +34,41 @@ if (isset($_GET['poll'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     requireCsrf();
     $action = $_POST['action'] ?? '';
+
+    // Save student information from the profile panel (admin only, after confirmation)
+    if ($action === 'save_student_profile') {
+        header('Content-Type: application/json; charset=utf-8');
+        $done = function (bool $ok, string $msg) { echo json_encode(['ok' => $ok, 'message' => $msg]); exit; };
+        if (($_SESSION['user_type'] ?? '') !== 'admin') $done(false, 'Only the admin can edit student information.');
+        $sid = (int)($_POST['student_id'] ?? 0);
+        if ($sid <= 0) $done(false, 'Student not found.');
+        if (!adminOtpConsumeApproval('edit_student', $sid)) $done(false, 'Please confirm with your admin password or emailed code first.');
+
+        $sno = trim((string)($_POST['student_no'] ?? ''));
+        $fn  = trim((string)($_POST['first_name'] ?? ''));
+        $ln  = trim((string)($_POST['last_name'] ?? ''));
+        $crs = trim((string)($_POST['course'] ?? ''));
+        $eml = trim((string)($_POST['email'] ?? ''));
+        $pw  = (string)($_POST['new_password'] ?? '');
+
+        if (!preg_match('/^[0-9]+$/', $sno)) $done(false, 'Student ID must contain numbers only.');
+        if ($fn === '' || $ln === '') $done(false, 'First name and last name are required.');
+        if ($eml !== '' && !filter_var($eml, FILTER_VALIDATE_EMAIL)) $done(false, 'The email address is not valid.');
+        if ($pw !== '' && mb_strlen($pw) < 8) $done(false, 'New password must be at least 8 characters.');
+
+        $dup = $pdo->prepare("SELECT id FROM students WHERE student_id = ? AND id <> ?");
+        $dup->execute([$sno, $sid]);
+        if ($dup->fetch()) $done(false, 'That Student ID is already used by another student.');
+
+        $before = auditRow($pdo, 'students', $sid);
+        $pdo->prepare("UPDATE students SET student_id=?, first_name=?, last_name=?, course=?, email=? WHERE id=?")
+            ->execute([$sno, $fn, $ln, $crs, $eml !== '' ? $eml : null, $sid]);
+        if ($pw !== '') {
+            $pdo->prepare("UPDATE students SET password=?, must_change_password=1 WHERE id=?")->execute([password_hash($pw, PASSWORD_DEFAULT), $sid]);
+        }
+        auditLog($pdo, 'update', 'student', $sid, $before, ['student_id' => $sno, 'first_name' => $fn, 'last_name' => $ln, 'course' => $crs, 'email' => $eml, 'password_reset' => $pw !== '']);
+        $done(true, 'Student information saved.');
+    }
     $tid    = (int)($_POST['message_id'] ?? 0);
     $m      = $tid ? msgGet($pdo, $tid) : null;
 
@@ -344,11 +381,21 @@ $base = '../admin/';   // admin and staff share the full menu
     <div class="msgm-convo">
         <div class="msgm-bar">
             <a class="msgm-back" href="messages.php?filter=<?= e($backFilter) ?><?= e($backQs) ?>" aria-label="<?= t('ui.back_to_messages_9ed1', 'Back to messages') ?>"><i class="ti ti-arrow-left"></i></a>
-            <span class="msgm-avatar sm"><?= e(msgInitials($thread['first_name'], $thread['last_name'])) ?></span>
-            <div class="msgm-bar-name">
+            <button type="button" class="msgm-avatar-btn" onclick="openStudentProfile()" title="View student information" style="background:none;border:none;padding:0;cursor:pointer;line-height:0;"><span class="msgm-avatar sm"><?= e(msgInitials($thread['first_name'], $thread['last_name'])) ?></span></button>
+            <?php
+                $__sp = null;
+                if (!empty($thread['student_id'])) {
+                    $__q = $pdo->prepare("SELECT id, student_id, first_name, last_name, course, email FROM students WHERE id = ?");
+                    $__q->execute([(int)$thread['student_id']]);
+                    $__sp = $__q->fetch() ?: null;
+                }
+                $__isAdminSp = (($_SESSION['user_type'] ?? '') === 'admin');
+                if ($__sp && !$__isAdminSp) $__sp['email'] = maskEmail((string)$__sp['email']);   // staff never get the full email
+            ?>
+            <button type="button" class="msgm-bar-name" onclick="openStudentProfile()" style="background:none;border:none;text-align:left;cursor:pointer;padding:0;" title="View student information">
                 <?= e($thread['first_name'] . ' ' . $thread['last_name']) ?>
-                <small>Student ID <?= e($thread['student_no']) ?></small>
-            </div>
+                <small>Student ID <?= e($thread['student_no']) ?> <i class="ti ti-info-circle"></i></small>
+            </button>
             <form method="POST" style="margin:0;<?= empty($thread['id']) ? 'display:none;' : '' ?>" data-msgc-title="Delete Conversation" data-msgc-desc="Delete this whole conversation permanently? This cannot be undone." data-msgc-ok="Delete" data-msgc-kind="danger">
                 <?= csrfField() ?>
                 <input type="hidden" name="message_id" value="<?= (int)$thread['id'] ?>">
@@ -694,4 +741,135 @@ $__out = count($__stu) - $__in;
 <script src="../assets/js/sidebar.js?v=5"></script>
 <script src="../assets/js/message-tts.js?v=1"></script>
 <script src="../assets/js/voice-record.js?v=1"></script>
+<style>
+  .sp-overlay { position:fixed; inset:0; background:rgba(0,0,0,.4); display:none; align-items:center; justify-content:center; z-index:100; padding:16px; }
+  .sp-overlay.open { display:flex; }
+  .sp-card { background:#fff; border-radius:16px; width:100%; max-width:460px; padding:22px; box-shadow:0 20px 40px rgba(0,0,0,.2); font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  .sp-head { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+  .sp-icon { width:40px; height:40px; border-radius:50%; background:#EEF2FF; color:#6D28D9; display:flex; align-items:center; justify-content:center; font-size:18px; }
+  .sp-title { font-weight:700; font-size:16px; color:#111827; }
+  .sp-sub { font-size:12px; color:#6B7280; }
+  .sp-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .sp-grid .full { grid-column:1 / -1; }
+  .sp-label { display:block; font-size:12px; color:#374151; font-weight:600; margin-bottom:4px; }
+  .sp-input { width:100%; border:1px solid #E5E7EB; border-radius:8px; padding:9px 10px; font-size:14px; background:#fff; color:#111827; }
+  .sp-input[readonly] { background:#F9FAFB; color:#374151; }
+  .sp-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; flex-wrap:wrap; }
+  .sp-btn { border-radius:8px; padding:8px 14px; font-size:13px; font-weight:600; cursor:pointer; border:1px solid #D1D5DB; background:#fff; color:#374151; }
+  .sp-btn.primary { background:#6D28D9; border-color:#6D28D9; color:#fff; }
+  .sp-note { font-size:11px; color:#9CA3AF; margin-top:10px; }
+  .sp-err { color:#B42318; font-size:12px; margin-top:8px; min-height:14px; }
+</style>
+
+<div class="sp-overlay" id="spOverlay">
+  <div class="sp-card" role="dialog" aria-labelledby="spTitle">
+    <div class="sp-head">
+      <div class="sp-icon"><i class="ti ti-user"></i></div>
+      <div>
+        <div class="sp-title" id="spTitle">Student Information</div>
+        <div class="sp-sub" id="spSub"></div>
+      </div>
+    </div>
+    <div class="sp-grid">
+      <div><label class="sp-label" for="spNo">Student ID</label><input class="sp-input" id="spNo" readonly></div>
+      <div><label class="sp-label" for="spCourse">Course</label><input class="sp-input" id="spCourse" readonly></div>
+      <div><label class="sp-label" for="spFirst">First Name</label><input class="sp-input" id="spFirst" readonly></div>
+      <div><label class="sp-label" for="spLast">Last Name</label><input class="sp-input" id="spLast" readonly></div>
+      <div class="full"><label class="sp-label" for="spEmail">Email</label><input class="sp-input" id="spEmail" type="email" readonly></div>
+      <div class="full sp-pw" style="display:none;">
+        <label class="sp-label" for="spPw">Change password <span style="color:#9CA3AF;font-weight:400;">(optional)</span></label>
+        <input class="sp-input" id="spPw" type="password" placeholder="Leave blank to keep the current password. At least 8 characters." autocomplete="new-password">
+      </div>
+    </div>
+    <div class="sp-err" id="spErr"></div>
+    <div class="sp-foot">
+      <button type="button" class="sp-btn" id="spClose" onclick="closeStudentProfile()">Close</button>
+      <?php if ($__isAdminSp): ?>
+      <button type="button" class="sp-btn primary" id="spEdit" onclick="setStudentEditing(true)"><i class="ti ti-edit"></i> Edit</button>
+      <button type="button" class="sp-btn primary" id="spSave" onclick="saveStudentProfile()" style="display:none;"><i class="ti ti-device-floppy"></i> Save Changes</button>
+      <?php endif; ?>
+    </div>
+    <?php if (!$__isAdminSp): ?>
+    <div class="sp-note">Only the admin can edit student information.</div>
+    <?php endif; ?>
+  </div>
+</div>
+
+<script>window.CSRF_TOKEN = <?= json_encode(csrfToken()) ?>;</script>
+<script src="../assets/js/admin-otp.js?v=2"></script>
+<script>
+(function () {
+  var SP = <?= json_encode($__sp ?: ['id' => 0, 'student_id' => '', 'first_name' => '', 'last_name' => '', 'course' => '', 'email' => ''], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+  var IS_ADMIN = <?= $__isAdminSp ? 'true' : 'false' ?>;
+  var ids = { no: 'spNo', course: 'spCourse', first: 'spFirst', last: 'spLast', email: 'spEmail' };
+
+  function field(id) { return document.getElementById(id); }
+
+  window.openStudentProfile = function () {
+    field('spNo').value = SP.student_id || '';
+    field('spCourse').value = SP.course || '';
+    field('spFirst').value = SP.first_name || '';
+    field('spLast').value = SP.last_name || '';
+    field('spEmail').value = SP.email || '';
+    field('spSub').textContent = (SP.first_name || '') + ' ' + (SP.last_name || '');
+    field('spPw').value = '';
+    field('spErr').textContent = '';
+    setStudentEditing(false);
+    field('spOverlay').classList.add('open');
+  };
+
+  window.closeStudentProfile = function () {
+    field('spOverlay').classList.remove('open');
+  };
+
+  window.setStudentEditing = function (on) {
+    if (!IS_ADMIN) return;
+    ['spNo', 'spCourse', 'spFirst', 'spLast', 'spEmail'].forEach(function (id) {
+      field(id).readOnly = !on;
+    });
+    document.querySelector('.sp-pw').style.display = on ? '' : 'none';
+    field('spEdit').style.display = on ? 'none' : '';
+    field('spSave').style.display = on ? '' : 'none';
+  };
+
+  window.saveStudentProfile = function () {
+    var err = field('spErr');
+    err.textContent = '';
+    var no = field('spNo').value.trim();
+    var first = field('spFirst').value.trim();
+    var last = field('spLast').value.trim();
+    var pw = field('spPw').value;
+    if (!/^[0-9]+$/.test(no)) { err.textContent = 'Student ID must contain numbers only.'; return; }
+    if (!first || !last) { err.textContent = 'First name and last name are required.'; return; }
+    if (pw !== '' && pw.length < 8) { err.textContent = 'New password must be at least 8 characters.'; return; }
+
+    AdminOtp.confirmThen({
+      op: 'edit_student',
+      targetId: SP.id,
+      title: 'Save student information',
+      subtitle: first + ' ' + last,
+      body: 'Confirm with your admin password or an emailed code to save these changes.',
+      confirmLabel: 'Save'
+    }, function () {
+      var fd = new FormData();
+      fd.append('action', 'save_student_profile');
+      fd.append('csrf_token', window.CSRF_TOKEN || '');
+      fd.append('student_id', SP.id);
+      fd.append('student_no', no);
+      fd.append('first_name', first);
+      fd.append('last_name', last);
+      fd.append('course', field('spCourse').value.trim());
+      fd.append('email', field('spEmail').value.trim());
+      fd.append('new_password', pw);
+      fetch('messages.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d.ok) { window.location.reload(); }
+          else { err.textContent = d.message || 'Could not save.'; }
+        })
+        .catch(function () { err.textContent = 'Could not save. Check your connection and try again.'; });
+    });
+  };
+})();
+</script>
 </body></html>
