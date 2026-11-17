@@ -221,7 +221,7 @@ if (!function_exists('t')) { require_once __DIR__ . '/lang.php'; }
     if (open) {
       head.classList.remove('has-new');
       load();
-      timer = setInterval(load, 8000);   // refresh while open so staff replies appear
+      timer = setInterval(load, 15000);   // refresh while open so staff replies appear
       text.focus();
     }
   }
@@ -247,6 +247,6 @@ if (!function_exists('t')) { require_once __DIR__ . '/lang.php'; }
       const d = await r.json();
       if (d.ok && d.thread && d.messages.length && !d.messages[d.messages.length - 1].mine) head.classList.add('has-new');
     } catch (e) {}
-  }, 60000);
+  }, 120000);
 })();
 </script>
