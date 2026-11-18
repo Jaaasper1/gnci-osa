@@ -1074,5 +1074,10 @@ return [
     'msg.passwords_match_live' => 'Magkatugma ang mga password.',
     'ui.at_least_8_characters_f641' => 'Hindi bababa sa 8 na character',
     'settings.sub_profile' => 'Ang iyong pangalan, email, course at Student ID',
+    'login.err_pending' => 'Naghihintay pa ng approval ng OSA ang account mo. Hindi mo na kailangang mag-register ulit. Subukan ulit mamaya.',
+    'login.err_disabled' => 'Naka-disable ang account mo. Makipag-ugnayan sa OSA office.',
+    'register.err_already_active' => 'May approved account na ang Student ID o email na ito. Bumalik at mag-log in na lang.',
+    'register.err_already_pending' => 'Nakapag-register ka na, at naghihintay pa ng approval ng OSA ang account mo. Hindi mo na kailangang mag-register ulit. Makaka-log in ka kapag na-approve na ito.',
+    'register.err_already_disabled' => 'Naka-disable ang account na ito. Makipag-ugnayan sa OSA office.',
     'settings.sub_password' => 'Palitan ang password na ginagamit mo sa pag-login',
 ];

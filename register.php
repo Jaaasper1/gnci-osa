@@ -20,6 +20,7 @@ if (isLoggedIn()) {
 $requireOtp = false;
 
 $error   = '';
+$errorIsNotice = false;
 $success = false;
 $courses = getCourseOptions();
 
@@ -76,8 +77,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['step'] ?? '') === 'details
     } else {
         $check = $pdo->prepare("SELECT id FROM students WHERE student_id = ? OR email = ?");
         $check->execute([$sid, $email]);
-        if ($check->fetch()) {
+        if ($__dup = $check->fetch()) {
             $error = t('register.err_duplicate', 'This Student ID or email is already registered. Contact the OSA office if you have a concern.');
+            try {
+                $__s = $pdo->prepare("SELECT is_active, disabled_at FROM students WHERE id = ?");
+                $__s->execute([(int)$__dup['id']]);
+                $__r = $__s->fetch();
+                if ($__r) {
+                    if ((int)$__r['is_active'] === 1) {
+                        $error = t('register.err_already_active', 'This Student ID or email already has an approved account. Please go back and log in instead.');
+                    } elseif (empty($__r['disabled_at'])) {
+                        $errorIsNotice = true;
+                        $error = t('register.err_already_pending', 'You already registered, and your account is waiting for approval from the OSA. You do not need to register again. You can log in once it is approved.');
+                    } else {
+                        $error = t('register.err_already_disabled', 'This account has been disabled. Please contact the OSA office.');
+                    }
+                }
+            } catch (Throwable $__e) { /* keep the generic message */ }
         } elseif (!actionRateLimit($pdo, 'register_ip', $_SERVER['REMOTE_ADDR'] ?? '', 10, 900)
                || !actionRateLimit($pdo, 'register_sid', $sid, 3, 900)) {
             $error = 'Too many registration attempts. Please wait 15 minutes, then try again.';
@@ -288,7 +304,11 @@ $pendingEmail = $_SESSION['reg_pending']['email'] ?? '';
                 <p class="auth-sub"><?= $requireOtp ? t('register.subtitle_otp', "Create an account. Set a password, or log in with an email code each time.") : t('register.subtitle_nootp', 'Create an account and set a password to log in.') ?></p>
 
                 <?php if ($error): ?>
+                    <?php if (!empty($errorIsNotice)): ?>
+                    <div class="alert" style="background:#FEF3C7;border:1px solid #FCD34D;"><i class="ti ti-clock" style="color:#92400E;"></i> <span style="color:#92400E;"><?= htmlspecialchars($error) ?></span></div>
+                    <?php else: ?>
                     <div class="alert alert-error"><i class="ti ti-alert-circle"></i> <?= htmlspecialchars($error) ?></div>
+                    <?php endif; ?>
                 <?php endif; ?>
 
                 <form id="reg-form" method="POST" action="register.php" class="auth-form" enctype="multipart/form-data" data-loading-text="<?= htmlspecialchars($requireOtp ? t('msg.sending_verification_code_738a', 'Sending verification code...') : 'Submitting...', ENT_QUOTES) ?>">

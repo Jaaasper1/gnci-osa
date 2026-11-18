@@ -15,6 +15,7 @@ if (isLoggedIn()) {
 }
 
 $error = '';
+$errorIsNotice = false;
 $throttleWait = 0; // seconds left before another login code may be requested (drives the live countdown)
 
 // Which screen to show: 'form' (Student ID only) or 'otp' (enter the code)
@@ -51,6 +52,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['step'] ?? '') === 'passwor
     } else {
         pwThrottleFail($pdo, $key);
         $error = t('msg.wrong_student_id_or_password_a91b', 'Wrong Student ID or password.');
+        // A student who registered but is not active yet: explain instead of "wrong password".
+        // Only said when the password is correct, so this does not reveal who has registered.
+        try {
+            $__st = $pdo->prepare("SELECT password, disabled_at FROM students WHERE student_id = ? AND is_active = 0 LIMIT 1");
+            $__st->execute([$sid]);
+            $__row = $__st->fetch();
+            if ($__row && password_verify($pw, (string)$__row['password'])) {
+                $errorIsNotice = empty($__row['disabled_at']);
+                $error = empty($__row['disabled_at'])
+                    ? t('login.err_pending', 'Your account is still waiting for approval from the OSA. You do not need to register again. Please try again later.')
+                    : t('login.err_disabled', 'Your account is disabled. Please contact the OSA office.');
+            }
+        } catch (Throwable $__e) { /* keep the generic message */ }
     }
 }
 
@@ -234,7 +248,11 @@ $pendingEmail = $_SESSION['login_pending']['email'] ?? '';
                 <p class="auth-sub"><?= t('auto.enter_your_student_id_and_password_91f1', t('msg.enter_your_student_id_and_password_91f1', 'Enter your Student ID and password.')) ?></p>
 
                 <?php if ($error): ?>
+                    <?php if (!empty($errorIsNotice)): ?>
+                    <div class="alert" style="background:#FEF3C7;border:1px solid #FCD34D;"><i class="ti ti-clock" style="color:#92400E;"></i> <span style="color:#92400E;"><?= htmlspecialchars($error) ?></span></div>
+                    <?php else: ?>
                     <div class="alert alert-error"><i class="ti ti-alert-circle"></i> <span><?= htmlspecialchars($error) ?></span></div>
+                    <?php endif; ?>
                 <?php endif; ?>
 
                 <form method="POST" action="index.php?mode=password" class="auth-form fl-form" autocomplete="off" id="studentPwForm">
@@ -242,7 +260,7 @@ $pendingEmail = $_SESSION['login_pending']['email'] ?? '';
                     <input type="hidden" name="step" value="password_login">
                     <div class="form-group">
                         <label>Student ID <span style="color:#991B1B;">*</span></label>
-                        <input type="text" name="username" class="form-control" placeholder="ex. 2019****"
+                        <input type="text" name="username" class="form-control" placeholder="ex. 20193372"
                                value="<?= htmlspecialchars($_POST['username'] ?? '') ?>"
                                inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/[^0-9]/g,'')"
                                autocomplete="off" required autofocus>
@@ -271,7 +289,7 @@ $pendingEmail = $_SESSION['login_pending']['email'] ?? '';
                     <div class="form-group<?= $error ? ' has-error' : '' ?>">
                         <label><?= t('login.label_student_id', 'Student ID') ?> <span style="color:#991B1B;">*</span></label>
                         <input type="text" name="username" class="form-control"
-                               placeholder="ex. 2019****"
+                               placeholder="ex. 20193372"
                                value="<?= htmlspecialchars($_POST['username'] ?? '') ?>"
                                inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/[^0-9]/g,'')"
                                autocomplete="off" required autofocus>
