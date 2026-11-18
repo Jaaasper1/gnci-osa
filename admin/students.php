@@ -32,7 +32,7 @@ if (isset($_POST['ajax_action'])) {
     }
 
     $action = trim($_POST['ajax_action'] ?? '');
-    if (in_array($action, ['request_admin_otp', 'delete_active', 'delete_disabled', 'disable_student', 'bulk_delete_active', 'bulk_delete_disabled', 'bulk_disable_student'], true) && ($_SESSION['user_type'] ?? '') !== 'admin') {
+    if (in_array($action, ['request_admin_otp', 'delete_active', 'delete_disabled', 'delete_duplicate', 'disable_student', 'bulk_delete_active', 'bulk_delete_disabled', 'bulk_disable_student'], true) && ($_SESSION['user_type'] ?? '') !== 'admin') {
         echo json_encode(['success' => false, 'message' => t('msg.only_the_admin_can_do_this_0cd7', 'Only the admin can do this.')]);
         exit;
     }
@@ -167,7 +167,7 @@ if (isset($_POST['ajax_action'])) {
         ]);
     } elseif ($action === 'request_admin_otp') {
         $op = trim($_POST['op'] ?? '');
-        if (!in_array($op, ['delete_active', 'delete_disabled', 'disable_student', 'edit_student', 'bulk_delete_active', 'bulk_delete_disabled', 'bulk_disable_student'], true)) {
+        if (!in_array($op, ['delete_active', 'delete_disabled', 'delete_duplicate', 'disable_student', 'edit_student', 'bulk_delete_active', 'bulk_delete_disabled', 'bulk_disable_student'], true)) {
             echo json_encode(['success' => false, 'message' => t('msg.unknown_action_9258', 'Unknown action.')]);
             exit;
         }
@@ -272,6 +272,28 @@ if (isset($_POST['ajax_action'])) {
             echo json_encode(['success' => true, 'message' => t('msg.disabled_account_deleted_permanently_c57d', 'Disabled account deleted permanently.')]);
         } else {
             echo json_encode(['success' => false, 'message' => t('msg.student_not_found_or_not_currently_disab_d5cf', 'Student not found or not currently disabled.')]);
+        }
+    } elseif ($action === 'delete_duplicate') {
+        // Delete one record from the Duplicates tab. Works for pending, active or disabled rows.
+        // No "account deleted" email is sent: the same person normally keeps the other account.
+        [$otpOk, $otpMsg] = adminOtpVerify($action, (int)$id, (int)($_SESSION['user_id'] ?? 0), $_POST['admin_otp'] ?? '');
+        if (!$otpOk) {
+            echo json_encode(['success' => false, 'message' => $otpMsg]);
+            exit;
+        }
+
+        $student = $pdo->prepare("SELECT * FROM students WHERE id=?");
+        $student->execute([$id]);
+        $s = $student->fetch();
+
+        $stmt = $pdo->prepare("DELETE FROM students WHERE id=?");
+        $stmt->execute([$id]);
+        if ($stmt->rowCount() > 0) {
+            if ($s && !empty($s['cor_file'])) deleteCorFileByName($s['cor_file']);
+            auditLog($pdo, 'delete', 'student', (int)$id, $s ?: [], ['reason' => 'duplicate']);
+            echo json_encode(['success' => true, 'message' => 'Duplicate account deleted.']);
+        } else {
+            echo json_encode(['success' => false, 'message' => t('msg.student_not_found_or_already_processed_c1d0', 'Student not found or already processed.')]);
         }
     } elseif ($action === 'delete_active') {
         [$otpOk, $otpMsg] = adminOtpVerify($action, (int)$id, (int)($_SESSION['user_id'] ?? 0), $_POST['admin_otp'] ?? '');
@@ -385,6 +407,68 @@ function stuMenuData(array $rows, string $dateField): array {
 
 // Tab that opens first: Pending Approvals if anyone is waiting, otherwise Active Students
 $startTab = count($pending) > 0 ? 'pending' : 'active';
+if (($_GET['tab'] ?? '') === 'duplicates') $startTab = 'duplicates';
+
+// ── Duplicates: students that share the same Student ID, the same name or the same email ──
+// Looks at every record (pending, active and disabled). Records that match each other are
+// grouped together; names are compared ignoring case, punctuation, extra spaces and word order.
+$dupGroups = [];
+$dupVoted  = [];
+$dupHit    = [];
+$dupAll = $pdo->query("SELECT id, student_id, first_name, last_name, course, email, is_active, disabled_at, approved_at, created_at FROM students")->fetchAll();
+$dupKeys = [];
+foreach ($dupAll as $r) {
+    $rid = (int)$r['id'];
+    $sidK = mb_strtolower(trim((string)$r['student_id']));
+    if ($sidK !== '') $dupKeys['sid'][$sidK][] = $rid;
+    $tok = preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower(trim($r['first_name'] . ' ' . $r['last_name'])), -1, PREG_SPLIT_NO_EMPTY);
+    if ($tok) { sort($tok); $dupKeys['name'][implode(' ', $tok)][] = $rid; }
+    $emK = mb_strtolower(trim((string)($r['email'] ?? '')));
+    if ($emK !== '') $dupKeys['email'][$emK][] = $rid;
+}
+$dupParent = [];
+$dupFind = function (int $x) use (&$dupParent) {
+    while (($dupParent[$x] ?? $x) !== $x) { $dupParent[$x] = $dupParent[$dupParent[$x]] ?? $dupParent[$x]; $x = $dupParent[$x]; }
+    return $x;
+};
+foreach ($dupKeys as $type => $map) {
+    foreach ($map as $ids) {
+        if (count($ids) < 2) continue;
+        foreach ($ids as $i) { if (!isset($dupParent[$i])) $dupParent[$i] = $i; }
+        $root = $dupFind($ids[0]);
+        foreach ($ids as $i) { $ri = $dupFind($i); if ($ri !== $root) $dupParent[$ri] = $root; }
+    }
+}
+$dupById = [];
+foreach ($dupAll as $r) $dupById[(int)$r['id']] = $r;
+$dupTmp = [];
+foreach (array_keys($dupParent) as $i) { $dupTmp[$dupFind($i)]['rows'][] = $dupById[$i]; }
+foreach ($dupKeys as $type => $map) {
+    foreach ($map as $ids) {
+        if (count($ids) < 2) continue;
+        $dupTmp[$dupFind($ids[0])]['why'][$type] = true;
+        foreach ($ids as $i) $dupHit[$i][$type] = true;
+    }
+}
+foreach ($dupTmp as $g) {
+    usort($g['rows'], function ($a, $b) {
+        $ra = $a['is_active'] ? 0 : ($a['disabled_at'] ? 2 : 1);
+        $rb = $b['is_active'] ? 0 : ($b['disabled_at'] ? 2 : 1);
+        return $ra <=> $rb ?: strcmp((string)$a['created_at'], (string)$b['created_at']);
+    });
+    $dupGroups[] = $g;
+}
+usort($dupGroups, function ($a, $b) {
+    return count($b['rows']) <=> count($a['rows']) ?: strcasecmp($a['rows'][0]['last_name'], $b['rows'][0]['last_name']);
+});
+$dupRowCount = 0; foreach ($dupGroups as $g) $dupRowCount += count($g['rows']);
+// Who already voted in the running election (so the admin keeps the right record)
+if ($dupGroups && ($ae = getActiveElection($pdo))) {
+    $dupIds = array_keys($dupParent);
+    $q = $pdo->prepare("SELECT DISTINCT student_id FROM votes WHERE election_id = ? AND student_id IN (" . implode(',', array_map('intval', $dupIds)) . ")");
+    $q->execute([(int)$ae['id']]);
+    foreach ($q->fetchAll(PDO::FETCH_COLUMN) as $vid) $dupVoted[(int)$vid] = true;
+}
 
 // Get the currently active election (if any) so we can show each student's voting status
 $activeElection = getActiveElection($pdo);
@@ -420,7 +504,7 @@ if ($dYear) {
 }
 $hasFilter = ($search !== '' || $courseSel !== '' || $dYear);
 
-$votedExpr = $activeElection ? '(EXISTS (SELECT 1 FROM votes v WHERE v.student_id = s.id AND v.election_id = ' . (int)$activeElection['id'] . '))' : '(0)';   // (0) not 0: a bare 0 in ORDER BY means a column position and crashes
+$votedExpr = $activeElection ? '(EXISTS (SELECT 1 FROM votes v WHERE v.student_id = s.id AND v.election_id = ' . (int)$activeElection['id'] . '))' : '0';
 $D = strtoupper($dir);
 $sortSql = [
     'sid'      => "CAST(s.student_id AS UNSIGNED) $D, s.student_id $D",
@@ -570,6 +654,10 @@ function stuUrl($overrides = []) {
             <i class="ti ti-user-off"></i> <?= t('ui.disabled_b9f5', 'Disabled') ?>
             <?php if (count($disabled) > 0): ?><span id="archived-tab-badge" class="stu-tab-badge"><?= count($disabled) ?></span><?php endif; ?>
         </button>
+        <button type="button" class="stu-tab <?= $startTab === 'duplicates' ? 'active' : '' ?>" id="stu-tab-btn-duplicates" onclick="switchStuTab('duplicates')">
+            <i class="ti ti-copy"></i> <?= t('ui.duplicates', 'Duplicates') ?>
+            <span id="dup-tab-badge" class="stu-tab-badge" style="background:#7C3AED;<?= count($dupGroups) === 0 ? 'display:none;' : '' ?>"><?= count($dupGroups) ?></span>
+        </button>
     </div>
 
     <div id="tabpanel-pending" class="stu-tabpanel" style="<?= $startTab === 'pending' ? '' : 'display:none;' ?>">
@@ -602,7 +690,7 @@ function stuUrl($overrides = []) {
                 <td><?= e($p['student_id']) ?></td>
                 <td><?= e($p['last_name'].', '.$p['first_name']) ?></td>
                 <td><?= e($p['course'] ?: '—') ?></td>
-                <td><?= e((($_SESSION['user_type'] ?? '') === 'admin' ? trim((string)$p['email']) : maskEmail($p['email'])) ?: '—') ?></td>
+                <td><?= e(maskEmail($p['email']) ?: '—') ?></td>
                 <td style="white-space:nowrap;">
                     <?php if (!empty($p['cor_file'])): ?>
                         <a href="../uploads/<?= e($p['cor_file']) ?>" target="_blank" rel="noopener" class="btn btn-sm btn-outline cor-view">
@@ -691,12 +779,95 @@ function stuUrl($overrides = []) {
     </div>
     </div>
 
+    <div id="tabpanel-duplicates" class="stu-tabpanel" style="<?= $startTab === 'duplicates' ? '' : 'display:none;' ?>">
+    <div class="card" id="dup-card" style="border:2px solid #C4B5FD;background:#F5F3FF;margin-bottom:20px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+            <div class="card-title" style="color:#5B21B6;margin-bottom:0;">
+                <i class="ti ti-copy" style="color:#7C3AED;"></i>
+                Possible Duplicates
+                <span id="dup-count" style="background:#7C3AED;color:#fff;border-radius:20px;padding:2px 10px;font-size:11px;margin-left:6px;"><?= count($dupGroups) ?></span>
+            </div>
+            <div id="dup-search-wrap" style="position:relative;min-width:260px;<?= count($dupGroups) === 0 ? 'display:none;' : '' ?>">
+                <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#9CA3AF;font-size:15px;"></i>
+                <input type="text" id="dup-search" placeholder="Search name, ID, email..." class="form-control" style="padding-left:32px;margin-bottom:0;background:#fff;" autocomplete="off">
+            </div>
+        </div>
+        <p style="font-size:12px;color:#5B21B6;margin:0 0 14px;">
+            Students that share the same Student ID, the same name or the same email are grouped together (pending, active and disabled accounts are all checked).
+            Fields that match are highlighted. Edit the wrong record, disable it, or delete the extra one. Deleting here does not send an email to the student.
+        </p>
+        <div id="dup-list">
+        <?php $gn = 0; foreach ($dupGroups as $g): $gn++;
+            $why = $g['why'] ?? [];
+            $gSearch = '';
+            foreach ($g['rows'] as $r) $gSearch .= ' ' . $r['student_id'] . ' ' . $r['first_name'] . ' ' . $r['last_name'] . ' ' . $r['course'] . ' ' . ($r['email'] ?? '');
+        ?>
+        <div class="dup-group" data-dup-group data-search="<?= strtolower(e($gSearch)) ?>">
+            <div class="dup-group-head">
+                <span class="dup-group-title"><i class="ti ti-users"></i> Group <span class="dup-gnum"><?= $gn ?></span> &middot; <span class="dup-gsize"><?= count($g['rows']) ?></span> records</span>
+                <?php if (!empty($why['sid'])): ?><span class="dup-chip">Same Student ID</span><?php endif; ?>
+                <?php if (!empty($why['name'])): ?><span class="dup-chip">Same name</span><?php endif; ?>
+                <?php if (!empty($why['email'])): ?><span class="dup-chip">Same email</span><?php endif; ?>
+            </div>
+            <div class="table-wrap"><table class="dup-table">
+                <thead><tr>
+                    <th>Student ID</th><th>Name</th><th>Course</th><th>Email</th><th>Status</th><th>Registered</th><th>Action</th>
+                </tr></thead>
+                <tbody>
+                <?php foreach ($g['rows'] as $r):
+                    $rid = (int)$r['id'];
+                    $isAct = (int)$r['is_active'] === 1;
+                    $isDis = !$isAct && !empty($r['disabled_at']);
+                    $fullName = $r['last_name'] . ', ' . $r['first_name'];
+                ?>
+                <tr id="dup-row-<?= $rid ?>">
+                    <td class="<?= !empty($dupHit[$rid]['sid']) ? 'dup-hit' : '' ?>"><?= e($r['student_id']) ?></td>
+                    <td class="<?= !empty($dupHit[$rid]['name']) ? 'dup-hit' : '' ?>"><?= e($fullName) ?></td>
+                    <td><?= e($r['course'] ?: '—') ?></td>
+                    <td class="<?= !empty($dupHit[$rid]['email']) ? 'dup-hit' : '' ?>"><?= e(maskEmail($r['email'] ?? '') ?: '—') ?></td>
+                    <td style="white-space:nowrap;">
+                        <?php if ($isAct): ?><span class="badge badge-active">Active</span>
+                        <?php elseif ($isDis): ?><span class="badge badge-closed">Disabled</span>
+                        <?php else: ?><span class="badge" style="background:#FEF3C7;color:#92400E;">Pending</span><?php endif; ?>
+                        <?php if (!empty($dupVoted[$rid])): ?><span class="badge badge-active" title="Already voted in the active election"><i class="ti ti-check"></i> Voted</span><?php endif; ?>
+                    </td>
+                    <td style="white-space:nowrap;"><?= $r['created_at'] ? date('M d, Y', strtotime($r['created_at'])) : '—' ?></td>
+                    <td style="white-space:nowrap;">
+                        <button class="btn btn-sm btn-primary"
+                            onclick="openEditModal(<?= $rid ?>,'<?= addslashes(e($r['student_id'])) ?>','<?= addslashes(e($r['first_name'])) ?>','<?= addslashes(e($r['last_name'])) ?>','<?= addslashes(e($r['course'])) ?>','<?= addslashes(e($r['email'] ?? '')) ?>')">
+                            <i class="ti ti-pencil"></i> <?= t('ui.edit_7dce', 'Edit') ?>
+                        </button>
+                        <?php if ($isAct): ?><button type="button" class="btn btn-sm btn-outline admin-only" onclick="dupDisable(<?= $rid ?>, '<?= addslashes(e($fullName)) ?>')"><?= t('ui.disable_bcfa', 'Disable') ?></button><?php endif; ?>
+                        <button class="btn btn-sm btn-danger admin-only" onclick="dupDelete(<?= $rid ?>, '<?= addslashes(e($fullName)) ?>')" style="margin-left:4px;">
+                            <i class="ti ti-trash"></i> <?= t('ui.delete_f2a6', 'Delete') ?>
+                        </button>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table></div>
+        </div>
+        <?php endforeach; ?>
+        </div>
+        <div id="dup-no-results" style="display:none;text-align:center;padding:20px;color:#6B7280;font-size:13px;">No duplicates match your search.</div>
+        <div id="dup-empty" style="<?= count($dupGroups) > 0 ? 'display:none;' : '' ?>text-align:center;padding:24px;color:#5B21B6;font-size:13px;">
+            <i class="ti ti-circle-check" style="font-size:28px;display:block;margin-bottom:6px;"></i>
+            No duplicate students found.
+        </div>
+    </div>
+    </div>
+
 <style>
 .stu-tabs { display:flex; gap:4px; border-bottom:2px solid #E5E7EB; margin-bottom:18px; }
 .stu-tab { display:flex; align-items:center; gap:6px; padding:10px 16px; font-size:13px; font-weight:600; color:#6B7280; background:none; border:none; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-2px; transition:all .15s; }
 .stu-tab:hover { color:#7C3AED; }
 .stu-tab.active { color:#7C3AED; border-bottom-color:#7C3AED; }
 .stu-tab-badge { background:#DC2626; color:#fff; border-radius:20px; padding:1px 8px; font-size:11px; }
+.dup-group { background:#fff; border:1px solid #DDD6FE; border-radius:12px; padding:12px 14px; margin-bottom:12px; }
+.dup-group-head { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
+.dup-group-title { font-size:13px; font-weight:700; color:#5B21B6; }
+.dup-chip { background:#EDE9FE; color:#5B21B6; border-radius:20px; padding:2px 10px; font-size:11px; font-weight:600; }
+.dup-table td.dup-hit { background:#FEF9C3; }
 </style>
 
 <script>
@@ -757,7 +928,7 @@ if (_confirmBtn) {
 
 if (_overlay) {
     _overlay.addEventListener('click', function(e) {
-        /* click outside no longer closes this popup */
+        if (e.target === this) closeModal();
     });
 }
 
@@ -1026,8 +1197,8 @@ document.addEventListener('keydown', function(e) {
 });
 
 function switchStuTab(tab) {
-    var panels = { pending: 'tabpanel-pending', active: 'tabpanel-active', archived: 'tabpanel-archived' };
-    var buttons = { pending: 'stu-tab-btn-pending', active: 'stu-tab-btn-active', archived: 'stu-tab-btn-archived' };
+    var panels = { pending: 'tabpanel-pending', active: 'tabpanel-active', archived: 'tabpanel-archived', duplicates: 'tabpanel-duplicates' };
+    var buttons = { pending: 'stu-tab-btn-pending', active: 'stu-tab-btn-active', archived: 'stu-tab-btn-archived', duplicates: 'stu-tab-btn-duplicates' };
     Object.keys(panels).forEach(function(key) {
         document.getElementById(panels[key]).style.display = (key === tab) ? '' : 'none';
         document.getElementById(buttons[key]).classList.toggle('active', key === tab);
@@ -1047,7 +1218,6 @@ function switchStuTab(tab) {
                     <?= exportMenu('export.php?type=students', 'btn btn-outline btn-sm', 'color:#059669;border-color:#059669;gap:5px;white-space:nowrap;', 'Export', null, [
                         exportCourseFilter($pdo, false, $courseSel !== '' ? [$courseSel] : []),
                         ['key' => 'status', 'label' => 'Status', 'options' => ['active' => 'Active', 'inactive' => 'Inactive']],
-                        ['key' => 'voted', 'label' => 'Voting', 'options' => ['voted' => 'Voted', 'not_voted' => 'Not voted']],
                     ]) ?>
                     <?php endif; ?>
                     </div>
@@ -1322,6 +1492,81 @@ function confirmStudentDisable(id, name) {
     });
 }
 
+// ── Duplicates tab ──
+function dupRefresh() {
+    var groups = document.querySelectorAll('#dup-list [data-dup-group]');
+    var n = 0;
+    groups.forEach(function (g) {
+        var rows = g.querySelectorAll('tbody tr');
+        if (rows.length < 2) { g.remove(); return; }   // no longer a duplicate
+        n++;
+        var num = g.querySelector('.dup-gnum'), size = g.querySelector('.dup-gsize');
+        if (num) num.textContent = n;
+        if (size) size.textContent = rows.length;
+    });
+    var c = document.getElementById('dup-count'); if (c) c.textContent = n;
+    var b = document.getElementById('dup-tab-badge');
+    if (b) { b.textContent = n; b.style.display = n > 0 ? '' : 'none'; }
+    var e = document.getElementById('dup-empty'); if (e) e.style.display = n > 0 ? 'none' : 'block';
+    var sw = document.getElementById('dup-search-wrap'); if (sw) sw.style.display = n > 0 ? '' : 'none';
+}
+function dupDelete(id, name) {
+    var row = document.getElementById('dup-row-' + id);
+    AdminOtp.open({
+        op: 'delete_duplicate',
+        targetId: id,
+        title: 'Delete Duplicate Account',
+        subtitle: name || '',
+        body: 'This record will be permanently deleted. This cannot be undone. Make sure you are keeping the right one.',
+        confirmLabel: __t('Delete Permanently'),
+        danger: true,
+        action: { ajax_action: 'delete_duplicate', id: id },
+        onDone: function (data) {
+            showToast(data.message, 'success');
+            if (row) {
+                row.style.transition = 'opacity 0.4s';
+                row.style.opacity = '0';
+                setTimeout(function () { row.remove(); dupRefresh(); }, 400);
+            }
+        }
+    });
+}
+function dupDisable(id, name) {
+    AdminOtp.open({
+        op: 'disable_student',
+        targetId: id,
+        title: __t('Disable Account'),
+        subtitle: name || '',
+        body: (name || __t('This student')) + ' will no longer be able to log in. Their data is kept and the account is auto-deleted after 30 days.',
+        confirmLabel: __t('Disable'),
+        danger: false,
+        action: { ajax_action: 'disable_student', id: id },
+        onDone: function (data) {
+            showToast(data.message, 'success');
+            setTimeout(function () { location.href = 'students.php?tab=duplicates'; }, 800);
+        }
+    });
+}
+(function () {
+    var input = document.getElementById('dup-search');
+    if (!input) return;
+    var timer = null;
+    input.addEventListener('input', function () {
+        clearTimeout(timer);
+        timer = setTimeout(function () {
+            var terms = (input.value || '').toLowerCase().split(/\s+/).filter(Boolean), shown = 0;
+            document.querySelectorAll('#dup-list [data-dup-group]').forEach(function (g) {
+                var hay = g.getAttribute('data-search') || '';
+                var ok = terms.every(function (t) { return hay.indexOf(t) !== -1; });
+                g.style.display = ok ? '' : 'none';
+                if (ok) shown++;
+            });
+            var nr = document.getElementById('dup-no-results');
+            if (nr) nr.style.display = (shown === 0 && terms.length) ? 'block' : 'none';
+        }, 150);
+    });
+})();
+
 function openEditModal(id, studentId, firstName, lastName, course, email) {
     document.getElementById('edit-id').value          = id;
     document.getElementById('edit-student-id').value  = studentId;
@@ -1340,7 +1585,7 @@ function closeEditModal() {
 }
 
 document.getElementById('edit-modal-overlay').addEventListener('click', function(e){
-    /* click outside no longer closes this popup */
+    if (e.target === this) closeEditModal();
 });
 
 function submitEdit() {
@@ -1424,6 +1669,10 @@ function submitEdit() {
             });
             closeEditModal();
             showToast(data.message, 'success');
+            // Edited from the Duplicates tab: reload so the groups are re-checked
+            if (document.getElementById('dup-row-' + s.id)) {
+                setTimeout(function () { location.href = 'students.php?tab=duplicates'; }, 800);
+            }
         }
     });
 }
@@ -1511,7 +1760,7 @@ function closeStudentImportModal() {
     document.getElementById('student-import-overlay').style.display = 'none';
 }
 document.getElementById('student-import-overlay').addEventListener('click', function(e) {
-    /* click outside no longer closes this popup */
+    if (e.target === this) closeStudentImportModal();
 });
 function handleStuFile(file) {
     if (!file) return;
@@ -1766,7 +2015,7 @@ html[data-theme="dark"] .cor-body{background:#111827}
 <script src="../assets/js/alerts.js"></script>
 <script src="../assets/js/sidebar.js?v=5"></script>
 <?php if (($_SESSION['user_type'] ?? '') !== 'admin'): ?><style>.admin-only{display:none!important}</style><?php endif; ?>
-<script src="../assets/js/bulk-select.js?v=8"></script>
+<script src="../assets/js/bulk-select.js?v=7"></script>
 <script>
 (function () {
   // Bulk actions reuse the same per-student server handlers (same permission + CSRF checks).
