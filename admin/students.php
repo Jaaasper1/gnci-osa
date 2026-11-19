@@ -11,6 +11,11 @@ require_once '../includes/pager.php';
 require_once '../includes/mailer.php';
 require_once '../includes/csrf.php';
 
+// Records an admin marked "Approve" in the Duplicates tab (= checked, not a duplicate). Created on first use.
+function stuEnsureDupOkTable(PDO $pdo): void {
+    try { $pdo->exec("CREATE TABLE IF NOT EXISTS student_dup_ok (student_id INT NOT NULL PRIMARY KEY, approved_by INT NULL, approved_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)"); } catch (Throwable $e) {}
+}
+
 // AJAX handler — check BEFORE requireAdmin() so session redirect doesn't break fetch()
 if (isset($_POST['ajax_action'])) {
     // Clear any accidental output, send JSON only
@@ -273,6 +278,18 @@ if (isset($_POST['ajax_action'])) {
         } else {
             echo json_encode(['success' => false, 'message' => t('msg.student_not_found_or_not_currently_disab_d5cf', 'Student not found or not currently disabled.')]);
         }
+    } elseif ($action === 'dup_approve') {
+        // "Approve" in the Duplicates tab: the admin checked this record and it is fine, so stop listing it as a duplicate.
+        stuEnsureDupOkTable($pdo);
+        $chk = $pdo->prepare("SELECT id FROM students WHERE id=?");
+        $chk->execute([$id]);
+        if ($chk->fetch()) {
+            $pdo->prepare("INSERT IGNORE INTO student_dup_ok (student_id, approved_by) VALUES (?, ?)")->execute([$id, (int)($_SESSION['user_id'] ?? 0)]);
+            auditLog($pdo, 'approve', 'student', (int)$id, [], ['duplicate_review' => 'approved']);
+            echo json_encode(['success' => true, 'message' => 'Marked as not a duplicate.']);
+        } else {
+            echo json_encode(['success' => false, 'message' => t('msg.student_not_found_or_already_processed_c1d0', 'Student not found or already processed.')]);
+        }
     } elseif ($action === 'delete_duplicate') {
         // Delete one record from the Duplicates tab. Works for pending, active or disabled rows.
         // No "account deleted" email is sent: the same person normally keeps the other account.
@@ -415,7 +432,8 @@ if (($_GET['tab'] ?? '') === 'duplicates') $startTab = 'duplicates';
 $dupGroups = [];
 $dupVoted  = [];
 $dupHit    = [];
-$dupAll = $pdo->query("SELECT id, student_id, first_name, last_name, course, email, is_active, disabled_at, approved_at, created_at FROM students")->fetchAll();
+stuEnsureDupOkTable($pdo);
+$dupAll = $pdo->query("SELECT s.id, s.student_id, s.first_name, s.last_name, s.course, s.email, s.is_active, s.disabled_at, s.approved_at, s.created_at FROM students s WHERE NOT EXISTS (SELECT 1 FROM student_dup_ok d WHERE d.student_id = s.id)")->fetchAll();
 $dupKeys = [];
 foreach ($dupAll as $r) {
     $rid = (int)$r['id'];
@@ -794,7 +812,7 @@ function stuUrl($overrides = []) {
         </div>
         <p style="font-size:12px;color:#5B21B6;margin:0 0 14px;">
             Students that share the same Student ID, the same name or the same email are grouped together (pending, active and disabled accounts are all checked).
-            Fields that match are highlighted. Edit the wrong record, disable it, or delete the extra one. Deleting here does not send an email to the student.
+            Fields that match are highlighted. Approve a record if it is fine (it leaves this list), or edit, disable or delete the wrong one. Deleting here does not send an email to the student.
         </p>
         <div id="dup-list">
         <?php $gn = 0; foreach ($dupGroups as $g): $gn++;
@@ -837,6 +855,7 @@ function stuUrl($overrides = []) {
                             onclick="openEditModal(<?= $rid ?>,'<?= addslashes(e($r['student_id'])) ?>','<?= addslashes(e($r['first_name'])) ?>','<?= addslashes(e($r['last_name'])) ?>','<?= addslashes(e($r['course'])) ?>','<?= addslashes(e($r['email'] ?? '')) ?>')">
                             <i class="ti ti-pencil"></i> <?= t('ui.edit_7dce', 'Edit') ?>
                         </button>
+                        <button type="button" class="btn btn-sm btn-gold" title="Mark as checked / not a duplicate" onclick="dupApprove(<?= $rid ?>, '<?= addslashes(e($fullName)) ?>')"><i class="ti ti-check"></i> <?= t('ui.approve_6f73', 'Approve') ?></button>
                         <?php if ($isAct): ?><button type="button" class="btn btn-sm btn-outline admin-only" onclick="dupDisable(<?= $rid ?>, '<?= addslashes(e($fullName)) ?>')"><?= t('ui.disable_bcfa', 'Disable') ?></button><?php endif; ?>
                         <button class="btn btn-sm btn-danger admin-only" onclick="dupDelete(<?= $rid ?>, '<?= addslashes(e($fullName)) ?>')" style="margin-left:4px;">
                             <i class="ti ti-trash"></i> <?= t('ui.delete_f2a6', 'Delete') ?>
@@ -1509,6 +1528,36 @@ function dupRefresh() {
     if (b) { b.textContent = n; b.style.display = n > 0 ? '' : 'none'; }
     var e = document.getElementById('dup-empty'); if (e) e.style.display = n > 0 ? 'none' : 'block';
     var sw = document.getElementById('dup-search-wrap'); if (sw) sw.style.display = n > 0 ? '' : 'none';
+}
+function dupApprove(id, name) {
+    openModal(
+        'Approve Record',
+        (name || 'This record') + ' will be marked as not a duplicate and removed from this list. The account itself is not changed.',
+        __t('Approve'), 'btn-gold',
+        function () {
+            var row = document.getElementById('dup-row-' + id);
+            if (row) row.querySelectorAll('button').forEach(function (b) { b.disabled = true; b.style.opacity = '0.5'; });
+            var fd = new FormData();
+            fd.append('ajax_action', 'dup_approve');
+            fd.append('id', id);
+            fd.append('csrf_token', CSRF_TOKEN);
+            fetch(window.location.pathname.replace(/\?.*$/, ''), { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (d && d.success) {
+                        showToast(d.message, 'success');
+                        if (row) { row.style.transition = 'opacity 0.4s'; row.style.opacity = '0'; setTimeout(function () { row.remove(); dupRefresh(); }, 400); }
+                    } else {
+                        showToast((d && d.message) || __t('Something went wrong. Please try again.'), 'error');
+                        if (row) row.querySelectorAll('button').forEach(function (b) { b.disabled = false; b.style.opacity = '1'; });
+                    }
+                })
+                .catch(function () {
+                    showToast(__t('Network error. Please try again.'), 'error');
+                    if (row) row.querySelectorAll('button').forEach(function (b) { b.disabled = false; b.style.opacity = '1'; });
+                });
+        }
+    );
 }
 function dupDelete(id, name) {
     var row = document.getElementById('dup-row-' + id);
