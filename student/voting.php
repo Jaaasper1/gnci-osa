@@ -498,6 +498,10 @@ $error   = $error ?? '';
                 <button type="button" class="cred-open" data-name="<?= htmlspecialchars($cand['first_name'] . ' ' . $cand['last_name']) ?>"><i class="ti ti-eye"></i> <?= htmlspecialchars(t('ui.view_all', 'View all')) ?></button>
                 <?php endif; ?>
                 <?php endif; ?>
+                <?php if (!empty(trim((string)($cand['bio'] ?? '')))): ?>
+                <div class="bio-src" style="display:none;"><?= nl2br(htmlspecialchars(trim($cand['bio']))) ?></div>
+                <button type="button" class="cred-open" data-src=".bio-src" data-label="<?= htmlspecialchars(t('ui.bio', 'Bio')) ?>" data-name="<?= htmlspecialchars($cand['first_name'] . ' ' . $cand['last_name']) ?>"><i class="ti ti-user"></i> <?= htmlspecialchars(t('ui.view_bio', 'View bio')) ?></button>
+                <?php endif; ?>
                 <button type="button" class="vote-select-btn"
                         data-position="<?= $pos['id'] ?>"
                         data-candidate="<?= $cand['id'] ?>"
