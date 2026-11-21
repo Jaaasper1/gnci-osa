@@ -24,7 +24,7 @@
     <div class="cred-dialog">
         <div class="cred-head">
             <div>
-                <div class="cred-sub"><?= htmlspecialchars(t('ui.credentials_honors_b3f7', 'Credentials / Honors')) ?></div>
+                <div class="cred-sub" id="cred-sub" data-default="<?= htmlspecialchars(t('ui.credentials_honors_b3f7', 'Credentials / Honors')) ?>"><?= htmlspecialchars(t('ui.credentials_honors_b3f7', 'Credentials / Honors')) ?></div>
                 <div class="cred-title" id="cred-title"></div>
             </div>
             <button type="button" class="cred-x" id="cred-x" aria-label="<?= htmlspecialchars(t('ui.close', 'Close')) ?>">&times;</button>
@@ -40,7 +40,8 @@
     document.addEventListener('click', function (e) {
         var b = e.target.closest('.cred-open');
         if (b) {
-            var src = b.parentNode.querySelector('.cred-src');
+            var src = b.parentNode.querySelector(b.getAttribute('data-src') || '.cred-src');
+            var sub = document.getElementById('cred-sub'); sub.textContent = b.getAttribute('data-label') || sub.getAttribute('data-default');
             if (!src) return;
             last = b; ttl.textContent = b.getAttribute('data-name') || '';
             body.innerHTML = src.innerHTML;          // already escaped by the server (nl2br + htmlspecialchars)
